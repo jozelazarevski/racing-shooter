@@ -912,6 +912,22 @@
   /* inside a chapter the bar IS the header — this is the placeholder the row
      builder emits in its place, and it must take up no room at all */
   .chapter-head-none{display:none}
+  /* r318 C5: the season calendar strip at the top of the chapter room */
+  .season-strip{margin:8px 0 4px;padding:8px 10px;border-radius:10px;
+    background:rgba(0,0,0,.22);border:1px solid var(--line-soft,#2a3340)}
+  .season-strip .cal-row{display:flex;flex-wrap:wrap;gap:5px}
+  .season-strip .cal-cell{flex:0 0 auto;min-width:40px;text-align:center;
+    padding:3px 6px;border-radius:7px;font-size:10px;letter-spacing:.5px;
+    color:var(--ink-soft,#9aa);background:rgba(255,255,255,.05);
+    border:1px solid transparent}
+  .season-strip .cal-cell b{display:block;font-size:12px;color:inherit}
+  .season-strip .cal-cell.run{color:var(--ink,#dde);
+    border-color:var(--line-soft,#2a3340)}
+  .season-strip .cal-cell.pod{color:var(--gold);border-color:var(--gold-dim)}
+  .season-strip .cal-foot{display:flex;flex-wrap:wrap;gap:4px 14px;
+    justify-content:space-between;margin-top:6px;font-size:11px;
+    letter-spacing:.5px;color:var(--ink-soft,#9aa)}
+  .season-strip .cal-sp{color:var(--gold-dim)}
   /* NO padding-top HERE ANY MORE. The bar was fixed and out of flow, so the
      screen had to buy back its height; in flow it takes its own room and a
      second allowance would just be a gap. */
@@ -2202,7 +2218,7 @@ body.touch #feed{right:184px}
      r309 layout (owner-requested feature; §6.11 freezes what shipped — this
      occupies the empty top-centre lane and touches nothing pinned). -->
 <div id="copilot-note" style="display:none"></div>
-<div id="build-tag">r317</div>
+<div id="build-tag">r318</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2537,10 +2553,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r317"></script>
+<script type="module" src="./src/main.js?v=r318"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r317"></script>
+<script src="./src/offline.js?v=r318"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r317"></script>
+<script type="module" src="./src/traffic.js?v=r318"></script>
 </body>
 </html>

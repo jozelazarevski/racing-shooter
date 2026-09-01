@@ -4161,6 +4161,44 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r318 — THE SEASON HAS A FACE: SPONSORS, THE CALENDAR, THE HISTORY (C5)
+
+The last of the published career design. Three small systems, all riding
+machinery that already existed — nothing new was invented to carry them.
+
+THE SPONSORS. A season podium SIGNS A BACKER for the next chapter:
+`SPONSOR_TIERS` — P1 AURUM PETROLEUM +150, P2 KESTREL TYRES +100, P3
+BOREAL TOOLS +60 (all fictional, §11.10 spirit) — written to
+`career.sponsors[k+1]` at the same `_prizePaid` moment the prize pays.
+The stipend then pays per TOP-5 finish in the sponsored chapter
+(`SPONSOR_TOP 5`), rides the C4 purse object into `earned`, and gets its
+own 🤝 row in the credit breakdown plus a feed line. Nothing is owed for
+a bad night — a sponsor is upside, not a penalty clause, which is what
+keeps it out of the economy laws' way (10/11 exact hold).
+
+THE CALENDAR STRIP. The chapter room (`_chapterIn` view) opens on
+`_renderSeasonStrip`: one cell per round in career order — banked rounds
+show your place (podiums in gold), unraced show an empty slot — and a
+foot line with your live table position, the leader, and the backer if
+one signed. A MENU element: the race HUD stays frozen (suite re-run
+green).
+
+THE HISTORY. Season completion appends ONE record to
+`career.seasonHistory` — chapter, position, points, champion, date —
+inside the `_prizePaid` guard so a replayed season cannot double-write.
+Surfaced where the player already looks: the chapter index card gains
+"🏆 CHAMPION" / "SEASON P2" on its raced/cleared line.
+
+test-career grows to 15 checks: K10 sign (tier-2 for a P2 season, next
+chapter only) + stipend law (P5 pays, P6 does not), K11 the strip (one
+cell per round, sponsor line present), K12 one history record per lived
+season. Fallout gates all hold the r316/r317 baseline exactly: ladder
+31/31, jobs 26/26, economy 10/11 (same pre-existing red), feats 12/14
+(same two), HUD freeze green.
+
+The career design artifact is now fully shipped: C1-C3 (r316), C4 purse +
+recap (r317), C5 sponsors/calendar/history (this build).
+
 ## r317 — THE PURSE AND THE RECAP (C4/C5), AND PHASE 5 CLOSES THE BOOKS
 
 Two halves: the career pays out, and the v1.5 Phase 5 regression — the

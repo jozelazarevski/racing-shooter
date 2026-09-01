@@ -12,6 +12,11 @@
  *   K5  the drivers have NAMES (no anonymous machine on the table), and
  *       none of them is a real-world name (§11.10 spirit)
  *   K6  the results card carries the standings board
+ *   K7-K9   (r317, C4) the purse: improvement pays once, the rival duel
+ *           pays live, the season prize pays once at completion
+ *   K10-K12 (r318, C5) a season podium signs a sponsor for the next
+ *           chapter (stipend on top-5 only), the chapter room carries the
+ *           calendar strip, and the season history keeps one record
  */
 import { chromium } from 'playwright-core';
 
@@ -90,10 +95,26 @@ const r = await p.evaluate(() => {
   }
   delete g.career.seasons[k]._prizePaid;
   g._pressureRival = null;
-  const p4 = g._recordSeasonRound(2);
+  delete g.career.sponsors; g.career.seasonHistory = [];
+  const p4 = g._recordSeasonRound(2);           // completes the season at P2
   const p5 = g._recordSeasonRound(2);
+  // ---- C5: the sponsor signed by that P2, the history it wrote ----
+  const signed = JSON.parse(JSON.stringify(g.career.sponsors?.[k + 1] ?? null));
+  const hist = JSON.parse(JSON.stringify(g.career.seasonHistory ?? []));
+  // the stipend law, unit level: a backer on THIS chapter pays top-5 only
+  g.career.sponsors = { [k]: { name: 'TEST BACKER', perRace: 100 } };
+  const s1 = g._recordSeasonRound(5).sponsorCr;
+  const s2 = g._recordSeasonRound(6).sponsorCr;
+  // ---- C5: the calendar strip in the chapter room (a menu, not the HUD) ----
+  g.tracksView = 'timeline';
+  g._chapterIn = ch.n;
+  g._renderLevelCards();
+  const strip = document.querySelector('#level-select .season-strip');
+  const cells = strip ? strip.querySelectorAll('.cal-cell').length : 0;
+  const stripTxt = strip ? strip.textContent.replace(/\s+/g, ' ').slice(0, 160) : null;
   const board = document.getElementById('season-board');
   return {
+    signed, hist, s1, s2, cells, rounds: ch.levels.length, stripTxt,
     p1: { pointsCr: p1.pointsCr, rivalCr: p1.rivalCr },
     p2: { pointsCr: p2.pointsCr, rivalCr: p2.rivalCr },
     p3rival: p3.rivalCr,
@@ -135,6 +156,17 @@ check('K8  beating your named rival pays; finishing behind them does not',
 check('K9  the season prize pays once at completion, never twice',
   r.p4prize > 0 && r.p5prize === 0,
   `completion P${r.p4pos} paid ${r.p4prize}, repeat ${r.p5prize}`);
+check('K10 a season P2 signs the tier-2 sponsor for the NEXT chapter',
+  r.signed?.perRace === 100 && !!r.signed?.name,
+  r.signed ? `${r.signed.name} +${r.signed.perRace}` : 'no sponsor signed');
+check('K10 the stipend pays top-5 and nothing below it',
+  r.s1 === 100 && r.s2 === 0, `P5 paid ${r.s1}, P6 paid ${r.s2}`);
+check('K11 the chapter room carries the calendar strip, one cell per round',
+  r.cells === r.rounds && (r.stripTxt ?? '').includes('🤝'),
+  `${r.cells}/${r.rounds} cells — ${r.stripTxt ?? 'no strip'}`);
+check('K12 the season history keeps ONE record per lived season',
+  r.hist.length === 1 && r.hist[0].pos === 2,
+  JSON.stringify(r.hist));
 check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();

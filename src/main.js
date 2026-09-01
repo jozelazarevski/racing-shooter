@@ -3281,6 +3281,17 @@ class Game {
   static RIVAL_BONUS_CR = 150;
   static SEASON_PRIZE_CR = [3000, 2000, 1200];
 
+  /** r318 C5: THE SPONSORS. A season podium signs a backer for the NEXT
+   *  chapter — a stipend per top-5 finish there, nothing owed for a bad
+   *  night. One sponsor per chapter, the tier set by where you finished the
+   *  season that earned it; all names fictional (§11.10 spirit). */
+  static SPONSOR_TIERS = [
+    { name: 'AURUM PETROLEUM', perRace: 150 },
+    { name: 'KESTREL TYRES', perRace: 100 },
+    { name: 'BOREAL TOOLS', perRace: 60 },
+  ];
+  static SPONSOR_TOP = 5;                      // pays rank <= this
+
   _recordSeasonRound(rank) {
     if (this.freeRoam || this.missionMode) return null;
     const k = this.chapterOf(this.level.id);
@@ -3307,9 +3318,14 @@ class Game {
     const rv = this._pressureRival;
     const rivalBeaten = !!(rv && rv.alive !== undefined
       && (this.player.progress ?? 99) >= (rv.progress ?? 0));
+    // r318 C5: the sponsor's stipend — the backer signed by the LAST season
+    // pays a fixed stipend for every top-5 in the chapter they back
+    const sp = this.career.sponsors?.[k];
     const purse = { pointsCr: gain * Game.SEASON_CR_PER_PT,
       rivalCr: rivalBeaten ? Game.RIVAL_BONUS_CR : 0,
       rivalName: rv ? (rv.driverName ?? rv.name) : null,
+      sponsorCr: sp && rank <= Game.SPONSOR_TOP ? sp.perRace : 0,
+      sponsorName: sp?.name ?? null,
       prizeCr: 0, prizePos: 0 };
     // C5: the season completes when every round of the chapter is on the
     // table — the recap speaks, and the prize pays ONCE
@@ -3324,10 +3340,26 @@ class Game {
       this.hud.feed(`${ch.name} CHAMPIONSHIP COMPLETE — YOU FINISH P${meAt}`,
         meAt <= 3 ? 'good' : 'info');
       if (meAt <= 3) this.hud.feed('SEASON PODIUM — THE NEXT CHAPTER IS OPEN', 'good');
+      // r318 C5: the record and the backer, both written at this one moment.
+      // History is append-only — a season lived is a season kept.
+      (this.career.seasonHistory ??= []).push({
+        k, name: ch.name, pos: meAt,
+        pts: table[meAt - 1]?.[1] ?? 0, champion: table[0]?.[0] ?? 'YOU',
+        when: Date.now(),
+      });
+      const tier = meAt <= 3 ? Game.SPONSOR_TIERS[meAt - 1] : null;
+      if (tier && this.chapters()[k + 1]) {
+        (this.career.sponsors ??= {})[k + 1] = {
+          name: tier.name, perRace: tier.perRace, from: ch.name, pos: meAt,
+        };
+        this.hud.feed(`${tier.name} SIGNS YOU — +${tier.perRace} CR PER TOP-${Game.SPONSOR_TOP}`
+          + ' IN THE NEXT CHAPTER', 'good');
+      }
     }
     this.hud.feed(`CHAMPIONSHIP: P${meAt} — ${table[meAt - 1]?.[1] ?? 0} PTS (+${rec.you})`,
       meAt <= 3 ? 'good' : 'info');
     if (purse.rivalCr) this.hud.feed(`${purse.rivalName} BEATEN  +${purse.rivalCr} CR`, 'good');
+    if (purse.sponsorCr) this.hud.feed(`${purse.sponsorName} PAYS  +${purse.sponsorCr} CR`, 'good');
     this._renderSeasonBoard(k, meAt);
     return purse;
   }
@@ -3375,6 +3407,35 @@ class Game {
       + `<span>${i + 1}. ${n}</span><b>${p}</b></div>`).join('');
     box.innerHTML = `<div style="letter-spacing:1.5px;font-weight:800;margin-bottom:4px">`
       + `🏁 ${name} CHAMPIONSHIP</div>${rows}`;
+  }
+
+  /** r318 C5: THE CALENDAR STRIP — the season at a glance, at the top of the
+   *  chapter room. One cell per round in career order: your banked place, or
+   *  an empty slot still to run; under it, where you stand in the table and
+   *  who backs you. A menu element — the race HUD stays frozen. */
+  _renderSeasonStrip(sel, c) {
+    const k = c._k;
+    const ss = this.career.seasons?.[k] ?? {};
+    const table = this.seasonTable(k);
+    const meAt = table.findIndex(([n]) => n === 'YOU') + 1;
+    const raced = c.levels.filter((l) => ss[l.id]).length;
+    const cells = c.levels.map((lv, i) => {
+      const r = ss[lv.id];
+      const cls = r ? (r.place <= 3 ? ' pod' : ' run') : '';
+      return `<span class="cal-cell${cls}" title="${lv.name}">R${i + 1}`
+        + `${r ? `<b>P${r.place}</b>` : '<b>·</b>'}</span>`;
+    }).join('');
+    const sp = this.career.sponsors?.[k];
+    const lead = table[0];
+    const strip = document.createElement('div');
+    strip.className = 'season-strip';
+    strip.innerHTML = `<div class="cal-row">${cells}</div>
+      <div class="cal-foot">
+        <span>🏁 ${raced ? `P${meAt} · ${table[meAt - 1]?.[1] ?? 0} PTS` : 'SEASON NOT STARTED'}${
+  raced && lead && lead[0] !== 'YOU' ? ` — ${lead[0]} LEADS ON ${lead[1]}` : ''}</span>
+        ${sp ? `<span class="cal-sp">🤝 ${sp.name} · +${sp.perRace} CR PER TOP-${Game.SPONSOR_TOP}</span>` : ''}
+      </div>`;
+    sel.appendChild(strip);
   }
 
   /** Stars banked inside one chapter, and the most it can hold. */
@@ -3951,8 +4012,11 @@ class Game {
       card.dataset.chn = c.n;
       // The shut card names its price in the PREVIOUS chapter's terms, because
       // that is where the player has to go and do something about it.
+      // r318 C5: a lived season is part of the card — the history in one word
+      const hist = (this.career.seasonHistory ?? []).find((h) => h.k === c._k);
       const line = open
-        ? `${raced}/${c.levels.length} RACED · ${done} CLEARED`
+        ? `${raced}/${c.levels.length} RACED · ${done} CLEARED${
+  hist ? ` · ${hist.pos === 1 ? '🏆 CHAMPION' : `SEASON P${hist.pos}`}` : ''}`
         : `NEEDS ${short}★ MORE IN CHAPTER ${prev ? prev.n : ''}`;
       card.innerHTML = `
         <div class="cc-top">
@@ -4068,7 +4132,11 @@ class Game {
       return;
     }
     sel.classList.toggle('ch-inside', !!inChapter);
-    if (inChapter) this._fillTopbar(inChapter);
+    if (inChapter) {
+      this._fillTopbar(inChapter);
+      // r318 C5: the chapter room opens on its season calendar
+      this._renderSeasonStrip(sel, inChapter);
+    }
     // THE LADDER IS ONE LADDER. Regions do not run in contiguous blocks of
     // career order — PINE VALLEY owns rungs 1, 6, 11, 12, 13 — so grouping the
     // timeline by region produces a "sequence" that counts 1, 6, 11, 3, and
@@ -10424,8 +10492,10 @@ class Game {
     // r317 C4: the championship purse joins the pot (points pay only their
     // improvement; the rival duel pays live; the season prize pays once)
     const purse = this._recordSeasonRound(rank)
-      ?? { pointsCr: 0, rivalCr: 0, prizeCr: 0, prizePos: 0, rivalName: null };
-    const purseCr = purse.pointsCr + purse.rivalCr + purse.prizeCr;
+      ?? { pointsCr: 0, rivalCr: 0, prizeCr: 0, prizePos: 0, rivalName: null,
+        sponsorCr: 0, sponsorName: null };
+    const purseCr = purse.pointsCr + purse.rivalCr + purse.prizeCr
+      + (purse.sponsorCr ?? 0);
     const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr + purseCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
@@ -10450,6 +10520,7 @@ class Game {
         if (purse.pointsCr) html += `<div class="cb-row"><span>🏁 CHAMPIONSHIP POINTS</span><b>+${purse.pointsCr}</b></div>`;
         if (purse.rivalCr) html += `<div class="cb-row"><span>🏁 ${purse.rivalName} BEATEN</span><b>+${purse.rivalCr}</b></div>`;
         if (purse.prizeCr) html += `<div class="cb-row"><span>🏆 SEASON P${purse.prizePos} PRIZE</span><b>+${purse.prizeCr}</b></div>`;
+        if (purse.sponsorCr) html += `<div class="cb-row"><span>🤝 SPONSOR — ${purse.sponsorName}</span><b>+${purse.sponsorCr}</b></div>`;
         for (const c of this.contracts ?? []) {
           // A MISSED JOB IS NOT A LOST JOB. A bare "✗ JOB · CLEAN SWEEP —"
           // reads as forfeited, when in fact it is still in hand and RACE
