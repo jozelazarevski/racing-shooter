@@ -2083,7 +2083,7 @@ export class Car {
     // design, and giving them the player's spread would just add noise to a
     // field that is already balanced by aiSpeed and the rubber band.
     const surf = this.game.track?.T?.surface;
-    const loose = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
+    const loose = this.offroadSkill ?? 0.7;   // r312: rivals carry their machine's skill
     // HOW MUCH THIS SURFACE ASKS OF THE TYRE — 1 on ice, 0.55 in the wet, 0 on
     // a dry road. Everything below scales off this one number, so "slippery"
     // is a property of the surface rather than three unrelated constants.
@@ -2203,8 +2203,16 @@ export class Car {
         // drag), and an unscaled cap made half throttle produce full force.
         // The pedal now scales the cap, so partial throttle is partial
         // drive, like an engine and unlike a cliff.
+        // r312: THE ACCEL STAT LIVES AGAIN. Since r293 the traction cap IS
+        // the engine (launchCapFade 99), and the cap had no accel term —
+        // FLATSIX (42) and PIT-99 (36) launched identically, their cards
+        // lying. A torquier drivetrain works its tyre harder: the cap
+        // scales with accel around the BRAWLER reference, bounded so no
+        // machine doubles its tyre or falls under 85% of it.
+        const accelMul = Math.min(1.18, Math.max(0.85,
+          this.accel / (DRIVING.accelRef ?? 36.5)));
         const tractA = DRIVING.launchTraction * (this._gripBudget ?? this.grip)
-          * Math.max(0.1, inputs.throttle);
+          * accelMul * Math.max(0.1, inputs.throttle);
         const capBlend = THREE.MathUtils.clamp(1 - Math.abs(vf) / (ref * DRIVING.launchCapFade), 0, 1);
         const driveA = wantA > tractA ? tractA + (wantA - tractA) * (1 - capBlend) : wantA;
         // wheelspin is a FIRST-GEAR event: this feed once faded with
@@ -2412,7 +2420,7 @@ export class Car {
     if (this._wetT > 0) {
       this._wetT -= dt;
       if ((this._wetMax ?? 0) > 1) {
-        const skill = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
+        const skill = this.offroadSkill ?? 0.7;   // r312: rivals carry their machine's skill
         const loss = 0.46 * (1 - 0.42 * skill);
         gripBudget *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
       } else {
@@ -4533,19 +4541,29 @@ export class EnemyCar extends Car {
     // Normalising on the field keeps the band exactly where it was measured
     // whatever the grid holds.
     const f = fieldSize > 1 ? slot / (fieldSize - 1) : 0;
+    // r312 (user: "not all cars have same 0-100... same with turnings"):
+    // RIVALS DRIVE THEIR MACHINES. Every roster name IS a catalogue car,
+    // yet the grid ran a flat stat ramp with grip 5.8 for all — identical
+    // hardware plus the rubber band was the "one pack" look from the
+    // start lights on. Each rival now takes ITS car's showroom stats at a
+    // 0.96 handicap (the grid must never beat the showroom outright), a
+    // small slot jitter on top so two races never feel identical, and its
+    // machine's real off-road skill — a DUNE rival shines on sand, a
+    // CROWN is a passenger there, exactly like the cards say.
+    const machine = CAR_CATALOG.find((c) => c.spec.name === spec.name
+      || c.name === spec.name)?.stats
+      ?? { maxSpeed: 55, accel: 36, grip: 5.2, offroad: 0.7 };
+    const H = 0.96;
     super(game, buildCarMesh(spec), {
-      maxSpeed: 53 + f * 4.4 + Math.random() * 1.4, // ~53..58.8 across the grid (player: 56..63)
-      // ~34.5..39.2 — deliberately INSIDE the garage's range (player cars are
-      // 36..40). The old 36..43 spread put the two quickest rivals above every
-      // car you can buy, and they out-dragged the starter BRAWLER off the line
-      // by 0.27s to 40 u/s (18%) — the grid must never beat the showroom.
-      accel: 34.5 + f * 3.4 + Math.random() * 1.3,
-      grip: 5.8,
+      maxSpeed: machine.maxSpeed * H + f * 0.8 + Math.random() * 0.8,
+      accel: machine.accel * H + Math.random() * 0.8,
+      grip: machine.grip * H + 0.25,   // +0.25: the planner needs a touch in hand
       steerRate: 3.0,
       driftLag: 0.12, // planted enough to hold the racing line
     });
     this.spec = spec;
     this.name = spec.name;
+    this.offroadSkill = machine.offroad ?? 0.7;
     this.maxHealth = this.health = 70;
     this.respawnDelay = 5;
     this.baseMaxSpeed = this.maxSpeed;   // difficulty/rubber-band scale on top of this
@@ -5455,7 +5473,7 @@ export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
     spec: { name: 'BRAWLER', style: 'brawler', body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX' },
-    stats: { maxSpeed: 55.5, accel: 36.5, grip: 4.85, health: 96, offroad: 0.70, nitroPower: 0.98, plating: 1.02 },
+    stats: { maxSpeed: 55.5, accel: 36.5, grip: 4.85, health: 96, offroad: 0.70, nitroPower: 0.98, plating: 1.02, steer: 2.5, driftL: 0.22 },
   },
   {
     // Was quietly the best car in the game: the highest grip in the catalogue
@@ -5465,17 +5483,17 @@ export const CAR_CATALOG = [
     // on top end and hopeless once the surface turns.
     key: 'sleek', name: 'SLEEK', price: 4000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 53, accel: 39, grip: 5.65, health: 84, offroad: 0.38, nitroPower: 1.12, plating: 1.10 },
+    stats: { maxSpeed: 53, accel: 39, grip: 5.65, health: 84, offroad: 0.38, nitroPower: 1.12, plating: 1.10, steer: 2.75, driftL: 0.19 },
   },
   {
     key: 'crown', name: 'CROWN', price: 8000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 64, accel: 36, grip: 4.60, health: 82, offroad: 0.35, nitroPower: 1.02, plating: 1.06 },
+    stats: { maxSpeed: 64, accel: 36, grip: 4.60, health: 82, offroad: 0.35, nitroPower: 1.02, plating: 1.06, steer: 2.35, driftL: 0.24 },
   },
   {
     key: 'dune', name: 'DUNE', price: 13000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 55, accel: 38, grip: 5.32, health: 110, offroad: 1.02, nitroPower: 0.92, plating: 0.95 },
+    stats: { maxSpeed: 55, accel: 38, grip: 5.32, health: 110, offroad: 1.02, nitroPower: 0.92, plating: 0.95, steer: 2.55, driftL: 0.20 },
   },
   {
     // A 911 IS A SEALED-SURFACE CAR, and the tyre rule means that is a real
@@ -5494,7 +5512,7 @@ export const CAR_CATALOG = [
     // anything else here. Deliberately NOT the grip or nitro leader; taking
     // either would have made an existing card lie about its own machine.
     stats: { maxSpeed: 58, accel: 42, grip: 5.35, health: 84, offroad: 0.42,
-      nitroPower: 1.12, plating: 1.0 },
+      nitroPower: 1.12, plating: 1.0, steer: 2.6, driftL: 0.18 },
   },
   {
     // ...AND THE ESTATE ON THE SAME BADGE IS THE OPPOSITE ANSWER: offroad 0.88
@@ -5506,7 +5524,7 @@ export const CAR_CATALOG = [
     spec: { name: 'BASTION', style: 'bastion', body: 0x1f2a38, accent: 0xc8ccd2,
       stripe: [0xc8ccd2], number: 9, brand: 'ZENITH', rims: GOLD },
     stats: { maxSpeed: 58, accel: 38.5, grip: 5.15, health: 124, offroad: 0.92,
-      nitroPower: 1.0, plating: 1.10 },
+      nitroPower: 1.0, plating: 1.10, steer: 2.45, driftL: 0.22 },
   },
   {
     // The ALPINE was the one machine that was never the right answer: lowest
@@ -5518,7 +5536,7 @@ export const CAR_CATALOG = [
     // open circuits.
     key: 'alpine', name: 'ALPINE', price: 22000, desc: 'Mountain drifter',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 56, accel: 39, grip: 5.45, health: 98, offroad: 0.84, nitroPower: 1.20, plating: 1.04 },
+    stats: { maxSpeed: 56, accel: 39, grip: 5.45, health: 98, offroad: 0.84, nitroPower: 1.20, plating: 1.04, steer: 2.7, driftL: 0.26 },
   },
   {
     // The most expensive machine in the game could not win a lap anywhere — it
@@ -5527,7 +5545,7 @@ export const CAR_CATALOG = [
     // still takes the least damage doing it.
     key: 'pit', name: 'PIT-99', price: 32000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 61, accel: 36, grip: 5.05, health: 132, offroad: 0.48, nitroPower: 0.85, plating: 0.78 },
+    stats: { maxSpeed: 61, accel: 36, grip: 5.05, health: 132, offroad: 0.48, nitroPower: 0.85, plating: 0.78, steer: 2.3, driftL: 0.24 },
   },
 ];
 
@@ -5536,7 +5554,8 @@ export class PlayerCar extends Car {
     const entry = catalogEntry ?? CAR_CATALOG[0]; // default ride: the brawler
     super(game, buildCarMesh(entry.spec), {
       maxSpeed: entry.stats.maxSpeed, accel: entry.stats.accel, grip: entry.stats.grip,
-      steerRate: 2.7, driftLag: 0.25, steerTaper: 0.26,
+      steerRate: entry.stats.steer ?? 2.5, driftLag: entry.stats.driftL ?? 0.22,
+      steerTaper: 0.26,
     });
     this.catalogKey = entry.key;
     this.maxHealth = this.health = entry.stats.health;

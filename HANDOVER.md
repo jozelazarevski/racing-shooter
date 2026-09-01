@@ -4161,6 +4161,71 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r312 — THE MACHINES DIFFER: 0-100, CORNERING AND HANDLING ARE THE CAR'S OWN
+Owner, between phases: "In my opinion not all cars have same 0-100kmph so
+start should be different same with turnings corner handling etc." He is
+right three times over, and each was a distinct defect:
+
+THE LAUNCH WAS ONE LAUNCH. The traction cap (launchTraction × gripBudget)
+never asked the ENGINE — a FLATSIX (ACC 42, the catalogue's headline
+holder) and a PIT-99 (36) left the line identically, their cards lying.
+The cap now scales with accel around a new `accelRef: 36.5` datum (the
+BRAWLER's own figure, so drivingspec 12.1's 5.8 ± 0.3 anchor is untouched
+by construction), bounded [0.85, 1.18] so no machine doubles its tyre.
+Measured on MONZA (dry, sealed — see below for why the stage matters):
+FLATSIX 2.77 s, SLEEK 2.83, ALPINE 2.95, DUNE 3.13, BASTION 3.20, PIT-99
+3.57, BRAWLER 3.68, CROWN 4.02 — a 1.25 s spread where there was none.
+
+STEERING AND DRIFT WERE ONE CAR. Every player machine ran steerRate 2.7 /
+driftLag 0.25 hardcoded in the build path (and the swap path set neither).
+The catalogue now carries `steer` and `driftL` per car — SLEEK 2.75/.19
+the scalpel, PIT-99 2.3/.24 the barge, ALPINE 2.7/.26 the mountain
+drifter — read by both the build and swapPlayerCar paths. Measured at a
+held 70 km/h full-lock: SLEEK turns 136° where CROWN turns 110°.
+
+THE GRID WAS ONE PACK IN SEVEN PAINTS. Every rival name IS a catalogue
+car, yet EnemyCar ran a flat ramp (grip 5.8 for all, maxSpeed off the
+slot). Each rival now takes ITS machine's showroom stats at a 0.96
+handicap (the grid never beats the showroom — asserted per rival), slot
+jitter on top, +0.25 grip for the planner, and its car's real offroadSkill
+wired into the loose/wet/ford laws that used to hardcode 0.7 — a DUNE
+rival shines on sand exactly like its card, a CROWN is a passenger there.
+
+THE TEST THAT MEASURED THE WRONG THING, TWICE (tests/test-machines.mjs,
+11 checks): the first cut timed 0-100 on PINE VALLEY and three machines
+"never reached 100" — the stage's first corner arrives before a 36-accel
+car gets there, so the clock timed the CORNER (fixed with drivingspec
+12.4's loop-back hop: an endless straight made of real road). The second
+cut ran on NEON GRID and ALPINE beat FLATSIX — that expressway's
+glass-asphalt is surface:'wet', where keep() lets the OFF-ROAD stat buy
+traction back, so the wet world was telling ITS truth, not answering the
+dry question. M1 now runs on MONZA. Also caught live: the python edit had
+left duplicate steerRate/driftLag keys in the build path (the old
+hardcodes silently won — deleted), and a bare swapPlayerCar launches every
+machine on the OLD car's tyre class because the garage sets cars.selected
+first (the test now models the real flow).
+
+FOUND STANDING RED, NOT OURS, FIXED ANYWAY: drivingspec 12.1/12.3 were red
+on the pristine r311 tree too — r310's start rotation had quietly broken
+both anchors on PINE (the first corner now arrives ~7 s off the line, so
+12.1 timed the CORNER at 96 km/h; idx 60 is mid-corner, so lateral scrub
+"braked" 10 m of 12.3's stop; and idx 10 sits IN a ford — every placement
+re-wet the tyres, aquaplane ×0.42 at launch). Forensic worth keeping: the
+r293 tuning comment's a(v) = 6.6 − 0.122·v is launchTraction 1.89 × 3.51,
+and 3.51 is PINE's WET-plateau grip budget (grip 4.85 × keep(0.6)) —
+PINE's surface is 'wet', so the spec's 5.8 s / 42 m were always the wet
+plateau's numbers. The runs now use the rotated lap's one dry straight
+window (idx 220, 46 m at radius ≥ 184, measured by scan) with the rig's
+water state cleared, and pin the same engine's dry figures: 5.18 s / 34.2
+m (5.2 ± 0.3 / 34 ± 3). Engine untouched — these are regression pins.
+
+Files: vehicles.js (catalog steer/driftL ×8, EnemyCar machine lookup,
+offroadSkill un-hardcoded ×3, accelMul cap, build-path reads), main.js
+(swap-path steer/driftL reads), driving.js + driving.json (accelRef),
+tests/test-machines.mjs (new), tests/test-drivingspec.mjs (12.1/12.3
+re-anchored). Battery, all green: drivingspec / cars / machines / drift /
+duel-rival / slowfield / field-stalls / killspos / route / rules.
+
 ## r311 — v1.5 PHASE 2: PROGRESS-BASED STUCK, AND KILLS FINALLY MOVE THE ORDER
 Build "next+1": §3.6 + §6.10.
 

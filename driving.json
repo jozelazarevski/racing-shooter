@@ -1,6 +1,7 @@
 {
   "launchTraction": 1.89,
   "launchCapFade": 99,
+  "accelRef": 36.5,
   "dragPower": 0.122,
   "dragCoast": 0.14,
   "dragOffRoad": 0.35,

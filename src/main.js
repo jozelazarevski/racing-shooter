@@ -3089,6 +3089,10 @@ class Game {
     p.maxSpeed = entry.stats.maxSpeed;
     p.accel = entry.stats.accel;
     p.grip = entry.stats.grip;
+    // r312 MACHINES DIFFER: steering authority and drift response follow
+    // the machine too, not just the engine — same reads as the build path.
+    p.steerRate = entry.stats.steer ?? 2.5;
+    p.driftLag = entry.stats.driftL ?? 0.22;
     p.maxHealth = entry.stats.health;
     p.offroadSkill = entry.stats.offroad;
     p.nitroPower = entry.stats.nitroPower ?? 1;
