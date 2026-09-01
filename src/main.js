@@ -5144,6 +5144,11 @@ class Game {
       }
     }
     if (st.cam.aspect) this._frameStage(st);
+    // r322: THE UPDATE IS ON SCREEN THE SAME TICK. A buy rebuilds the mesh
+    // above; if the loop happens to be stopped or between frames, the old
+    // car (or nothing) would sit on the canvas until it came round. Paint
+    // now — the purchase and the picture are one moment.
+    if (st.cvs.isConnected) this._stagePaint(st);
   }
 
   /** FRAME THE CAR FROM THE CAR, not from a guessed number.
@@ -5187,8 +5192,28 @@ class Game {
     st.cam.updateProjectionMatrix();
   }
 
-  /** Start or stop the loop. The ONLY thing that should ever keep it running
-   *  is the garage tab being visible on the title screen. */
+  /** r322: ONE FRAME, NOW. Size, frame and render synchronously, so the
+   *  canvas is never blank however the loop is gated — the report was the
+   *  turntable arriving empty or frozen until its start conditions happened
+   *  to line up ("make this rotating car always visible... immediately"). */
+  _stagePaint(st) {
+    const w = st.cvs.clientWidth || 300;
+    const h = st.cvs.clientHeight || 190;
+    if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
+      st.w = w; st.h = h; st.framedFor = st.sig;
+      st.r.setSize(w, h, false);
+      st.cam.aspect = w / h;
+      st.cam.updateProjectionMatrix();
+      this._frameStage(st);
+    }
+    st.r.render(st.scene, st.cam);
+  }
+
+  /** Start or stop the loop. It runs exactly while the canvas is actually
+   *  DISPLAYED — offsetParent answers that wherever the garage was reached
+   *  from, which the old title-screen/tab bookkeeping did not (entering via
+   *  BACK TO GARAGE off the results card left the gate false and the
+   *  turntable dark). Starting paints a frame before the first tick. */
   _stageRun(on) {
     const st = this.__stage;
     if (!st) return;
@@ -5198,12 +5223,10 @@ class Game {
       return;
     }
     if (st.raf) return;
+    if (st.cvs.isConnected) this._stagePaint(st);
     const tick = (t) => {
       st.raf = requestAnimationFrame(tick);
-      const vis = this.state === 'title'
-        && !document.getElementById('title-screen')?.classList.contains('hidden')
-        && document.getElementById('tab-btn-garage')?.classList.contains('current')
-        && st.cvs.isConnected;
+      const vis = st.cvs.isConnected && st.cvs.offsetParent !== null;
       if (!vis) { this._stageRun(false); return; }
       if (t - st.last < 33) return;                    // 30fps is plenty for a turntable
       const dt = Math.min(0.1, (t - st.last) / 1000);
@@ -5227,16 +5250,7 @@ class Game {
         p.m.rotation.set(k * 1.1, k * 1.7 * p.side, 0);
         p.m.material.opacity = Math.sin(Math.PI * k) ** 1.4 * 0.26;
       }
-      const w = st.cvs.clientWidth || 300;
-      const h = st.cvs.clientHeight || 190;
-      if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
-        st.w = w; st.h = h; st.framedFor = st.sig;
-        st.r.setSize(w, h, false);
-        st.cam.aspect = w / h;
-        st.cam.updateProjectionMatrix();
-        this._frameStage(st);
-      }
-      st.r.render(st.scene, st.cam);
+      this._stagePaint(st);
     };
     st.last = performance.now();
     st.raf = requestAnimationFrame(tick);

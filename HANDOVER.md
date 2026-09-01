@@ -4161,6 +4161,46 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r322 — THE TURNTABLE NEVER ARRIVES DARK, AND SPEC v2.3 LANDS
+
+Owner: "Make this rotating car always visible when I go over and update
+it. So it is visible immediately." Two causes found in the stage loop:
+- Its visibility gate was BOOKKEEPING, not visibility: `state ===
+  'title'` && the title screen unhidden && the garage tab `.current`.
+  Reach the garage any way that bookkeeping did not anticipate (BACK TO
+  GARAGE off the results card) and the gate read false — the loop shut
+  itself down on its first tick and the canvas sat dark or frozen.
+- Even on the happy path the first tick fell into the 30 fps throttle
+  (`t - st.last < 33` with `last` stamped at arm time), so the first
+  PAINT was always a frame or two late.
+
+The fix is one primitive: `_stagePaint(st)` — size, frame, render, NOW,
+synchronously. `_stageRun(true)` paints before arming the loop;
+`_stageSync` paints after every mesh swap, so a purchase and its
+picture are the same moment even if the loop is stopped; and the loop's
+gate is now the truth — `cvs.isConnected && offsetParent !== null` —
+which runs the turntable exactly while it is actually displayed,
+wherever the garage was reached from, and still stops it cold behind
+the race or another tab. The tick's own sizing block collapsed into the
+same primitive (one copy of the resize/frame logic instead of two).
+
+test-showroom grows to 11: S6 entering the garage stamps a synchronous
+paint before any animation frame; S7 a build change repaints with the
+loop deliberately stopped; S8 the loop keeps turning with the canvas
+displayed and `state` off 'title' (the exact BACK TO GARAGE hole).
+parts 30/30 and the HUD freeze hold.
+
+CLAUDE.md v2.3 IS IN THE REPO (root, verbatim; supersedes the v1.5
+working spec this cycle was built against). New in 2.3, registered as
+the B1-B7 queue: the recording-F fourth-pass faults — progress metric
+frozen on the strip, field-wide stall, floating foundations (7.13),
+pickups inside terrain (7.12), daylight drop-lip readability (7.9 rock
+band), road-slab conform (3.8/7.11), camera close-clamp (3.9), traffic
+that rivals must PASS (5.7), respawn velocity (3.6a) — plus the
+acceptance queries P9-P12, S1b, S10, X1. Much of B4/B5 shipped in
+r310-r313; the queue is to VERIFY against the new queries before
+rebuilding anything.
+
 ## r321 — THE SHOWROOM (owner: "more exciting, increase the graphics, more details and complexity")
 
 The garage screen, sent back with that note. Three layers, all menus —
