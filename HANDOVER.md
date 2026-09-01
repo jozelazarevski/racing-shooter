@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r305 — THE WEAPONS BECOME ONE LINE, AND THE BOTTOM EDGE IS RENEGOTIATED
+User (with a live one-thumb screenshot): "Make the fire bombs rocket and
+all at one line at the bottom, increase the buttons a bit." The r300
+2x2 quad becomes a single right-anchored row — mine/missile/shock/
+nitro at 56px (was 46), FIRE 88 (was 80) — with SHARED X-ADDRESSES in
+both schemes (right 302/238/174/110/14). Heights differ per scheme
+because the floors differ, and that is now LAW: one-thumb rides the
+bottom edge at b12 (the ring rest moved 110→150px up on tall portraits
+— input.js rest(); landscape's 0.22·h term unchanged), two-thumb sits
+at b132 above its pedals. H5 is AMENDED to match: x-addresses must
+hold across schemes, y follows the floor, UNSTUCK still holds both
+axes. Furniture that had to move: one-thumb DRIFT stacks ABOVE FIRE
+(b112 — thumb rolls up the same edge), UNSTUCK up to b250 (clear of
+the raised ring top ~632 and the mine button), the gauge into the free
+lane (one-thumb 50%+17/b110 between ring and DRIFT column; two-thumb
+50%−60/b200). CASCADE LESSON, PAID TWICE NOW: landscape gauge homes
+put BEFORE the base rules lost the cascade silently (a media query
+adds no specificity) — they live in their own media block AFTER the
+base rules, with a comment saying why. Small-portrait UNSTUCK threads
+the feed-to-ring gap at b200 (y312-368 measured on 320x568).
+Gates: test-mobile-hud 24/24 (six combos), test-hudreview 15/15 with
+the amended H5. Tag r305.
+
 ## r304 — "I CAN'T DRIVE BACKWARDS": THE GEAR WORKED, EVERYTHING AROUND IT FOUGHT
 Measure before tuning, again: the reverse LAW was fine (hard brake ≥0.6
 held 0.45 s at standstill → 5 m/s² backwards, r288, verified −8.8 m/s

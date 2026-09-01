@@ -78,7 +78,10 @@ export class Input {
       // the HULL INTEGRITY panel, which is where it was photographed. Changing
       // the ZONE's height does not move it: the first attempt at this fix
       // shrank the zone and the overlap came back identical to the pixel.
-      base.style.top = (r.height - Math.min(110, innerHeight * 0.22)) + 'px';
+      // 150 on tall portraits (r305): the weapon row owns the bottom 80px
+      // now, so the ring rests 40px higher there. The 0.22 term still
+      // governs landscape (390 tall -> 86), unchanged.
+      base.style.top = (r.height - Math.min(150, innerHeight * 0.22)) + 'px';
       base.classList.remove('live');
       setKnob(0, 0);
     };

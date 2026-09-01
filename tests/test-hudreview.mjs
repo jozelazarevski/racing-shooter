@@ -125,7 +125,11 @@ check('H3  the danger lane shows the LATEST only; other lanes untouched',
   h3.danger === 1 && h3.dangerText.includes('−25') && h3.progress === 0 && h3.chatter === 0,
   `danger=${h3.danger} ("${h3.dangerText}"), progress=${h3.progress}, chatter=${h3.chatter}`);
 
-// ---- H5: scheme toggle moves NOTHING in the weapon cluster -----------------
+// ---- H5 (amended r305): the weapon ROW keeps its X-ADDRESSES across
+// schemes — the muscle-memory that matters is which button is where along
+// the line. Its HEIGHT follows each scheme's floor (one-thumb rides the
+// bottom edge, two-thumb sits above its pedal row), so Y is per-scheme by
+// design; UNSTUCK still holds both axes. --------------------------------
 const h5 = await p.evaluate(() => {
   document.body.classList.add('touch');
   document.body.classList.remove('two-thumb');
@@ -138,11 +142,13 @@ const h5 = await p.evaluate(() => {
   document.body.classList.add('two-thumb');
   const two = grab();
   document.body.classList.remove('touch', 'two-thumb');
-  const moved = ids.filter((id) => one[id][0] !== two[id][0] || one[id][1] !== two[id][1]);
-  return { moved };
+  const movedX = ids.filter((id) => one[id][0] !== two[id][0]);
+  const sosMovedY = one['t-unstuck'][1] !== two['t-unstuck'][1];
+  return { movedX, sosMovedY };
 });
-check('H5  weapon cluster and UNSTUCK hold their ground across schemes',
-  h5.moved.length === 0, h5.moved.length ? `moved: ${h5.moved.join(', ')}` : '');
+check('H5  the weapon row keeps its x-addresses across schemes; UNSTUCK holds both',
+  h5.movedX.length === 0 && !h5.sosMovedY,
+  h5.movedX.length ? `x moved: ${h5.movedX.join(', ')}` : h5.sosMovedY ? 'UNSTUCK y moved' : '');
 
 // ---- H6 (reversed, §3.5): rivals get NO arrow; a hunting missile does -----
 const h6 = await p.evaluate(() => {
