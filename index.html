@@ -1350,6 +1350,23 @@
     font-size:10px;font-weight:700;letter-spacing:.6px;color:#e2c9a2}
   #build-preview .bp-spec span{padding:2px 7px;border-radius:5px;
     background:rgba(0,0,0,.35);border:1px solid var(--line-soft)}
+  /* r321 THE SPEC SHEET — six live bars off the player object. The notch
+     (u) is the STOCK value: everything right of it is what the money bought. */
+  #build-preview .bp-sheet{display:flex;flex-direction:column;gap:4px;margin-top:3px}
+  #build-preview .sp-row{display:grid;grid-template-columns:44px 1fr 86px;
+    gap:8px;align-items:center}
+  #build-preview .sp-row i{font-style:normal;font-size:8.5px;font-weight:800;
+    letter-spacing:1.2px;color:var(--gold-dim);text-align:right}
+  #build-preview .sp-bar{position:relative;height:9px;border-radius:5px;
+    background:rgba(0,0,0,.42);border:1px solid rgba(255,233,168,.14);overflow:hidden}
+  #build-preview .sp-bar b{position:absolute;inset:0 auto 0 0;border-radius:4px;
+    background:linear-gradient(90deg,#8a6a2a,var(--yellow) 70%,#ffe9a8);
+    box-shadow:0 0 8px rgba(255,214,90,.35);transition:width .5s ease}
+  #build-preview .sp-bar u{position:absolute;top:-1px;bottom:-1px;width:2px;
+    background:rgba(20,14,8,.85)}
+  #build-preview .sp-row em{font-style:normal;font-size:10px;font-weight:800;
+    letter-spacing:.4px;color:var(--cream);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
   /* the four numbers the whole screen exists to move */
   #build-preview .bp-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 6px;margin-top:2px}
   #build-preview .bp-nums span{display:flex;align-items:baseline;gap:4px}
@@ -1409,7 +1426,11 @@
   .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
     background:rgba(12,8,3,.4);padding:8px 9px 9px}
   .bay-head{display:flex;align-items:center;gap:7px;margin:0 0 7px;
-    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream)}
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream);
+    padding-bottom:5px;
+    border-bottom:1px solid transparent;
+    border-image:linear-gradient(90deg,var(--gold-dim),transparent 65%) 1}
+  .bay-head span:first-child{filter:drop-shadow(0 0 6px rgba(255,214,90,.45))}
   .bay-msg{margin:6px 2px 0;padding:6px 8px;border-radius:7px;font-size:10.5px;
     line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
     background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
@@ -1427,6 +1448,26 @@
     background:linear-gradient(180deg,rgba(255,140,26,.3),rgba(255,140,26,.1));
     box-shadow:0 2px 0 var(--ink),0 0 16px rgba(255,140,26,.35),
       inset 0 0 18px rgba(255,180,90,.18)}
+  /* r321 SHOWROOM DRAMA — lift on hover, a light sweep over the FITTED part,
+     art on a soft radial glow. Everything animated sits behind a
+     reduced-motion gate, and nothing here moves the race HUD. */
+  @media (hover:hover){
+    .part-card:not(.blocked):hover{transform:translateY(-2px);
+      border-color:var(--gold-dim);box-shadow:0 6px 14px rgba(0,0,0,.45)}
+  }
+  .part-card .pc-art{background:radial-gradient(ellipse 60% 45% at 50% 55%,
+    rgba(255,214,120,.14),transparent 70%)}
+  .part-card.on{overflow:hidden}
+  @media (prefers-reduced-motion:no-preference){
+    .part-card.on::after{content:'';position:absolute;top:0;bottom:0;width:36%;
+      left:-40%;transform:skewX(-18deg);pointer-events:none;
+      background:linear-gradient(90deg,transparent,rgba(255,236,180,.20),transparent);
+      animation:pc-shine 3.2s ease-in-out infinite}
+    @keyframes pc-shine{0%,55%{left:-40%}85%,100%{left:120%}}
+    .up-buy:not(:disabled):not(.maxed){animation:buy-pulse 2.4s ease-in-out infinite}
+    @keyframes buy-pulse{0%,100%{box-shadow:0 2px 0 var(--ink)}
+      50%{box-shadow:0 2px 0 var(--ink),0 0 12px rgba(255,214,90,.55)}}
+  }
 
   .part-card .pc-art{width:100%;max-width:132px;height:auto;
     filter:drop-shadow(0 4px 7px rgba(0,0,0,.6))}
@@ -2218,7 +2259,7 @@ body.touch #feed{right:184px}
      r309 layout (owner-requested feature; §6.11 freezes what shipped — this
      occupies the empty top-centre lane and touches nothing pinned). -->
 <div id="copilot-note" style="display:none"></div>
-<div id="build-tag">r320</div>
+<div id="build-tag">r321</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2553,10 +2594,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r320"></script>
+<script type="module" src="./src/main.js?v=r321"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r320"></script>
+<script src="./src/offline.js?v=r321"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r320"></script>
+<script type="module" src="./src/traffic.js?v=r321"></script>
 </body>
 </html>
