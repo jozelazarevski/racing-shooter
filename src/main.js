@@ -1079,19 +1079,19 @@ const DEMANDS = {
   // the theme, twist/fast from the traced geometry), not yet measured — the
   // measured convention needs a built world per row and there are twelve.
   // If test-affinity reports measured values for these ids, adopt them.
-  33: { loose: 0.12, twist: 0.30, fast: 0.72, climb: 0.45 }, // RED BULL RING
+  33: { loose: 0.12, twist: 0.30, fast: 0.72, climb: 0.45 }, // ALPENRING
   34: { loose: 0.12, twist: 0.85, fast: 0.15, climb: 0.35 }, // MONACO STREETS
   35: { loose: 0.55, twist: 0.35, fast: 0.80, climb: 0.10 }, // SILVERSTONE
   36: { loose: 0.55, twist: 0.45, fast: 0.65, climb: 0.50 }, // SPA-FRANCORCHAMPS
   37: { loose: 0.12, twist: 0.70, fast: 0.45, climb: 0.30 }, // SUZUKA
-  38: { loose: 0.55, twist: 0.60, fast: 0.55, climb: 0.55 }, // NORDSCHLEIFE
-  39: { loose: 0.12, twist: 0.25, fast: 0.95, climb: 0.08 }, // MONZA
-  40: { loose: 0.12, twist: 0.65, fast: 0.50, climb: 0.05 }, // MARINA BAY
-  41: { loose: 0.12, twist: 0.55, fast: 0.70, climb: 0.65 }, // MOUNT PANORAMA
+  38: { loose: 0.55, twist: 0.60, fast: 0.55, climb: 0.55 }, // WALDSCHLEIFE
+  39: { loose: 0.12, twist: 0.25, fast: 0.95, climb: 0.08 }, // AUTODROMO VELOCE
+  40: { loose: 0.12, twist: 0.65, fast: 0.50, climb: 0.05 }, // NEON MARINA
+  41: { loose: 0.12, twist: 0.55, fast: 0.70, climb: 0.65 }, // RAZORBACK MOUNTAIN
   42: { loose: 0.55, twist: 0.75, fast: 0.25, climb: 0.20 }, // RALLYCROSS ARENA
   43: { loose: 0.55, twist: 0.55, fast: 0.50, climb: 0.30 }, // OULTON PARK
-  44: { loose: 0.12, twist: 0.60, fast: 0.55, climb: 0.55 }, // LAGUNA SECA
-  45: { loose: 0.10, twist: 0.95, fast: 0.15, climb: 0.60 }, // TOUR DE CORSE
+  44: { loose: 0.12, twist: 0.60, fast: 0.55, climb: 0.55 }, // DRY LAGOON
+  45: { loose: 0.10, twist: 0.95, fast: 0.15, climb: 0.60 }, // TOUR DES CAPS
   46: { loose: 0.25, twist: 0.70, fast: 0.35, climb: 0.20 }, // VINEYARD VELOCE
   47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
   48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA

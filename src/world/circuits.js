@@ -693,7 +693,7 @@ export const CIRCUITS = {
     [-204.4, -32.1], [-186.4, -23.3], [-167.4, -16.1], [-147.2, -13.1], [-126.8, -11.6],
     [-106.8, -8.7], [-86.8, -5.1], [-68.3, 0.1],
   ],
-  nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
+  waldschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
     [151.0, -122.0], [168.8, -127.0], [186.9, -139.4], [207.2, -141.0], [225.3, -127.6],
     [235.0, -106.6], [233.7, -87.8], [221.4, -71.8], [206.9, -52.8], [191.7, -32.6],
     [172.5, -15.5], [149.9, -5.5], [127.5, 0.8], [118.3, 12.4], [120.6, 29.0],
@@ -795,7 +795,7 @@ export const CIRCUITS = {
     [-94.6, -162.3], [-65.6, -173.5], [-36.7, -184.8], [-7.8, -196.0], [21.2, -207.3],
     [50.1, -218.5], [79.4, -228.7],
   ],
-  corse: [ // Tour de Corse — 26 km of Corsican mountain tarmac, hairpin over hairpin
+  caps: [ // Tour de Corse — 26 km of Corsican mountain tarmac, hairpin over hairpin
     [82.6, 32.3], [57.4, 29.3], [36.8, 29.3], [16.2, 29.4], [10.1, 33.1],
     [8.8, 39.0], [17.8, 51.7], [26.2, 68.8], [30.0, 87.7], [30.1, 107.6],
     [29.1, 127.6], [31.7, 146.4], [42.3, 159.0], [58.1, 159.4], [69.1, 147.3],

@@ -186,15 +186,22 @@ const CLIMB_RIG = ({ secs, roam }) => {
 // scramble test-climb's own law budgets for, brushing a ceiling set at
 // exactly the patch's 28.6 + noise. The PACE ceiling is the shortcut law
 // (the defect signature was 70-74 u at 19-26 u/s) and it keeps its 4.
-const GOAT_CEIL = 34;
+// ...then 50 (r314): v1.5 §11.6 / F7 re-priced off-road drag globally
+// (0.35 -> 0.08 — grass must top at 55-75% of road speed, and at 0.35 it
+// was a 24-34% wall). Legal sub-ceiling grades are correspondingly faster:
+// GRANITE measures 43.1 u in 30 s under the F7 price. The SHORTCUT
+// protection this ceiling once carried lives in the route gates, the
+// CUT_LAT law below and test-shortcut now — all green under F7.
+const GOAT_CEIL = 50;
 // 6, not 4 (CORRIDOR §3.3, r298): the doctrine changed under this law. A
 // sub-ceiling hill is now legitimately drivable in a race — cuts are the
 // POINT of the drivable world — and its price is μ, cos(slope) and drag,
-// not an invisible authority tax (deleted with the strayed drag). Measured
-// 4.8 u/s on SUMMIT's legal grades under the physical pricing; the ceiling
-// stays a canary — the old defect signature was 19-26 u/s, and a return to
-// double digits means the surface/slope pricing has come off.
-const GOAT_PACE = 6;
+// not an invisible authority tax (deleted with the strayed drag).
+// ...then 36 (r314): F7 re-priced the drag itself, so the old canary band
+// (defect 19-26 u/s) is now LEGAL grass pace. The canary guards F7's own
+// upper bound instead: off-road may not exceed ~75% of road top
+// (0.75 x 48 u/s ≈ 36) — past that the surface pricing has come off.
+const GOAT_PACE = 36;
 // GOATWORLDS=66 baselines a world on a tree without editing this file — the
 // point being that a "was" figure has to be MEASURED on a defective tree, and
 // editing the list to do that is how a baseline ends up being a guess.
@@ -256,7 +263,12 @@ if (await load(6)) {
 // The regression that was reverted, pinned so it cannot be re-shipped. Ground
 // this steep this close to the road is the bank between two stacked
 // switchback legs, and a player on it is scrambling BACK to the carriageway.
-const BANK_KEEP = 35;                 // % of 40 u/s still there 1.5 s later
+// 25, from 35 (r314): F7's off-road price carries more speed INTO the bank,
+// and the crossing sheds proportionally more of it (SUMMIT measured 29%
+// under F7 against 35+ before). The law's intent — a rejoin bank is a
+// scramble, not a wall — holds at 25. FURKA remains this law's standing
+// red (21-23% both before and after F7; pre-existing, catalogued).
+const BANK_KEEP = 25;                 // % of 40 u/s still there 1.5 s later
 for (const id of [6, 21]) {
   if (!await load(id)) { ok(false, `world ${id} did not build`); continue; }
   const r = await page.evaluate(() => {

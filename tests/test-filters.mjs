@@ -138,7 +138,7 @@ const R = await page.evaluate(async () => {
     s.value = v;
     s.dispatchEvent(new Event('input'));
   };
-  type('spa');                       // a route key, not the theme it wears
+  type('ardennes');                       // a route key, not the theme it wears
   out.spa = shownNames();
   type('night');                     // a facet word, without touching a chip
   out.searchNight = shownNames();

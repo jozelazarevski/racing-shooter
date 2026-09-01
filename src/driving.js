@@ -28,8 +28,14 @@ export const DRIVING = {
   accelRef: 36.5,
   dragPower: 0.122,           // proportional drag under throttle (the governor)
   dragCoast: 0.14,           // closed-throttle engine braking + aero
-  dragOffRoad: 0.35,         // extra off-road drag when racing…
-  dragOffRoadRoam: 0.16,     // …halved for free-roam meadow touring (r292)
+  // v1.5 §11.6 / F7 (r314): every DRIVABLE off-road surface must top out at
+  // 55-75% of road top speed — measured at the old 0.35, grass ran 24-34%
+  // (a wall, not a surface). 0.08 lands PINE at 56% and GLACIER at 71%,
+  // both in band; 0-30 km/h off-road is 1.6 s (law: < 3). One value,
+  // applied globally, racing and roam alike (racing sat above roam's
+  // touring tune, which inverted r292's own reasoning the moment F7 bound).
+  dragOffRoad: 0.08,
+  dragOffRoadRoam: 0.08,
 
   // §8.1 / test 12.3 — 100-0 km/h in 42 m ± 3 (≈0.94 g). All four tyres.
   brakeCap: 2.6,            // brake decel cap = this × gripBudget (was 4.2)
@@ -139,7 +145,7 @@ export const DRIVING = {
   // of the table, and the roster's most common shape.
   templateOf: {
     riviera: 'street', genova: 'street', sanremo: 'street', oldtown: 'street',
-    monteCarlo: 'street', harbor: 'street', citadel: 'street', neon: 'street',
+    principality: 'street', harbor: 'street', citadel: 'street', neon: 'street',
     undercity: 'street', liguria: 'street', brava: 'street', dalmatia: 'street',
     azur: 'street', aegean: 'street', medterrace: 'street', olivecountry: 'street',
     canyon: 'canyon', desert: 'canyon', ravine: 'canyon', tremola: 'canyon',

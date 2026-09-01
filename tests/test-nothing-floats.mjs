@@ -91,7 +91,7 @@ const KNOWN = {
   // are not read as intrusions").
   'CANYON RUN': { max: 95, gap: 41, why: 'canyon-rim saguaros on the road datum, worst 40.15 u' },
   'CORNICHE': { max: 110, gap: 42, why: 'the same rim saguaros, worst 40.47 u' },
-  'LAGUNA SECA': { max: 100, gap: 39, why: 'the same rim saguaros, worst 37.66 u' },
+  'DRY LAGOON': { max: 100, gap: 39, why: 'the same rim saguaros, worst 37.66 u' },
   'ROCKFALL RAVINE': { max: 65, gap: 35, why: 'the same rim saguaros, worst 33.18 u' },
   // STREET LANTERN GLOBES on brackets — a bulb hangs off an arm by design, and
   // the arm is a separate mesh in a different 2 u column.
@@ -122,8 +122,8 @@ const KNOWN = {
   // MEDITERRANEAN TERRACE COPING, a 3.4 x 0.05 x 0.32 u strip on the wall it
   // caps — the wall is one long Buffer mesh the column grid cannot stamp.
   'OLIVE COAST': { max: 22, gap: 6, why: 'terrace-wall coping strips, worst 5.03 u' },
-  'MONZA': { max: 38, gap: 6, why: 'the same coping strips, worst 5.03 u' },
-  'TOUR DE CORSE': { max: 40, gap: 6, why: 'the same coping strips, worst 5.03 u' },
+  'AUTODROMO VELOCE': { max: 38, gap: 6, why: 'the same coping strips, worst 5.03 u' },
+  'TOUR DES CAPS': { max: 40, gap: 6, why: 'the same coping strips, worst 5.03 u' },
   'SALINE SPRINT': { max: 30, gap: 5.5, why: 'the same coping strips, worst 4.39 u' },
   // VINE TRELLIS POSTS standing on the ploughed soil bank they are planted in
   // — the bank is one long Buffer mesh the 2 u column grid cannot stamp.

@@ -79,7 +79,7 @@ const KNOWN_BODY = {
   // On TOUR DE CORSE every candidate is in somebody's road and `gridSlot(0)`
   // puts the player 0.00 u from a leg, losing 22.9 u/s a lap.
   'RED CENTRE RUN': { max: 10, why: 'pylon legs: mesh kept, collider dropped, by measurement (r200)' },
-  'TOUR DE CORSE': { max: 5, why: 'the same pylon legs on the corse route' },
+  'TOUR DES CAPS': { max: 5, why: 'the same pylon legs on the corse route' },
   'TERRAZZA ALTA': { max: 4, why: 'the same pylon legs — TERRAZZA ALTA runs the corse route' },
   // r199 found it and could not name the builder: the colours are computed, so
   // a literal grep does not reach it.
