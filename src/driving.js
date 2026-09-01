@@ -36,6 +36,13 @@ export const DRIVING = {
   // touring tune, which inverted r292's own reasoning the moment F7 bound).
   dragOffRoad: 0.08,
   dragOffRoadRoam: 0.08,
+  // r315: the off-road CLIMB divisor (the uphill vCap term's slope divisor
+  // when off-road; on-road keeps 0.55). F7 freed the flats; this is what
+  // keeps a mountainside from being a road — "I can still enter a
+  // mountain" was a 29 u/s charge up a 30° face into the drawn rock.
+  offRoadClimbDiv: 0.14,
+  offRoadClimbBleed: 14,     // u/s² toward the climb cap: banks cross, charges die
+  offRoadClimbFreeGrade: 0.15, // rolling grass under this grade climbs free (F7)
 
   // §8.1 / test 12.3 — 100-0 km/h in 42 m ± 3 (≈0.94 g). All four tyres.
   brakeCap: 2.6,            // brake decel cap = this × gripBudget (was 4.2)

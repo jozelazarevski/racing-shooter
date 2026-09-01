@@ -2317,7 +2317,25 @@ export class Car {
     // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
     // thrust can't quietly cancel the climb penalty at the clamp.
     let vCap = topSpeed;
-    if (slope > 0) vCap = Math.max(topSpeed * 0.55, topSpeed - (GRADE * slope) / 0.55);
+    // r315 ("I can still enter a mountain"): OFF-ROAD, the climb term is a
+    // WALL OF EFFORT, not a gentle tax. F7's drag re-price (0.35 -> 0.08)
+    // let a car charge a 30° mountainside at ~29 u/s and ride visually into
+    // the drawn rock; the old 0.55 divisor and 55% floor were sized when the
+    // drag itself did the stopping. Off-road the divisor drops to
+    // offRoadClimbDiv (0.14): a 30° face is a ~5 u/s crawl (the goat law's
+    // own word), rolling grass under ~10° barely notices, and the flat F7
+    // band is untouched. On-road climbs keep the 0.55 world.
+    if (slope > 0) {
+      // …and rolling grass is NOT a climb: off-road grades under
+      // offRoadClimbFreeGrade ride free (GLACIER's F7 strip undulates at
+      // ~0.2 and fell to 43% of road top under the raw term). The deadband
+      // moves the wall to real faces; a rejoin bank at 0.6-1.1 barely
+      // notices 0.15 of forgiveness.
+      const free = offRoad ? (DRIVING.offRoadClimbFreeGrade ?? 0.15) : 0;
+      const s2 = Math.max(0, slope - free);
+      const div = offRoad ? (DRIVING.offRoadClimbDiv ?? 0.14) : 0.55;
+      vCap = Math.max(topSpeed * (offRoad ? 0.14 : 0.55), topSpeed - (GRADE * s2) / div);
+    }
     else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
     // v1.5 §11.5/§6.6 (r310): while BOOSTING the stage ceiling binds the
     // WHOLE cap — the downhill extension and the boost floor included, or
@@ -2334,7 +2352,18 @@ export class Car {
       // frame, and Il Budello sailed to 186 anyway)
       vCap = Math.min(vCap, Math.max(this.game._nitroCeilU, Math.abs(this.speedAlong ?? 0)));
     }
-    vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);
+    // r315: OFF-ROAD UPHILL the cap BLEEDS momentum instead of seizing it.
+    // The hard clamp turned a rejoin bank (grades 0.6-1.1, crossed on ~1 s
+    // of momentum) into a one-frame confiscation — speed kept fell to 3%
+    // against the law's 25% floor. At offRoadClimbBleed u/s² a bank
+    // crossing carries through on what the car brought, while a HELD
+    // mountain charge still converges to the crawl cap in ~2.5 s.
+    if (offRoad && slope > 0 && vf > vCap) {
+      vf = Math.max(Math.max(vCap, vf - (DRIVING.offRoadClimbBleed ?? 14) * dt),
+        -this.maxSpeed * 0.35);
+    } else {
+      vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);
+    }
     if (boosting) vf = Math.max(vf, Math.min(this.maxSpeed * 1.05 * offMult, vCap));
     // FREEZE STRIKE / JUNGLE FURY: the slow field is physical — it stomps
     // in-flight boosts too, so rivals really do crawl at half pace

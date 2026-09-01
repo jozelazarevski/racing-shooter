@@ -4161,6 +4161,61 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r315 — THREE FROM THE OWNER: HIT DEBRIS, THE MOUNTAIN LAW, THE COPILOT
+One message, three asks, one build (the r302/r309 batching precedent).
+
+HIT DEBRIS ("when I hit a car with missile or machine gun I want debris
+flying out of the other car too"): the VICTIM sheds at the weapon-hit
+choke point (onEnemyHit). The generic damage path gated its debris at 15
+damage — a cannon round (3.5-4.5) never crossed it, so machine-gunning a
+rival read as nothing landing, and a part popped only twice in a rival's
+whole 70 hull. Now: a missile takes a visible PIECE off the car every
+time (popCarPart — a real accessory flies, bounces, and settles as live
+debris) plus a 5-7 chunk burst; cannon fire chips metal per hit (sparks +
+1-2 debris) and strips a part every ~7 hits. Invulnerable targets (grid
+spawn) shed nothing. Verified by probe: 12 cannon hits = 12 bursts, one
+rocket = one flying part.
+
+THE MOUNTAIN LAW ("I can still enter a mountain"): head-on and lateral
+probes showed every big mass solid at its collider — what the report
+actually was: r314's F7 re-price let a car CHARGE a 30° mountainside at
+~29 u/s and ride visually into the drawn rock (the uphill vCap's 0.55
+divisor and 55% floor were sized when drag 0.35 did the stopping; the
+measured 29.6 u/s was exactly the old floor). Off-road the climb term is
+now a wall of effort: divisor offRoadClimbDiv 0.14, crawl floor 14% —
+and TWO refinements the first cut broke, both measured: the cap BLEEDS
+momentum at offRoadClimbBleed 14 u/s² instead of seizing it (the hard
+clamp confiscated a rejoin bank's crossing speed in one frame — bank keep
+fell to 3% against the 25% floor; with the bleed SUMMIT keeps 51%), and
+grades under offRoadClimbFreeGrade 0.15 climb FREE (GLACIER's undulating
+F7 strip fell to 43% of road top under the raw term; with the deadband
+it is 67%, in band). End state: SUMMIT's off-course charge is 0.9 u at a
+5.8 u/s crawl (the goat law's own words), flat grass keeps F7, banks
+cross on momentum, FURKA's rejoin stays its pre-existing red (23%,
+grade-1.1 walls, red before and after everything).
+
+THE COPILOT ("tell the driver to slow down, prepare for left or right
+turn, just like in a real rally. And maybe this Copilot can be purchased
+and upgraded"): a real garage part — RALLY COPILOT 🎧, max 3, priced on
+the standard rung ladder, per-car like every upgrade, and WIRED (no
+RECOVERY BEACON repeat): L1 yells ⚠ SLOW DOWN when you carry too much
+speed for the corner nearly on you; L2 adds direction and severity
+(◀ LEFT — HAIRPIN); L3 calls earlier, adds a distance figure past 20 m,
+and calls medium corners. The note engine reads the ROAD the way the
+rival planner and the difficulty stand-in do — heading delta over the
+planners' 24 m window gives the arc, radius the grade (HAIRPIN < 18 u <
+SHARP < 30 < MEDIUM < 55), the stand-in's own corner model
+(v = sqrt(18.9 r)) the speed it can be taken at; one call per corner,
+re-armed after passing. Delivery is a new top-centre pacenote pill
+(the one empty lane on the frozen layout — §6.11 pins what shipped, and
+the geometry snapshot still passes untouched) plus haptics per grade
+(audio is the project's deliberate no-op stub). Direction convention
+asserted in the suite: steer > 0 raises the heading, and the copilot
+calls that LEFT. tests/test-copilot.mjs: 7 checks — unbought stays
+silent, L1 only yells, L3 flows at rally cadence with both directions
+and grades, no page errors. Measured cadence on PINE at L3: 18 notes in
+45 s.
+
 ## r314 — v1.5 PHASE 4: NAMES, GRASS, DUSK, THE SEAT, AND THE TOWN BUDGET
 Build "next+3". Five systems, each measured (tests/test-phase4.mjs, 10/10):
 
