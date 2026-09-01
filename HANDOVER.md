@@ -4161,6 +4161,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r311 — v1.5 PHASE 2: PROGRESS-BASED STUCK, AND KILLS FINALLY MOVE THE ORDER
+Build "next+1": §3.6 + §6.10.
+
+STUCK IS ABOUT PROGRESS, NOT DISPLACEMENT (§3.6): the wedge net's 6/12 m
+displacement anchor was creep-defeatable — grinding ALONG a wall at
+3 m/s covers the clearance sideways while going nowhere on the course
+(recording E: stuck 4 s at a time, three events). The law now measures
+ALONG-TRACK advance: under one metre of course progress, throttle held,
+for stuckDetectS → rescued. |signed| progress, so deliberate reversing
+never trips it; race-only, so roam crawls and goat climbs are
+untouched. Pinned in test-killspos P2 (rescued at 2.5 s having slid
+15 m sideways — the old anchor never fired there) and P3 (an honest
+2 m/s crawl is never touched). The §3.6 wall-yaw clause was already
+shipped (r295 wall escape at <30 km/h).
+
+KILLS AFFECT POSITION (§6.10): a destroyed rival holds
+killRespawnHoldS (4.0, in route config + driving.json) and respawns AT
+THE GATE IT LAST PASSED, still owing the next — progress is
+gate-anchored, so the killer gains exactly the ground the victim
+loses. Telemetry: rivalDestroyed + return{reason:'kill'} (Q22's pair).
+THE SUITE CAUGHT A REAL BUG BEFORE IT SHIPPED: placing "6 m before
+gate 0" wrapped trackIndex to N−3 with the lap counter untouched, and
+progress = lap + index/N read the teleport as A WHOLE LAP GAINED — the
+kill PROMOTED its victim (measured 1.079 → 1.999). The same
+arithmetic sat in the player's returnToGate. Neither wraps now: a
+gate-0 return seats ON the line (confiscation measured honest,
+1.088 → 1.002).
+
+RIG LESSONS (recorded because both briefly looked like law failures):
+absolute rank is the wrong Q22 metric on a rig whose player parks
+through the hold — the field races on; and "victim drops behind the
+killer" only holds when the gap was under a gate. The mechanism —
+progress confiscation — is the honest pin.
+
+Gates: test-killspos NEW 7/7; wedge/unstuck/reverse/gorge/patch13/
+route/field-stalls/rules regression. Tag r311.
+
 ## r310 — v1.5 PHASE 1: STAGE RULES BIND EVERY WORLD, THE LINE LIVES ON A STRAIGHT
 CLAUDE.md v1.5 arrived (supersedes 1.4; HUD FROZEN as of recording E —
 our r309 layout IS the reference; §11/§12 stage rules bind all 78

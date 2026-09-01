@@ -10497,7 +10497,11 @@ class Game {
     const back = Math.max(1, Math.round((RT.returnAheadM ?? 6) / sampleLen));
     car._nextGate = gateId;                  // the gate is still owed
     car._gateAlong = undefined;
-    car.placeAt((gt.si - back + N) % N, 0, true);
+    // never wrap backwards past the lap line — for gate 0 the return seats
+    // ON the line instead, or progress reads the teleport as a lap gained
+    // (r311, caught on the rival kill-respawn; same arithmetic here)
+    const rawIdx = gt.si - back;
+    car.placeAt(rawIdx < 0 ? gt.si : rawIdx, 0, true);
     const sp = (RT.returnSpeedKmh ?? 40) / 3.6;
     car.vel.set(Math.sin(car.heading), 0, Math.cos(car.heading)).multiplyScalar(sp);
     car.vy = 0; car.airborne = false;

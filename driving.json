@@ -71,6 +71,7 @@
     "stuckDetectS": 2.5,
     "upsideDownS": 2.0,
     "playerResetDelayS": 1.5,
+    "killRespawnHoldS": 4.0,
     "camClearanceM": 1.5
   }
 }

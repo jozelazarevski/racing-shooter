@@ -166,6 +166,7 @@ export const DRIVING = {
     stuckDetectS: 2.5,
     upsideDownS: 2.0,
     playerResetDelayS: 1.5,
+    killRespawnHoldS: 4.0,   // §6.10: a destroyed rival holds this long, then its last gate
     camClearanceM: 1.5,
     // ribbonNearM is GONE (r302): the ribbon and the gate arrow it fed are
     // erased under CLAUDE.md v1.2 §3.5 — a key nothing reads is a config
