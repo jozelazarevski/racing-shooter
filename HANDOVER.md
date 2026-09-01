@@ -4161,6 +4161,75 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r310 — v1.5 PHASE 1: STAGE RULES BIND EVERY WORLD, THE LINE LIVES ON A STRAIGHT
+CLAUDE.md v1.5 arrived (supersedes 1.4; HUD FROZEN as of recording E —
+our r309 layout IS the reference; §11/§12 stage rules bind all 78
+worlds). The owner ordered the §9 build order run as phases; this is
+build "next": stage rules + Cliff Knot reference + camera 6.8 + nitro
+ceiling 6.6.
+
+TEMPLATES (§12, driving.js `templates`/`templateOf` + stageTemplate()/
+nitroCeilingKmh()): street 140 / canyon 170 / forest 160 / circuit 190
+(BY REGION — Grand Circuits whatever the theme) / open 200 / snow 150.
+Ceilings DERIVED (min(design+20, gearTop+40)), in DISPLAYED km/h — the
+spec's numbers come from recordings of the HUD (the engine displays
+u/s×3.1; physics converts ×3.6 — a long-standing split, noted).
+
+NITRO CEILING, THREE ATTEMPTS TO MAKE IT HOLD (all preserved in
+comments): (1) capping nitroCapMul floored at 1 — toothless on
+upgraded cars; (2) clamping vCap per-frame — RATCHETED, because the
+steering block's lag recomposition adds to vf AFTER the longitudinal
+clamp and speedAlong is a live getter (measured: Il Budello crept
+47.8→55.9 u/s through a 51.6 cap); (3) SHIPPED: anchor at boost-FIRE
+(the ceiling, or the speed already carried — nitro never pushes past
+the budget, never confiscates momentum) and enforce ONCE at the final
+velocity write, airborne exempt (ballistic is honest). Streets hold
+160 (measured 166 with airborne transients); recording E's 205-213 is
+dead.
+
+THE LINE LIVES ON A STRAIGHT (§11.1, the §13.3 generator fix): the
+sampled lap ROTATES its start onto the straightest stretch before
+anything builds against index 0 — gantry, grid, gates, elevation and
+every feature are index-relative and follow free. Canyon's line sat on
+a 34 m bend; now 7197 m through the run-in/run-out window (Cliff Knot
+593, Il Budello 177). FALLOUT, all fixed: gates could land in a jump
+gorge (deck 26 u under the datum → the vertical guard refused every
+pass and R1 jammed at 5/12) → gates walk ≤30 samples to sound road;
+test-gorge finds its gorge by scanning; test-drift stages on measured
+flat ground with colliders out (its 1.8x ratio gate was calibrated on
+a car scrubbing to a stop — honest full-lock grip turns ~124° in 2 s,
+the law is MORE turn AND kept speed, gate now 1.2x); test-route's ride
+rig stubs the kill nets (a deck-glued rig in the gorge fired §3.3 and
+returnToGate(lastPassed) rewound its sequence every frame).
+
+VALIDATOR (src/stagecheck.js, §11 + §13.2): runs on every world's
+first race frame after the density pass; auto-culls obstacle-class
+props from street corridors (11.3) and KICKER LANDING FANS (sized from
+the stage's own nitro ceiling — the rule recording E paid at the
+kicker-into-rock and this session's log paid at t=32-35); logs
+stageViolation telemetry with fix:'generator' for what it cannot
+honestly touch. Pickups generator-side in _buildPickups: nitro ≤1
+street / ≤2 others (was 3!), none within 80 m of the line — extras
+become hull pickups. CAMERA §6.8: buildings (3-20 u solids; larger is
+LANDSCAPE and the terrain probe's job — a 396 u massif cone in the
+cache lifted the boom all over town) join the sight-line probe via a
+20 Hz cache. AUDITED: no automatic camera switches exist in this
+engine (mode changes only at init + the two manual controls) — 6.8's
+cut deletion is vacuously satisfied.
+
+§13.1 ROSTER REPORT (tools-scratch/stagerules-report.json, all 78):
+street-obstacles 75 worlds, kicker-landing 55 (auto-culled where
+handles exist; handle-less remnants counted per the Law of Solidity),
+finish-runin 6 + finish-runout 8 (stages so twisty no rotation finds a
+legal 140 m — genuine §13.3 radius work, flagged), rail-over-road 1.
+
+Gates: test-stagerules NEW 17/17 (S1 straightness, S2 ceiling, S3
+pickups, S4 corridors+fans, S5 camera-vs-buildings), route 21/21,
+patch13 16/16, gorge 5/5, drift 6/6, patch02/corridor2/corridor3/
+reverse/shortcut/wedge/unstuck/lap-count all green. Tag r310.
+NEXT PHASES QUEUED: r311 stuck+kills, r312 AI §5, r313 perf/dusk/
+naming/grass, r314 regression (tasks #35-38).
+
 ## r309 — SPEED THAT LOOKS LIKE SPEED, REVS THAT FOLLOW THE PEDAL, ONE EQUAL LINE
 Three user asks + the speed-feel follow-up ("I don't feel I go 70 per
 hour" — after r308 fixed the phantom lift, the remaining gap is

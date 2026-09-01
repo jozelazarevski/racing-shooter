@@ -57,6 +57,14 @@ for (const [lvl, counts] of Object.entries(EXPECT)) {
     const N = t.center.length;
     route.reset(c);
     const start = route.gates[0].si;
+    // r310: the ride GLUES the car to the deck, and Canyon's deck dives
+    // through a jump gorge right after gate 4 — the §3.3 kill net fired on
+    // the glued car and returnToGate(lastPassed) rewound _nextGate every
+    // frame, jamming the sequence at 5/12. A real car jumps the gorge or
+    // drowns ONCE; the kill volumes are test-gorge's law, the gates are
+    // this one's, so the nets sit out for the staged ride.
+    const kcRealChasm = c.intoChasm?.bind(c), kcRealDrown = c.drown?.bind(c);
+    c.intoChasm = () => {}; c.drown = () => {};
     const ride = (from, samples) => {
       for (let s = 0; s < samples; s++) {
         const idx = (from + s) % N;
@@ -69,6 +77,8 @@ for (const [lvl, counts] of Object.entries(EXPECT)) {
       }
     };
     ride((start - 8 + N) % N, N + 16);
+    if (kcRealChasm) c.intoChasm = kcRealChasm;
+    if (kcRealDrown) c.drown = kcRealDrown;
     const dump = window.__rally?.dump?.() ?? '';
     const gateEvs = dump.split('\n').filter((l) => l.includes('"kind":"gate"'))
       .map((l) => JSON.parse(l));
