@@ -80,6 +80,47 @@ check('S4  a bought rung moves the card AND the sheet together',
   `card "${r.engineDesc1}", sheet "${r.speedText1}", notch ${r.notch}`);
 check('S5  dampers speak the landing law',
   /22 → 25 U\/S/.test(r.dampDesc) && /CLIFF/.test(r.dampDesc), r.dampDesc);
+
+// ---- r322: the turntable is visible IMMEDIATELY (owner: "make this
+// rotating car always visible when I go over and update it") ----
+const s = await p.evaluate(async () => {
+  const g = window.__game;
+  const st = g.__stage;
+  // S6: entering the garage paints synchronously — _stagePaint stamps w/h
+  // and framedFor before any animation frame has a chance to run
+  g._stageRun(false);
+  st.w = 0; st.h = 0; st.framedFor = null;
+  g.showMenu?.('garage');
+  g.renderGarage();
+  const s6 = { painted: st.framedFor === st.sig && st.w > 0, rafArmed: !!st.raf };
+  // S7: a build change repaints even with the loop STOPPED — the purchase
+  // and the picture are one moment
+  g._stageRun(false);
+  const up = g.carUpgrades();
+  up.armor = (up.armor | 0) + 1;
+  st.framedFor = null;
+  g._stageSync();
+  const s7 = { painted: st.framedFor === st.sig, loopOff: !st.raf };
+  up.armor--; g._stageSync();
+  // S8: the loop survives on actual visibility, not title-screen
+  // bookkeeping — with the canvas displayed but state off 'title', it
+  // keeps turning (the BACK TO GARAGE path used to go dark here)
+  g._stageRun(true);
+  const stateWas = g.state;
+  g.state = 'results';
+  const spin0 = st.spin;
+  await new Promise((res) => setTimeout(res, 400));
+  const s8 = { alive: !!st.raf, turned: st.spin > spin0 };
+  g.state = stateWas;
+  return { s6, s7, s8 };
+});
+check('S6  entering the garage paints the turntable synchronously',
+  s.s6.painted && s.s6.rafArmed, JSON.stringify(s.s6));
+check('S7  an update repaints instantly even with the loop stopped',
+  s.s7.painted && s.s7.loopOff, JSON.stringify(s.s7));
+check('S8  the turntable runs on visibility, not screen bookkeeping',
+  s.s8.alive && s.s8.turned, JSON.stringify(s.s8));
+
 check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();
