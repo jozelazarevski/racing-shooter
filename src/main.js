@@ -378,8 +378,13 @@ const SHOT_RIG_GROUND = new THREE.Vector3(8.0, 2.5, 3.2);
 // look-ahead — the aim point rides much nearer the car — which the high
 // camera angle absorbs; the H1 gate in test-hudreview holds the band.
 const CAM_MODES = [
-  { name: 'TOP-DOWN',  back: 16, h: 46, look: 4,  lookH: 0,   spdBack: 8, spdH: 16, steer: 1, roadYaw: true },   // PATCH_02 §3.9: 1.35x at top speed
-  { name: 'TOP FAR',   back: 20, h: 72, look: 5.5, lookH: 0,  spdBack: 6, spdH: 24, steer: 1, roadYaw: true },
+  // spdH 16/24 -> 8/10 (r309, "I don't feel I go 70 per hour"): the speed
+  // rise LIFTED the camera 35% at pace, which shrinks everything on screen
+  // exactly when the player wants to feel fast. 1.17x/1.14x keeps a rise
+  // (§6.8's envelope is 1.0-1.35x) without eating the sensation; the speed
+  // lines now start at 95 km/h to carry the rest.
+  { name: 'TOP-DOWN',  back: 16, h: 46, look: 4,  lookH: 0,   spdBack: 8, spdH: 8, steer: 1, roadYaw: true },
+  { name: 'TOP FAR',   back: 20, h: 72, look: 5.5, lookH: 0,  spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
   // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
   // enough that the car filled the screen, so you could not see far enough up
   // the road to place the next corner ("super hard to drive in this camera
@@ -10553,7 +10558,7 @@ class Game {
       const sl = document.getElementById('speed-lines');
       if (sl) {
         const kmh = Math.abs(p.speedAlong) * 3.6;
-        sl.style.opacity = kmh > 150 ? Math.min(0.45, (kmh - 150) / 110).toFixed(2) : '0';
+        sl.style.opacity = kmh > (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 95) ? Math.min(0.45, (kmh - (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 95)) / 110).toFixed(2) : "0";
       }
     }
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];

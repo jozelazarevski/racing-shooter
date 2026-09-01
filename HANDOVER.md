@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r309 — SPEED THAT LOOKS LIKE SPEED, REVS THAT FOLLOW THE PEDAL, ONE EQUAL LINE
+Three user asks + the speed-feel follow-up ("I don't feel I go 70 per
+hour" — after r308 fixed the phantom lift, the remaining gap is
+PRESENTATION):
+- CAMERA AT PACE: spdH 16/24 → 8/10 on the overhead pair. The §3.9
+  1.35x speed rise shrank everything on screen exactly when the player
+  wanted to feel fast; 1.17x/1.14x stays inside §6.8's 1.0-1.35x
+  envelope. Speed lines from 95 km/h, not 150 — and the hardcoded 150
+  in main.js now actually READS speedLinesFromKmh (the key existed
+  since r295 and nothing read it; the config lied).
+- REVS FOLLOW THE PEDAL (user: "if I don't press the gas the rpms
+  should not stay up"): the presentation drivetrain scales the gear
+  band by 0.33 + 0.67·throttle — off the gas the needle sags to an
+  engine-braking murmur, swells back with the pedal. Works on both
+  schemes (auto-gas throttle is already 0 while braking/reversing).
+- FIRE = 56px LIKE THE REST (user): the line is five equals now —
+  right 270/206/142/78/14 (portrait), uniform 48s in landscape and the
+  380 media. Gauge up 86 → 104px on touch (96 at 320-wide, where the
+  104 dial met DRIFT's column by 7px, measured).
+Their race log also confirms r304's grace working in the wild: gate 8
+missed at 41 m lateral, re-crossed by driving 1.7 s later, no yank.
+Gates: test-mobile-hud 24/24, test-hudreview 15/15. Tag r309.
+
 ## r308 — "SLOW MOTION" WAS THE CAMERA, FIVE METRES TOO HIGH ON EVERY HILL
 User: "Somehow driving feels slow motion." Ruled out in order, against
 the pristine r294 base: physics pace IDENTICAL (0-100 5.63 s vs 5.83,
