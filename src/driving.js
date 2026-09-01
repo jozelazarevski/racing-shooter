@@ -21,6 +21,11 @@ export const DRIVING = {
   // two levers; the pair below is measure-tuned against drivereal.mjs.
   launchTraction: 1.89,      // was 2.8: drive force cap = this × gripBudget
   launchCapFade: 99,        // cap fades out by this × half showroom speed
+  // r312 MACHINES DIFFER: the BRAWLER's showroom accel (36.5) is the datum
+  // the accel-aware traction cap scales around, so a quicker engine really
+  // launches quicker (0-100 spreads across the catalog) without re-tuning
+  // launchTraction. Bounded [0.85, 1.18] in vehicles.js.
+  accelRef: 36.5,
   dragPower: 0.122,           // proportional drag under throttle (the governor)
   dragCoast: 0.14,           // closed-throttle engine braking + aero
   dragOffRoad: 0.35,         // extra off-road drag when racing…
