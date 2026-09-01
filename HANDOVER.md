@@ -4161,6 +4161,103 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r320 — THE CLIFF COLLECTS (phone report, PIKES PEAK)
+
+Screenshot from the phone: the car at the bottom of the ravine under the
+PIKES PEAK shelf, hull untouched, 3 km/h in reverse — "Should be wrecked
+at this kind of falls." Measured and reproduced exactly: the off-road
+grounded branch HAD NO AIRBORNE ENTRY. Its ease is clamped to VY_CAP, so
+a car that left a shelf edge slowly was rappelled down the whole wall at
+a serene 11 u/s — never airborne, so `onLand`'s existing impact law
+(free to 22 u/s, 6.5 hull per unit past, dampers move both) never fired.
+Placed one step past the deck of the report world's biggest shelf
+(32.8 u): descended to the floor at hull 100. That is the screenshot.
+
+TWO CHANGES, BOTH IN THE LAW'S OWN TERMS:
+- `fallEdgeDrop 3`: ground more than a suspension-length below the car
+  is a FALL, not a slope — the car goes ballistic and the landing law
+  prices the drop. Ordinary descents never trip it (the 12/s
+  proportional ease holds the gap near zero on any slope it can
+  follow); ramps and crests use the untouched on-road launch paths;
+  rivals never leave the road, so the AI is untouched by construction.
+- `fallWreckOver 16`: past free + 16 (38 u/s ≈ a 28 u drop on stock
+  dampers) the landing is an OUTCOME, not a damage event — raw, past
+  any hull. The linear band was difficulty-scaled, so on NORMAL the
+  33 u drop left 21 of a stock hull and barely dented the report car's
+  149. Designed jumps cannot reach the bar (ramp launches cap at vy
+  11); LONG-TRAVEL DAMPERS still move it, since it rides `free`.
+
+tests/test-cliff.mjs, 7 checks: the report replayed (ballistic + wreck),
+the free band still free, the hard-landing band priced not wrecked, the
+wreck bar absolute on stock and moved by level-5 dampers, the rival
+untouched at the same edge. Fallout gates: goat 25/26 (the standing
+FURKA rejoin 23% only), sinking/unstuck/drivingspec/shortcut/difficulty
+all green, round-fixes' ramp-cap check green (its two obsolete-law reds
+stand; note its staged economy figure moved 2426 -> 2786 because the C4
+purse now pays in that staged finish — same obsolete expectation, new
+constant).
+
+## r319 — ELEVEN STANDING REDS, ONE ROOT CAUSE EACH (THE GEOMETRY LEDGER)
+
+The oldest pre-existing reds in the battery — nature 6, sinking 1, water
+2, sculpt-road 1, river 1 — investigated one by one, each attributed to
+its actual cause before anything was touched. Ten of the eleven were a
+TEST measuring against the wrong datum; one was a real generator defect.
+All five suites are green now.
+
+THE DATUM FAMILY (tests fixed, world untouched). Since the r286 seating
+fix, everything scattered stands on `_seatY` — the LOWER of the analytic
+curve and the drawn 10 u mesh chord, because "rule 6 is about the
+picture, and the picture is the mesh." The probes proved it: 91 of 101
+"buried" trees/solids on PINE/FLUME/FURKA sat EXACTLY on `_drawnGroundY`
+with the deliberate 0.25 u root sink; the analytic curve simply reads
+1-8 u higher in steep ground. test-nature's rule 6 now measures against
+`min(terrainHeight, _drawnGroundY)` — worst offsets fell from -8.36 to
+-0.25 (the sink itself). Same story for sculpt-road's "shark tooth":
+the 1-in-89 offender was a 3.4 u BOULDER seated on the chord, not a
+peak — the law now applies to peaks (h > 10) on the seen datum, and all
+88 real peaks stand proud.
+
+test-sinking's FURKA red was a car parked at sample 349 that the index
+tracker legitimately re-tracked onto a switchback's OTHER leg five
+samples away — where it stood exactly ON that deck (y == roadY, vy 0).
+The law is now "below BOTH decks is falling through the world; on
+either one is fine", and its teeth survive: worst is 0.06 u of
+suspension settle.
+
+test-water's ford law measured |water - deck| both ways; the offenders
+were two boundary vertices per ford running 4-8 u BELOW the deck —
+river bed and fall lips passing under the embankment edge, hidden
+inside geometry. The law is now the two sins a player can SEE: no
+vertex PROUD of the deck by 2 u, and the wash must TOUCH the deck
+somewhere (a dry crossing fails). Both bite: FLUME touches at 0.08 u.
+
+THE ONE REAL DEFECT — the river fold (generator fixed). HEDGEROW DASH's
+planned curve carries a kink so sharp the radius is 10.6 u at t=0.490
+and 55 u at t=0.488, under 5.3 u of water plus the 6 u bank: the bank
+ribbon folded over itself. The fix is a LAW in `_planRiver`, not a
+patch: a reach can only be as wide as its bend can carry. After the
+width bake, a 400-point uniform polyline (station-centred sampling
+walks straight past the kink — measured) clamps `halfAt` to
+`rad - bank` at the nearest stations. The river visibly narrows through
+the tight meander, which is what rivers do; no RNG is consumed, so no
+other station of any seeded world moves. test-river's R1 is per-station
+now too (tightest bend vs the width AT it, not the widest reach 400 u
+away) — HEDGEROW passes at exactly 10.6 vs 10.6, PINE/FLUME with
+margin.
+
+Fallout gate on the width clamp (a world-gen change): water, nature,
+drivingspec (the PINE ford aquaplane budget rides `R.half`, not
+`halfAt` — unchanged by construction, verified anyway), sinking,
+sculpt-road — all green post-change.
+
+Standing-red ledger after this build: the battery's remaining reds are
+the obsolete-law group (round-fixes 2, arsenal 4, economy 1, feats 2,
+dampers 6, funpack 2, r143fix 2, affinity 1, tyres 1, newworlds 1,
+editor family, drown 1), goat 1 (FURKA rejoin 23%, a tuning debt), the
+menu-DOM crash trio (transitions/pick/menu-noreset need re-anchoring),
+roadclear 4, nothing-on-road 6, and the exit-124 timeout family.
+
 ## r318 — THE SEASON HAS A FACE: SPONSORS, THE CALENDAR, THE HISTORY (C5)
 
 The last of the published career design. Three small systems, all riding

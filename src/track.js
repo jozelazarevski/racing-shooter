@@ -8154,6 +8154,38 @@ export class Track {
       const t = k / Math.max(1, bed.length - 1);
       return half * (1 + 0.24 * Math.sin(t * 41 + 0.7) + 0.12 * Math.sin(t * 17.3));
     });
+    // A REACH CAN ONLY BE AS WIDE AS ITS BEND CAN CARRY. The breathing above
+    // is independent of the plan, so nothing stopped a wide station landing
+    // on a tight meander — on HEDGEROW DASH one bend turned at 10.6 u radius
+    // under 5.3 u of water plus the 6 u bank, and the bank ribbon folded
+    // over itself. Clamp the WIDTH, not the curve: a river narrowing through
+    // a tight bend reads as a river, while re-planning the curve moves the
+    // whole valley. No RNG is consumed, so every other station of every
+    // seeded world is untouched.
+    {
+      const H = this._river.halfAt, L = H.length;
+      const bank = this._river.bank;
+      // Curvature is read from a fine uniform polyline, not per station:
+      // HEDGEROW's offender is a KINK so sharp (radius 10.6 u at t = 0.490,
+      // 55 u at t = 0.488) that any sampling centred on the stations walks
+      // straight past it. Walk the same 400-point polyline the fold
+      // physically happens on, and narrow the nearest stations.
+      const FN = 400, fp = [];
+      for (let i = 0; i <= FN; i++) fp.push(this._river.curve.getPointAt(i / FN));
+      for (let i = 1; i < FN; i++) {
+        const a = fp[i - 1], c = fp[i], e = fp[i + 1];
+        const ab = Math.hypot(c.x - a.x, c.z - a.z);
+        const bc = Math.hypot(e.x - c.x, e.z - c.z);
+        const ac = Math.hypot(e.x - a.x, e.z - a.z);
+        const area = Math.abs((c.x - a.x) * (e.z - a.z) - (e.x - a.x) * (c.z - a.z)) / 2;
+        const rad = area < 1e-6 ? Infinity : (ab * bc * ac) / (4 * area);
+        const cap = Math.max(2, rad - bank);
+        const k = Math.round((i / FN) * (L - 1));
+        for (const kk of [k - 1, k, k + 1]) {
+          if (kk >= 0 && kk < L && H[kk] > cap) H[kk] = cap;
+        }
+      }
+    }
   }
 
   /** Nearest centreline sample to (x, z): {d, k}. d is Infinity past the bed. */

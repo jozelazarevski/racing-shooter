@@ -128,7 +128,15 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
       betweenPct: +(100 * between / Math.max(1, tris)).toFixed(1),
       hasWorldRiver: !!water, bankTris,
       fordN: ford.length,
-      fordWorst: ford.length ? +Math.max(...ford.map(Math.abs)).toFixed(2) : null,
+      // Two visible sins, measured separately (r319). PROUD water floats
+      // above the carriageway — any vertex, always visible. A DRY ford is a
+      // wash that never touches the deck at all. A vertex BELOW the deck is
+      // neither: it is the river's own bed or a fall lip passing under the
+      // embankment edge, hidden inside the geometry — FLUME's worst was
+      // -8.21 u, two boundary vertices of a wash whose other samples ride
+      // the deck (and drivingspec proves the crossing soaks the player).
+      fordProud: ford.length ? +Math.max(...ford).toFixed(2) : null,
+      fordTouch: ford.length ? +Math.min(...ford.map(Math.abs)).toFixed(2) : null,
     };
   });
 
@@ -159,11 +167,18 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
   check(`${name}: the bank is still there`, r.bankTris > 0, `${r.bankTris} bank triangles`);
 
   // 6. The ford still washes over the road rather than floating above it or
-  //    hiding inside it. 2 u is generous; it caught a 1.8 u regression during
-  //    development, where a pooled reach sat proud of the carriageway.
+  //    hiding inside it — asserted as the two sins a player can SEE (r319):
+  //    no vertex proud of the carriageway by 2 u (the pooled-reach
+  //    regression this caught at 1.8 u during development), and the wash
+  //    TOUCHES the deck somewhere (a ford whose every sample hides inside
+  //    the embankment is a dry crossing). Vertices BELOW the deck are the
+  //    river bed and fall lips passing under the edge — buried geometry,
+  //    invisible, and drivingspec separately proves the crossing soaks you.
   if (r.fordN) {
-    check(`${name}: the ford sits on the deck`, r.fordWorst < 2,
-      `worst |water - deck| = ${r.fordWorst} u over ${r.fordN} on-road samples`);
+    check(`${name}: no ford water stands proud of the deck`, r.fordProud < 2,
+      `worst proud ${r.fordProud} u over ${r.fordN} on-road samples`);
+    check(`${name}: the wash touches the deck`, r.fordTouch < 2,
+      `closest sample ${r.fordTouch} u from the deck`);
   }
 
   await p.close();

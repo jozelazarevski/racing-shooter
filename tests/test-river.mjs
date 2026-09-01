@@ -65,11 +65,17 @@ for (const [id, name] of WORLDS) {
     if (!R?.curve) return { river: false };
 
     // ---- R1: minimum turning radius along the planned curve ----
+    // PER STATION, against the width AT that station (r319). The global form
+    // — tightest bend anywhere vs widest reach anywhere — asked a bend to
+    // carry water that flows 400 u away from it: HEDGEROW's one 10.6 u bend
+    // was flagged against the river's widest station while the generator now
+    // guarantees (and narrows to) rad - bank at each station, which is the
+    // actual no-fold condition of the mesh.
     const N = 400, pts = [];
     for (let i = 0; i <= N; i++) pts.push(R.curve.getPointAt(i / N));
-    const widest = R.halfAt ? Math.max(...R.halfAt) : R.half;
-    const need = widest + (R.bank ?? 0);
-    let minR = Infinity, tight = 0;
+    const halfAtN = (i) => R.halfAt
+      ? R.halfAt[Math.round((i / N) * (R.halfAt.length - 1))] : R.half;
+    let minR = Infinity, tight = 0, needAtMin = 0;
     for (let i = 1; i < N; i++) {
       const a = pts[i - 1], c = pts[i], d = pts[i + 1];
       const ab = Math.hypot(c.x - a.x, c.z - a.z);
@@ -77,9 +83,11 @@ for (const [id, name] of WORLDS) {
       const ac = Math.hypot(d.x - a.x, d.z - a.z);
       const area = Math.abs((c.x - a.x) * (d.z - a.z) - (d.x - a.x) * (c.z - a.z)) / 2;
       const rad = area < 1e-6 ? Infinity : (ab * bc * ac) / (4 * area);
-      if (rad < minR) minR = rad;
-      if (rad < need) tight++;
+      const need = halfAtN(i) + (R.bank ?? 0);
+      if (rad < minR) { minR = rad; needAtMin = need; }
+      if (rad < need - 0.05) tight++;
     }
+    const need = needAtMin;
 
     // ---- R2/R3/R4: the built meshes against the ground under them ----
     // Two properties of the old version of this survey let the floating river
@@ -128,7 +136,9 @@ for (const [id, name] of WORLDS) {
     const water = meshes['river-water'] ? survey(meshes['river-water']) : null;
     const bank = meshes['river-bank'] ? survey(meshes['river-bank']) : null;
 
-    return { river: true, half: R.half, widest: +widest.toFixed(2), bank: R.bank, depth: R.depth,
+    return { river: true, half: R.half,
+      widest: +(R.halfAt ? Math.max(...R.halfAt) : R.half).toFixed(2),
+      bank: R.bank, depth: R.depth,
       minRadius: +minR.toFixed(1), needRadius: +need.toFixed(1), tight, water, bankSurvey: bank };
   });
 

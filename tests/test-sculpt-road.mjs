@@ -145,8 +145,16 @@ const F = await page.evaluate(async () => {
   const out = { cones: 0, buried: 0, teeth: 0 };
   for (const s of t.solids) {
     if (s.h === undefined || s.mat !== 'stone') continue;
+    // PEAKS only. The shark teeth were the massif's big cones (h 20-60)
+    // poking tips through a surface that had swallowed them; a boulder is
+    // furniture, seated on the DRAWN ground by `_seatY` and covered by
+    // test-nature's rule 6 — measuring one against the analytic curve here
+    // re-reported a correctly-seated 3.4 u stone as a tooth (r319).
+    if (s.h <= 10) continue;
     out.cones++;
-    const ground = t.terrainHeight(s.x, s.z);
+    const a = t.terrainHeight(s.x, s.z);
+    const dg = t._drawnGroundY ? t._drawnGroundY(s.x, s.z) : null;
+    const ground = dg === null ? a : Math.min(a, dg);   // the surface you see
     const base = s.y - 2;                       // solids carry y = base + 2
     const visible = (base + s.h) - ground;
     if (base > ground + 1) out.buried++;        // floating would be worse

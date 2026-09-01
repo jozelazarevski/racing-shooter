@@ -9,11 +9,13 @@
   "offRoadClimbDiv": 0.14,
   "offRoadClimbBleed": 14,
   "offRoadClimbFreeGrade": 0.15,
+  "fallEdgeDrop": 3,
+  "fallWreckOver": 16,
   "brakeCap": 2.6,
   "hbYawImpulse": 0.18,
   "hbMinSpeed": 8.4,
   "hbIceDisabled": true,
-  "slipGripFloor": 0.70,
+  "slipGripFloor": 0.7,
   "csAssistGain": 0.55,
   "csAssistSlipMin": 0.22,
   "spinSlipAngle": 1.13,
@@ -80,20 +82,79 @@
   },
   "ai": {
     "roster": [
-      { "name": "rabbit", "paceOffset": -0.02, "consistency": 0.95, "aggression": 0.4, "cutChance": 0.2, "defence": 0.8 },
-      { "name": "racer1", "paceOffset": 0.00, "consistency": 0.90, "aggression": 0.6, "cutChance": 0.2, "defence": 0.7 },
-      { "name": "racer2", "paceOffset": 0.012, "consistency": 0.88, "aggression": 0.7, "cutChance": 0.3, "defence": 0.6 },
-      { "name": "mid1", "paceOffset": 0.024, "consistency": 0.80, "aggression": 0.5, "cutChance": 0.3, "defence": 0.5 },
-      { "name": "mid2", "paceOffset": 0.038, "consistency": 0.80, "aggression": 0.8, "cutChance": 0.3, "defence": 0.4 },
-      { "name": "back1", "paceOffset": 0.048, "consistency": 0.65, "aggression": 0.3, "cutChance": 0.5, "defence": 0.3 },
-      { "name": "back2", "paceOffset": 0.06, "consistency": 0.65, "aggression": 0.9, "cutChance": 0.4, "defence": 0.3 }
+      {
+        "name": "rabbit",
+        "paceOffset": -0.02,
+        "consistency": 0.95,
+        "aggression": 0.4,
+        "cutChance": 0.2,
+        "defence": 0.8
+      },
+      {
+        "name": "racer1",
+        "paceOffset": 0.0,
+        "consistency": 0.9,
+        "aggression": 0.6,
+        "cutChance": 0.2,
+        "defence": 0.7
+      },
+      {
+        "name": "racer2",
+        "paceOffset": 0.012,
+        "consistency": 0.88,
+        "aggression": 0.7,
+        "cutChance": 0.3,
+        "defence": 0.6
+      },
+      {
+        "name": "mid1",
+        "paceOffset": 0.024,
+        "consistency": 0.8,
+        "aggression": 0.5,
+        "cutChance": 0.3,
+        "defence": 0.5
+      },
+      {
+        "name": "mid2",
+        "paceOffset": 0.038,
+        "consistency": 0.8,
+        "aggression": 0.8,
+        "cutChance": 0.3,
+        "defence": 0.4
+      },
+      {
+        "name": "back1",
+        "paceOffset": 0.048,
+        "consistency": 0.65,
+        "aggression": 0.3,
+        "cutChance": 0.5,
+        "defence": 0.3
+      },
+      {
+        "name": "back2",
+        "paceOffset": 0.06,
+        "consistency": 0.65,
+        "aggression": 0.9,
+        "cutChance": 0.4,
+        "defence": 0.3
+      }
     ],
-    "pressureClampPct": 3, "pressurePickAfterS": 15,
-    "separationM": 6, "followGapS": 0.4, "setupMaxS": 1.5, "commitS": 2.0,
-    "defenceMovesPerStraight": 1, "lapBoundaryNoConvergeS": 10,
-    "playerTokensEarly": 1, "playerTokensLate": 2, "tokenRotateS": 6, "rivalRamCapPerHit": 8,
-    "launchReactionMinS": 0.2, "launchReactionMaxS": 0.8,
-    "lateralNoiseTrailM": 4, "lateralNoiseOpenM": 12,
+    "pressureClampPct": 3,
+    "pressurePickAfterS": 15,
+    "separationM": 6,
+    "followGapS": 0.4,
+    "setupMaxS": 1.5,
+    "commitS": 2.0,
+    "defenceMovesPerStraight": 1,
+    "lapBoundaryNoConvergeS": 10,
+    "playerTokensEarly": 1,
+    "playerTokensLate": 2,
+    "tokenRotateS": 6,
+    "rivalRamCapPerHit": 8,
+    "launchReactionMinS": 0.2,
+    "launchReactionMaxS": 0.8,
+    "lateralNoiseTrailM": 4,
+    "lateralNoiseOpenM": 12,
     "parCornerALat": 44,
     "paceCornerExp": 6
   }
