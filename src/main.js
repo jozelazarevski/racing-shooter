@@ -10655,6 +10655,14 @@ class Game {
     // anchor at the local road datum's rim, so a dip is seen from above:
     // the slot, the walls and the car in plan, not the wall's interior.
     // The look target still follows the car, so the eye tracks it down.
+    // TRIGGER AT +8, NOT +1 (r308, "driving feels slow motion"): at +1 the
+    // lift engaged on 25-49% of every lap — any ordinary hill puts the
+    // local datum a few metres over the car (measured max +5.3 across four
+    // worlds), so since r306 the overhead camera floated up to 5 m higher
+    // on half the road, and everything on screen moved smaller and slower.
+    // A real gorge drops the CAR ~28 below the datum; +8 splits the two
+    // populations with margin, and subtracting the threshold eases the
+    // onset instead of popping.
     let gorgeLift = 0;
     if (M.roadYaw && this.track?.center && p.trackIndex !== undefined) {
       const Nc = this.track.center.length;
@@ -10662,7 +10670,7 @@ class Game {
       for (let q = -12; q <= 12; q += 3) {
         rim = Math.max(rim, this.track.center[(p.trackIndex + q + Nc) % Nc].y);
       }
-      if (rim > p.pos.y + 1) gorgeLift = Math.min(30, rim - p.pos.y);
+      if (rim > p.pos.y + 8) gorgeLift = Math.min(30, rim - p.pos.y - 8);
     }
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))

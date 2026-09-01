@@ -70,10 +70,33 @@ ok(R.kill.deaths === 0 && R.kill.alive,
 ok(R.kill.returns >= 1 && R.kill.y > -10,
   'the return actually happened and put the car back up on the road',
   `${R.kill.returns} return(s), resting at y=${R.kill.y}`);
-ok(R.cam.carY < -10 && R.cam.camY > R.cam.rim + 30,
+ok(R.cam.carY < -10 && R.cam.camY > R.cam.rim + 25,
   'the overhead camera floors at the rim over a gorge — never inside the slot',
   `car at y=${R.cam.carY}, camera at y=${R.cam.camY} (rim ${R.cam.rim}; the dead-cam sat at ~27)`);
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
+
+// ---- r308: the lift is for GORGES ONLY. On an ordinary hilly lap the
+// overhead camera must ride at its tuned height — at the r306 +1 trigger it
+// floated up to 5 m higher on 25-49% of every lap, and the whole game read
+// as slow motion ("driving feels slow motion", measured to the metre). ----
+const H = await p.evaluate(async () => {
+  const g = window.__game, pl = g.player, t = g.track, N = t.center.length;
+  const M = g.constructor.CAM_MODES[0];
+  let worst = 0, at = -1;
+  for (let i = 40; i < N; i += 37) {
+    pl.placeAt(i, 0, true); pl.alive = true; pl.health = 100;
+    pl.vel.set(Math.sin(pl.heading) * 15, 0, Math.cos(pl.heading) * 15);
+    for (let f = 0; f < 25; f++) g.frame();
+    // skip genuine gorge samples — the deck itself dives there
+    if (t.center[pl.trackIndex].y - pl.pos.y > 8) continue;
+    const over = g.camera.position.y - pl.pos.y - M.h;
+    if (over > worst) { worst = over; at = i; }
+  }
+  return { worst: +worst.toFixed(1), at, h: M.h };
+});
+ok(H.worst < 8,
+  'on ordinary hills the overhead camera holds its tuned height — no phantom lift',
+  `worst excess ${H.worst} u over M.h=${H.h} (at sample ${H.at}; r306 shipped up to +5 everywhere, plus zoom)`);
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
