@@ -4204,6 +4204,20 @@ export class Car {
     this.alive = false;
     this.mesh.visible = false;
     this.respawnTimer = this.respawnDelay ?? 5;
+    // v1.5 §6.10 (r311): KILLS AFFECT POSITION. A destroyed rival holds
+    // 4.0 s and respawns at the gate it LAST PASSED — it loses the ground
+    // it had made since, so the shooter gains the places it earned
+    // (recording E: "rival kills do not change position"). Progress is
+    // gate-anchored, so the demotion is automatic once the car is back
+    // there. Race-with-route only; roam and missions keep the old timer.
+    const g = this.game;
+    if (this !== g.player && g.state === 'race' && !g.freeRoam && !g.missionMode
+        && g.route?.gates?.length) {
+      this.respawnTimer = window.__DRIVING?.route?.killRespawnHoldS ?? 4.0;
+      this._respawnAtGate = ((this._nextGate ?? 0) - 1 + g.route.gates.length)
+        % g.route.gates.length;
+      g.telemetry?.log('rivalDestroyed', { rival: this.name ?? 'rival' });
+    }
     this.game.particles.explosion(this.pos, true);
     this.game.audio.explosion(true);
     this.game.flashLight(this.pos);
@@ -4291,6 +4305,26 @@ export class Car {
     this._tintFrac = 1;
     this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull
+    // §6.10 (r311): a killed rival comes back at its LAST GATE, still
+    // owing the next one — same shape as every other return in the game.
+    const g = this.game;
+    const gt = this._respawnAtGate != null ? g.route?.gates?.[this._respawnAtGate] : null;
+    if (gt) {
+      const N = g.track.center.length;
+      const back = Math.max(1, Math.round(6 / (g.track.segLen ?? 4)));
+      // NEVER wrap backwards past the lap line: (si-back+N)%N for gate 0
+      // put the car at index N-3 with its lap counter untouched, and
+      // progress = lap + index/N read it as a WHOLE LAP GAINED — the kill
+      // promoted its victim (caught by test-killspos: 1.079 -> 1.999).
+      const rawIdx = gt.si - back;
+      this.trackIndex = rawIdx < 0 ? gt.si : rawIdx;
+      this._nextGate = gt.id;
+      this._gateAlong = undefined;
+      g.telemetry?.log('return', { car: this.name ?? 'rival', reason: 'kill', gateId: gt.id });
+      this._respawnAtGate = null;
+      this.placeAt(this.trackIndex, 0, true);
+      return;
+    }
     this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
   }
 
@@ -5674,18 +5708,24 @@ export class PlayerCar extends Car {
       if (!trying) {
         this._wedgeT = 0;
         this._wedgeAt = null;
+        this._wedgeIdx = null;
       } else {
-        if (!this._wedgeAt) this._wedgeAt = { x: this.pos.x, z: this.pos.z };
-        // 12 m OFF THE COURSE, 6 m otherwise (r294, "gets stuck here" — IL
-        // BUDELLO, pinned by a building at 3-8 km/h): the spec engine
-        // grinds against obstacles at speeds just over the old 6 m line
-        // (4.3 km/h), going nowhere for ever. When the race itself is
-        // shouting OFF THE COURSE the player is somewhere the stage does
-        // not want them — rescue generously there. Roam and on-course keep
-        // the tight line, so a genuine mountain crawl is never yanked.
-        const wedgeClear = (this._strayed ?? 0) > 0 ? 12 : 6;
-        if (Math.hypot(this.pos.x - this._wedgeAt.x, this.pos.z - this._wedgeAt.z) > wedgeClear) {
-          this._wedgeAt = { x: this.pos.x, z: this.pos.z };
+        // v1.5 §3.6 (r311): FORWARD PROGRESS, not displacement. The 6/12 m
+        // displacement anchor was creep-defeatable — a car grinding ALONG
+        // a wall at 3 m/s covers the clearance sideways while going
+        // nowhere on the course (recording E: stuck 4 s at a time, three
+        // events). Progress is measured ALONG THE LAP: less than one
+        // metre of along-track advance, throttle held, for stuckDetectS
+        // is stuck — however far the bodywork scrubbed. Deliberate
+        // reversing is |signed| progress and never trips it; roam is
+        // untouched (controlsLive is race-only).
+        if (this._wedgeIdx == null) this._wedgeIdx = this.trackIndex;
+        const Nw = g.track.center.length;
+        let dIdx = (this.trackIndex - this._wedgeIdx + Nw) % Nw;
+        if (dIdx > Nw / 2) dIdx -= Nw;
+        const segL = g.track.segLen ?? 4;
+        if (Math.abs(dIdx) * segL >= 1) {
+          this._wedgeIdx = this.trackIndex;
           this._wedgeT = 0;
         } else {
           this._wedgeT = (this._wedgeT ?? 0) + dt;
