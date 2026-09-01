@@ -4161,6 +4161,42 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r321 — THE SHOWROOM (owner: "more exciting, increase the graphics, more details and complexity")
+
+The garage screen, sent back with that note. Three layers, all menus —
+the race HUD is frozen and untouched (suite re-run green).
+
+THE SPEC SHEET. `bp-nums` (four bare numbers) becomes six live bars
+under the build stage: SPEED (the HUD's own km/h), PULL, GRIP, HULL,
+FIRE (damage a round + magazine), NITRO. Values are read off the LIVE
+player object — the same numbers the race reads, never a re-derivation
+that could drift. Ceilings are the catalogue's strongest possible build
+(best chassis × maxed wrench × V12, computed once in `Game.__specCeil`),
+so a full bar means "the most this game will sell you", and a dark
+NOTCH on each bar marks the stock value — everything right of it is
+what the money bought.
+
+HONEST CARDS. Every upgrade card now states now → next in the car's own
+numbers via `_upgradeNowNext`, mirrored from applyUpgrades' formulas:
+"200 → 208 KM/H TOP SPEED", "96 → 111 HULL", "3.5 → 5.3 DAMAGE A
+ROUND", "90 → 120 CANNON ROUNDS", and dampers speak the r320 landing
+law — "22 → 25 U/S LANDS FREE — CLIFFS STILL KILL". The "+4% / lvl"
+slogans asked the player to do arithmetic against a base they could not
+see. TIRES keeps its compound-unlock line (the one line that was ever
+misleading is the one that already told the truth).
+
+THE DRAMA. CSS only: part art on a soft radial glow, hover lift on
+cards, a light sweep over the FITTED part, affordable buy buttons
+pulse, bay heads carry a gold gradient rule and a glowing glyph. All
+animation sits behind prefers-reduced-motion.
+
+tests/test-showroom.mjs, 8 checks: six normalised bars with the km/h
+figure agreeing with the player object, no notch on a stock build,
+three cards' now→next regexes, and S4 — buying a rung moves the card
+AND the sheet together, so the shop and the car cannot disagree.
+Fallout: parts 30/30, hudfreeze green, tyres 27/28 and economy 10/11
+(their exact pre-existing singles).
+
 ## r320 — THE CLIFF COLLECTS (phone report, PIKES PEAK)
 
 Screenshot from the phone: the car at the bottom of the ravine under the

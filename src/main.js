@@ -4858,6 +4858,50 @@ class Game {
     this._renderTyreBay();
   }
 
+  /** r321: WHAT THIS RUNG IS WORTH, IN THE CAR'S OWN NUMBERS — one line per
+   *  ladder, now → next, mirrored from applyUpgrades' formulas (top speed,
+   *  hull, damage, rounds, racks, charges, nitro) and Car.onLand's landing
+   *  law (dampers). Returns null where a number would lie (handling's feel,
+   *  tires' compound line, which keeps its own renderer). */
+  _upgradeNowNext(u, lvl) {
+    const base = this._base ?? {};
+    const eng = this.fittedPart('engine');
+    const wing = this.fittedPart('spoiler');
+    const arrow = (a, b, unit) => (lvl < u.max ? `${a} → ${b} ${unit}` : `${a} ${unit} — MAXED`);
+    switch (u.key) {
+      case 'engine': {
+        const kmh = (l) => Math.round((base.maxSpeed ?? 55) * (1 + 0.04 * l)
+          * (eng.speed ?? 1) * (wing.speed ?? 1) * 3.6);
+        return arrow(kmh(lvl), kmh(lvl + 1), 'KM/H TOP SPEED');
+      }
+      case 'armor': {
+        const h = (l) => Math.round((base.maxHealth ?? 96) + 15 * l);
+        return arrow(h(lvl), h(lvl + 1), 'HULL');
+      }
+      case 'cannon': {
+        const d = (l) => (3.5 * (1 + 0.52 * l)).toFixed(1);
+        return arrow(d(lvl), d(lvl + 1), 'DAMAGE A ROUND');
+      }
+      case 'magazine': return arrow(90 + 30 * lvl, 90 + 30 * (lvl + 1), 'CANNON ROUNDS');
+      case 'rack': return arrow(1 + lvl, 2 + lvl, 'ROCKETS · SAME IN MINES');
+      case 'beacon': return arrow(1 + lvl, 2 + lvl, 'SOS CHARGES');
+      case 'nitro': {
+        const n = (l) => `${Math.round((1 + 0.22 * l) * 100)}%`;
+        return arrow(n(lvl), n(lvl + 1), 'NITRO CHARGE');
+      }
+      case 'dampers': {
+        const f = (l) => (22 + 2.6 * l).toFixed(0);
+        return arrow(f(lvl), f(lvl + 1), 'U/S LANDS FREE — CLIFFS STILL KILL');
+      }
+      case 'copilot': {
+        const L = ['SILENT SEAT', 'SLOW-DOWN CALLS', '+ DIRECTION & SEVERITY',
+          '+ EARLY CALLS & DISTANCE'];
+        return lvl < u.max ? `${L[lvl]} → ${L[lvl + 1]}` : `${L[lvl]} — MAXED`;
+      }
+      default: return null;
+    }
+  }
+
   /** One upgrade line as a card — the same shape as a part card, because a
    *  player does not care which of the game's two systems a thing came out of.
    *  The bar is the LEVEL, the button is the next rung's price. */
@@ -4876,6 +4920,14 @@ class Game {
       desc = nextMax > nowMax
         ? `NEXT LEVEL UNLOCKS ${TYRE_LABEL[nextMax]} TYRES · +4% grip`
         : `+4% grip / lvl · ${TYRE_LABEL[nowMax]} IS YOUR BEST COMPOUND`;
+    } else {
+      // r321: THE CARD SAYS THE NUMBER, NOT THE SLOGAN. "+4% top speed / lvl"
+      // asks the player to do arithmetic against a base they cannot see; the
+      // card now states this build's value and the next rung's, computed by
+      // the SAME formulas applyUpgrades uses, so the shop can never promise
+      // what the car will not deliver.
+      const nn = this._upgradeNowNext(u, lvl);
+      if (nn) desc = nn;
     }
     const pips = Array.from({ length: u.max },
       (_, i) => `<b class="${i < lvl ? '' : 'off'}"></b>`).join('');
@@ -5211,25 +5263,54 @@ class Game {
     const wingStock = stockPart(PART_SLOT.spoiler);
     const base = this._base ?? { maxSpeed: p?.maxSpeed ?? 0, accel: p?.accel ?? 0, maxHealth: p?.maxHealth ?? 0 };
     const chip = (label, mod) => `<span class="${mod ? 'up' : ''}">${mod ? '▲ ' : ''}${label}</span>`;
-    const num = (label, now, was, unit = '') => {
-      const d = Math.round(now) - Math.round(was);
-      return `<span><i>${label}</i><b>${Math.round(now)}${unit}</b>${
-  d ? `<u class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}</u>` : ''}</span>`;
-    };
     const ladders = UPGRADES.reduce((n, u) => n + (up[u.key] | 0), 0);
     const swapped = (eng.id !== engStock.id ? 1 : 0) + (wing.id !== wingStock.id ? 1 : 0);
+    // ---- r321 THE SPEC SHEET. Six bars off the LIVE player object — the
+    // same numbers the race reads, never a re-derivation that could drift.
+    // Ceilings are the catalogue's best chassis fully built (engine wrench
+    // maxed × V12, tyre ladder maxed), computed once, so a full bar means
+    // "the strongest build the game can sell" and the stock notch on each
+    // bar shows what the money added.
+    const CEIL = (Game.__specCeil ??= (() => {
+      let sp = 0, ac = 0, gr = 0, hu = 0;
+      for (const c of CAR_CATALOG) {
+        sp = Math.max(sp, c.stats.maxSpeed); ac = Math.max(ac, c.stats.accel);
+        gr = Math.max(gr, c.stats.grip); hu = Math.max(hu, c.stats.health);
+      }
+      return { speed: sp * 1.2 * 1.24, accel: ac * 1.24, grip: gr * 1.2,
+        hull: hu + 15 * 5, fire: 3.5 * (1 + 0.52 * 5), nitro: 1 + 0.22 * 5 };
+    })());
+    const stats = car?.stats ?? {};
+    const bar = (label, now, was, ceil, text) => {
+      const w = Math.min(100, Math.round(100 * now / ceil));
+      const s = Math.min(100, Math.round(100 * was / ceil));
+      return `<div class="sp-row"><i>${label}</i>
+        <span class="sp-bar"><b style="width:${w}%"></b>${
+  s < w ? `<u style="left:${s}%"></u>` : ''}</span>
+        <em>${text}</em></div>`;
+    };
+    const sheet = `<div class="bp-sheet">
+      ${bar('SPEED', p?.maxSpeed ?? 0, base.maxSpeed, CEIL.speed,
+    `${Math.round((p?.maxSpeed ?? 0) * 3.6)} KM/H`)}
+      ${bar('PULL', p?.accel ?? 0, base.accel, CEIL.accel,
+    `${(p?.accel ?? 0).toFixed(0)}`)}
+      ${bar('GRIP', (stats.grip ?? 4.5) * (p?.gripBoost ?? 1), stats.grip ?? 4.5, CEIL.grip,
+    `${((stats.grip ?? 4.5) * (p?.gripBoost ?? 1)).toFixed(1)}${
+  (p?.downforce ?? 0) > 0 ? ` +WING` : ''}`)}
+      ${bar('HULL', p?.maxHealth ?? 0, base.maxHealth, CEIL.hull,
+    `${Math.round(p?.maxHealth ?? 0)}`)}
+      ${bar('FIRE', p?.cannonDamage ?? 3.5, 3.5, CEIL.fire,
+    `${(p?.cannonDamage ?? 3.5).toFixed(1)}/RD · ${p?.maxRounds ?? 90}`)}
+      ${bar('NITRO', p?.nitroRate ?? 1, 1, CEIL.nitro,
+    `×${(p?.nitroRate ?? 1).toFixed(2)}`)}
+    </div>`;
     el.innerHTML = `<div class="bp-shop"></div>
       <div class="bp-side">
         <div class="bp-name">${car?.name ?? ''}${
   ladders || swapped ? '<b class="bp-tag">MODIFIED</b>' : '<b class="bp-tag stock">STOCK</b>'}</div>
         <div class="bp-spec">${chip(eng.name, eng.id !== engStock.id)}${
   chip(wing.name, wing.id !== wingStock.id)}${chip(`${TYRE_LABEL[tc]} TYRES`, tc > 0)}</div>
-        <div class="bp-nums">
-          ${num('TOP', p?.maxSpeed ?? 0, base.maxSpeed)}
-          ${num('PULL', p?.accel ?? 0, base.accel)}
-          ${num('HULL', p?.maxHealth ?? 0, base.maxHealth)}
-          ${num('DOWN', (p?.downforce ?? 0) * 100, 0, '%')}
-        </div>
+        ${sheet}
         <div class="bp-mods">${swapped} PART${swapped === 1 ? '' : 'S'} SWAPPED ·
           ${ladders} UPGRADE${ladders === 1 ? '' : 'S'} FITTED</div>
       </div>`;
