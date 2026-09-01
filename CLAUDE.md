@@ -86,6 +86,8 @@ Open, in priority order. Each row is a repair of observed behaviour.
 
 **3.9 Camera close-clamp.** When the probe clamps the camera closer than 6 m to the car (the waterfall frames at 0:33 show a camera a few metres away, nearly edge-on), it MUST rise toward top-down instead of pulling in, keeping the car and at least 15 m of surroundings in frame.
 
+**3.6b Respawn velocity, owner override (r324, 2026-09-01).** "When car restarts after selecting goes straight to nitro. Should be stopped." A restarted car STANDS: `returnSpeedKmh` = 0 and every placement zeroes any burning boost (the wreck respawn was carrying `boostTimer` through death). This supersedes the 40 km/h in 3.6 and the >= 35 km/h clause of P5; the heading-on-tangent clause of P5 stands.
+
 **3.6a Respawn velocity, corrected evidence.** Fall 2 respawn (0:20) leaves the car at 0 km/h with the joystick centred; fall 3 respawn (0:34) leaves it at 32 km/h coasting. The earlier "0 to 14 over 4 s" reading was partly the player not pushing. The fault that stands: respawn velocity is inconsistent and never the specified 40 km/h along the tangent; P5 covers it.
 
 **3.7 Landing assist.** For 300 ms after touchdown: lateral velocity blended toward heading at 80% per 100 ms, yaw rate clamped 60[deg]/s, steer honoured, handbrake cancels and preserves the slide.

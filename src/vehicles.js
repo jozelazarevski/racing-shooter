@@ -1804,6 +1804,13 @@ export class Car {
     this.pos.copy(t.pointAt(index, lateral));
     this.heading = t.headingAt(index);
     this.vel.set(0, 0, 0);
+    // r324 (owner: "When car restarts... goes straight to nitro. Should be
+    // stopped.") A placement is a fresh stand, and a burning boost must not
+    // cross it: the wreck respawn ends here and was carrying boostTimer
+    // through death — measured 3.0 s still lit on the far side — so the car
+    // came back surging. Every restart path (respawn, rescue, returnToGate,
+    // resetRace, the rival pit-lift) funnels through this method.
+    this.boostTimer = 0;
     this.trackIndex = index;
     this.lateral = lateral;
     // sync vertical state to the (possibly elevated) road — no spawn-drop

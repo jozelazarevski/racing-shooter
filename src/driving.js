@@ -176,7 +176,9 @@ export const DRIVING = {
     openMaxHalfWidthM: 60,
     missedGateGraceS: 4.0,
     returnAheadM: 6,
-    returnSpeedKmh: 40,
+    returnSpeedKmh: 0,  // r324 owner override of §3.6's 40: a restarted car
+                        // STANDS — under touch auto-gas, 40 km/h at respawn
+                        // read as an instant nitro launch
     maxClimbDeg: 35,
     fatalDropM: 12,
     waterDepthM: 1.2,
