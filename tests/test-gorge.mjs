@@ -38,8 +38,15 @@ const R = await p.evaluate(() => {
   const rl = g.telemetry.log.bind(g.telemetry);
   g.telemetry.log = (k, d) => { if (k === 'return') returns++; return rl(k, d); };
 
-  // 1. the failed jump: creep into the gorge at 6 m/s, wait out the grace
-  pl.placeAt(100, 0, true);
+  // 1. the failed jump: creep into the gorge at 6 m/s, wait out the grace.
+  // r310: the start now rotates onto a straight (§11.1), so the gorge is
+  // FOUND, not hardcoded — the deck dives ~26 u below the datum there.
+  let gIdx = -1;
+  for (let i = 0; i < N; i++) {
+    if (t.center[i].y - (t.groundHeightAt ? t.groundHeightAt(i, 0) : t.center[i].y) > 15) { gIdx = i; break; }
+  }
+  if (gIdx < 0) return { noGorge: true };
+  pl.placeAt((gIdx - 10 + N) % N, 0, true);
   pl.vel.set(Math.sin(pl.heading) * 6, 0, Math.cos(pl.heading) * 6);
   const deaths0 = g.deaths;
   for (let f = 0; f < 360; f++) g.frame();
@@ -52,7 +59,7 @@ const R = await p.evaluate(() => {
   const realDrown = pl.drown.bind(pl);
   const realChasm = pl.intoChasm.bind(pl);
   pl.drown = () => {}; pl.intoChasm = () => {};
-  pl.placeAt(110, 0, true); pl.vel.set(0, 0, 0);
+  pl.placeAt((gIdx + 3) % N, 0, true); pl.vel.set(0, 0, 0);
   let camY = 0, rim = -Infinity;
   for (let f = 0; f < 45; f++) {
     pl._wedgeT = 0; pl._lostT = 0; pl._cliffT = 0; g._gateMissT = 0;

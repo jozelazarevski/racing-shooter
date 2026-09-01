@@ -6448,6 +6448,44 @@ export class Track {
         this.nrm[i].set(tg.z, 0, -tg.x);
       }
     }
+    // v1.5 §11.1 (r310) — THE LINE LIVES ON A STRAIGHT. The generator put
+    // index 0 wherever the sketch happened to start; measured on CANYON
+    // RUN, the finish line sat on a 34 m-radius bend (the §11.1 floor is
+    // 60 m through 80 m of run-out and 60 m of run-in). This is §13.3's
+    // "generator change, not hand edit": rotate the sampled lap so the
+    // start lands on the straightest stretch, BEFORE anything builds
+    // against index 0 — the gantry, the grid, the gates, the elevation
+    // profile and every feature are index-relative and follow for free.
+    // A lap already legal at its drawn start is left exactly as drawn.
+    {
+      const sampleLen0 = Math.max(1, Math.hypot(
+        this.center[1].x - this.center[0].x, this.center[1].z - this.center[0].z));
+      const outS = Math.round(80 / sampleLen0), inS = Math.round(60 / sampleLen0);
+      const rad = (i) => {
+        const a = this.center[(i - 6 + N) % N], b = this.center[i % N], c = this.center[(i + 6) % N];
+        const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+        const cross = abx * bcz - abz * bcx;
+        if (Math.abs(cross) < 1e-6) return 1e9;
+        const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ac = Math.hypot(c.x - a.x, c.z - a.z);
+        return (ab * bc * ac) / (2 * Math.abs(cross));
+      };
+      const worstAround = (k) => {
+        let w = 1e9;
+        for (let j = -inS; j <= outS; j += 3) w = Math.min(w, rad((k + j + N) % N));
+        return w;
+      };
+      if (worstAround(0) < 60) {
+        let best = 0, bestR = worstAround(0);
+        for (let k = 3; k < N; k += 3) {
+          const r = worstAround(k);
+          if (r > bestR) { bestR = r; best = k; }
+        }
+        if (best > 0) {
+          for (const arr of [this.center, this.tan, this.nrm]) arr.push(...arr.splice(0, best));
+          this._startRotated = { by: best, worstRadiusM: Math.round(Math.min(bestR, 9999)) };
+        }
+      }
+    }
     this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
