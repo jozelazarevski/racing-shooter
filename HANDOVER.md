@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r308 — "SLOW MOTION" WAS THE CAMERA, FIVE METRES TOO HIGH ON EVERY HILL
+User: "Somehow driving feels slow motion." Ruled out in order, against
+the pristine r294 base: physics pace IDENTICAL (0-100 5.63 s vs 5.83,
+spec FT5's own window; matched spot speeds), no render regression
+(headless fps equal), JS update +0.5 ms/frame (logged as debt, not the
+phone's bottleneck). The real cause was r306's own gorge lift: its
+trigger was `rim > car + 1` over ±12 samples, which is true on ANY
+GRADIENT — measured engaging on 25-49% of every lap (Pine 29, Canyon
+25, Summit 48, Maple 49%), lifting the overhead camera up to +5.3 m on
+ordinary hills. Higher camera, smaller apparent motion: the whole game
+read as slow motion within a day of r306 shipping. The two populations
+don't overlap — ordinary hills max +5.3, a real gorge puts the CAR ~28
+below the datum — so the trigger moves to +8 with the threshold
+subtracted (eased onset, no pop). Gorge behaviour kept: camera 38 u
+above the rim in the slot. test-gorge grows the r308 pin: worst
+hill excess now 0.5 u (suite skips genuine gorge samples by the same
++8 law). LESSON, same family as the HANDOVER's top defect: a trigger
+tuned on the anomaly must be checked against the BASELINE population —
++1 was chosen looking only at the gorge. Camera suite 7/7 twice (one
+drive-variance flake, the r300-documented one). DEBT: update loop is
+2.34 ms/frame vs 1.80 on r294 (+30% across r295-r307) — profile the
+route/hud/aggro additions when it matters. Tag r308.
+
 ## r307 — THE DRIFT FINALLY TURNS THE CAR
 User: "When I drift it does not seem it helping me turn. But just
 sliding." Measured to the number before touching anything: a 2 s
