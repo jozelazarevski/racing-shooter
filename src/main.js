@@ -141,14 +141,19 @@ const DIFFS = {
   // backfire this file already recorded once, where a raised maxSpeed drops
   // rivals under the `v > maxSpeed*0.55` nitro gate and they boost half as
   // often. The knob that reads fastest makes the field slower.
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.58, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
+  // rubberBand/bandUp are GONE (r313, §5): the band itself is deleted from
+  // EnemyCar — convergence now lives ONLY in the pressure rival's ±3% lease
+  // — and a key nothing reads is a config that lies. A tier's whole pace is
+  // aiSpeed × aiCorner; its forgiveness is that pace being low, not a pack
+  // that waits.
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.58, aiAggression: 1.0 },
   // hard aiCorner 0.65 (r291): the drag restore lifted absolute speeds and
   // the tier-blind pinch caps bind sooner, compressing normal and hard to a
   // 3-point coin flip on open worlds (1212 vs 1209 measured). Two points of
   // corner budget give HARD back a real edge without re-crossing the
   // clean-winnable bound.
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.65, aiAggression: 1.4,  rubberBand: 0.15 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.65, aiAggression: 1.4 },
 };
 
 const UPGRADES = [
@@ -9920,6 +9925,7 @@ class Game {
       e.alive = true;
       e.mesh.visible = true;
       e.boostTimer = 0;
+      e._launchHold = e._launchReaction ?? 0;   // §5.5: a restart re-arms the lights
       const s = this.track.gridSlot(i + 1);
       e.placeAt(s.index, s.lateral);
     });
@@ -10006,6 +10012,14 @@ class Game {
     this.player.outOfHulls = false;
     this.state = 'countdown';
     this.countdown = 3.6;
+    // §5.2 (r313): the pressure lease starts vacant every race
+    this._pressureRival = null;
+    this._pressurePickedLap = 0;
+    // §5.4 (r313): so do the target tokens. Leases expire against raceTime,
+    // so a lease granted late in race N (until ≈ 90) read as LIVE for all of
+    // race N+1's early window after a restart — two stale tokens beat the
+    // early cap of one (caught by the acceptance harness's restart loop).
+    this._aggro = [];
     // PATCH_02 §3.1: NOBODY DIES ON THE GRID. The recording lost 26 hull
     // before the car ever moved. Every car is invulnerable and weapon-locked
     // from grid spawn to GO + 1.5 s; rivals may not make the player their
@@ -10453,9 +10467,41 @@ class Game {
     for (const car of [this.player, ...this.enemies]) {
       if (!car.alive) continue;
       const ev = this.route.step(car);
-      if (ev && car === this.player) {
-        this.telemetry?.log('gate', { id: ev.id, passed: ev.passed,
-          lateralM: ev.lateral, section: ev.kind });
+      if (ev) {
+        // §5.4 (r313): every car's gate passage is stamped — a rival within
+        // 1.5 s of its own gate is driving, not shooting (vehicles.js reads
+        // _lastGateT at all three weapon gates)
+        if (ev.passed) car._lastGateT = this.raceTime;
+        if (car === this.player) {
+          this.telemetry?.log('gate', { id: ev.id, passed: ev.passed,
+            lateralM: ev.lateral, section: ev.kind });
+        }
+      }
+    }
+    // §5.2 (r313): THE PRESSURE RIVAL — the honest rubber band. At GO+15,
+    // the ONE rival nearest the player in progress holds the lease (nearest
+    // progress IS nearest live pace: progress = pace × time from the same
+    // start); re-picked each player lap. Only that rival's pace may track
+    // the player, clamped ±pressureClampPct in vehicles.js — everyone else
+    // races their own race.
+    {
+      const AI2 = window.__DRIVING?.ai ?? {};
+      const pickAfter = AI2.pressurePickAfterS ?? 15;
+      const plLap = this.player.lap ?? 1;
+      if (this.raceTime >= pickAfter
+          && (!this._pressureRival || this._pressurePickedLap !== plLap)) {
+        let best = null, bestD = 1e9;
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const d = Math.abs((e.progress ?? 0) - (this.player.progress ?? 0));
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        if (best && best !== this._pressureRival) {
+          this._pressureRival = best;
+          this.telemetry?.log('aiState', { rival: best.persona ?? best.name,
+            state: 'PRESSURE', targetId: 'player' });
+        }
+        this._pressurePickedLap = plLap;
       }
     }
     // §4.4 the missed-gate grace: the next gate sitting BEHIND the car
@@ -10511,6 +10557,7 @@ class Game {
     car.vy = 0; car.airborne = false;
     car.invuln = Math.max(car.invuln ?? 0, 1.5);
     car._noPickupT = 1.5;                    // a return never grants nitro
+    car._lastReturnT = this.raceTime;        // probes read this (Q13/Q19 audits)
     if (car === this.player) {
       this.telemetry?.log('return', { reason, gateId });
     }
@@ -10527,13 +10574,15 @@ class Game {
     const now = this.raceTime;
     this._aggro = (this._aggro ?? []).filter((a) => a.until > now && a.r.alive);
     const P2 = window.__DRIVING?.patch02 ?? {};
+    const AIT = window.__DRIVING?.ai ?? {};   // v1.5 §5.4 owns these knobs now
     if (now < (P2.rivalTargetDelayS ?? 4)) return false;
     const mine = this._aggro.find((a) => a.r === rival);
     if (mine) return true;   // v1.1: tokens ROTATE — a lease is 6 s, never renewed on use
     const cap = now < (P2.playerTargetEarlyUntilS ?? 20)
-      ? (P2.playerTargetTokensEarly ?? 1) : (P2.playerTargetTokensLate ?? 2);
+      ? (AIT.playerTokensEarly ?? P2.playerTargetTokensEarly ?? 1)
+      : (AIT.playerTokensLate ?? P2.playerTargetTokensLate ?? 2);
     if (this._aggro.length < cap) {
-      this._aggro.push({ r: rival, until: now + (P2.targetTokenRotateS ?? 6) });
+      this._aggro.push({ r: rival, until: now + (AIT.tokenRotateS ?? P2.targetTokenRotateS ?? 6) });
       this.telemetry?.log('rivalTarget', { rivalId: rival.name ?? 'rival', acquire: true });
       return true;
     }
@@ -10564,10 +10613,12 @@ class Game {
                          && (b._crashT ?? -9) < this.raceTime - 0.5) {
             a._crashT = b._crashT = this.raceTime;
             const dmg = Math.min(20, (impact - 9) * 0.6);
-            // PATCH_02 §3.3: a rival ramming the PLAYER costs at most 8 —
-            // the pack must pressure with position, not delete a hull.
-            a.damage(a === this.player && b !== this.player ? Math.min(8, dmg) : dmg, b);
-            b.damage(b === this.player && a !== this.player ? Math.min(8, dmg) : dmg, a);
+            // PATCH_02 §3.3 / v1.5 §5.4: a rival ramming the PLAYER costs at
+            // most rivalRamCapPerHit (8) — the pack must pressure with
+            // position, not delete a hull.
+            const ramCap = window.__DRIVING?.ai?.rivalRamCapPerHit ?? 8;
+            a.damage(a === this.player && b !== this.player ? Math.min(ramCap, dmg) : dmg, b);
+            b.damage(b === this.player && a !== this.player ? Math.min(ramCap, dmg) : dmg, a);
             const mid = a.pos.clone().add(b.pos).multiplyScalar(0.5);
             this.particles.debris(mid, 3);
             if (a === this.player || b === this.player) {

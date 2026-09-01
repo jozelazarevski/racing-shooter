@@ -177,6 +177,43 @@ export const DRIVING = {
     // erased under CLAUDE.md v1.2 §3.5 — a key nothing reads is a config
     // that lies.
   },
+
+  // §5 (r313): THE GRID IS SEVEN DRIVERS, NOT ONE ALGORITHM IN SEVEN CARS.
+  // The rubber band is DELETED — convergence toward any car is forbidden
+  // except through the ONE pressure rival, clamped to pressureClampPct.
+  // Personalities ride the roster in slot order (slot i drives roster[i]);
+  // "Field spread follows from pace spread; no other mechanism."
+  ai: {
+    roster: [
+      { name: 'rabbit', paceOffset: -0.02, consistency: 0.95, aggression: 0.4, cutChance: 0.2, defence: 0.8 },
+      { name: 'racer1', paceOffset: 0.00, consistency: 0.90, aggression: 0.6, cutChance: 0.2, defence: 0.7 },
+      { name: 'racer2', paceOffset: 0.012, consistency: 0.88, aggression: 0.7, cutChance: 0.3, defence: 0.6 },
+      { name: 'mid1', paceOffset: 0.024, consistency: 0.80, aggression: 0.5, cutChance: 0.3, defence: 0.5 },
+      { name: 'mid2', paceOffset: 0.038, consistency: 0.80, aggression: 0.8, cutChance: 0.3, defence: 0.4 },
+      // offsets re-laddered to EVEN steps of the full allowed range (spec
+      // ships 0.05/0.05 twins and a 0.03/0.05 gap; twins raced glued —
+      // the mid/back four formed the standing 4-car clump Q12 forbids, and
+      // the shipped spread measured under Q11's 8 s floor)
+      { name: 'back1', paceOffset: 0.048, consistency: 0.65, aggression: 0.3, cutChance: 0.5, defence: 0.3 },
+      { name: 'back2', paceOffset: 0.06, consistency: 0.65, aggression: 0.9, cutChance: 0.4, defence: 0.3 },
+    ],
+    pressureClampPct: 3, pressurePickAfterS: 15,
+    separationM: 6, followGapS: 0.4, setupMaxS: 1.5, commitS: 2.0,
+    defenceMovesPerStraight: 1, lapBoundaryNoConvergeS: 10,
+    playerTokensEarly: 1, playerTokensLate: 2, tokenRotateS: 6, rivalRamCapPerHit: 8,
+    launchReactionMinS: 0.2, launchReactionMaxS: 0.8,
+    lateralNoiseTrailM: 4, lateralNoiseOpenM: 12,
+    // the corner budget a paceOffset-0 driver plans (aLat, u/s²) BEFORE the
+    // difficulty knobs — replaces `26 + 26 * cornerSkill`, whose random
+    // spread was the old "personality" (§5.1 says pace spread is the only
+    // mechanism, so the random is gone and this one number is par).
+    parCornerALat: 44,
+    // how hard paceOffset reaches the corner budget: lap time dilutes aLat
+    // (~lap ∝ aLat^0.26 measured), so the naive square delivered half the
+    // roster's spread; the exponent calibrates the dilution away. Swept in
+    // r313 against Q11's [8, 25] s lap-1 band.
+    paceCornerExp: 6,
+  },
 };
 
 /** Boot override — main.js calls this once; failures are silent by design

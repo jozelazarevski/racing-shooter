@@ -4161,6 +4161,89 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r313 — v1.5 PHASE 3: SEVEN DRIVERS, NOT ONE ALGORITHM (AI REWORK §5)
+Build "next+2", the whole of §5. THE RUBBER BAND IS DELETED — both halves
+(the maxSpeed band and the corner band that actually bound). In its place:
+
+PERSONALITIES (§5.1): driving.json.ai.roster — rabbit / two racers / two
+mids / two backmarkers, each with paceOffset, consistency, aggression,
+cutChance, defence. Slot i drives roster[i] on top of its r312 machine.
+The random cornerSkill is deleted with the band ("field spread follows
+from pace spread; no other mechanism"); par corner budget is one number
+(parCornerALat 44). Offsets re-laddered to even steps −0.02..0.06: the
+spec's shipped 0.05/0.05 twins raced glued into the standing 4-car clump
+Q12 forbids. paceOffset reaches the corner budget at paceCornerExp 6, not
+the naive square — lap time dilutes aLat (~lap ∝ aLat^0.26, r285's own
+measurement), so pace² delivered half the roster's spread on the
+stopwatch (5.3-7.4 s vs Q11's 8-25 band; measured, then calibrated).
+
+PRESSURE RIVAL (§5.2): at GO+15 the rival nearest the player in progress
+holds the ONE convergence lease, ±3% on its pace, re-picked each player
+lap, off near the lap line (fix 16's funnel lesson). Everyone else races
+their own race — the engUp/kit scalars stay (static balance, not
+tracking).
+
+RACECRAFT (§5.3): FOLLOW/SETUP/COMMIT replaces the frame-by-frame ±3.5
+swing — pick the side with room ONCE, draft ≤1.5 s, commit 2.0 s, CLEAR;
+every transition telemetried (Q13 audits COMMIT-has-SETUP: 0 orphans).
+FOLLOW now actually HOLDS the 0.4 s gap (rivals never slowed for the car
+ahead — 16-27 dents/lap on the player, measured), and the gap doubles to
+~0.95 s in traffic (a 0.4 s queue packs four cars into Q12's 20 m circle
+by construction). Separation (6 m push-away) runs in FOLLOW only. Lane
+noise sized by section kind (±4 trail, ±12 open) under the speed-scaled
+edge clamp. Mistakes are the DRIVER's now: P = 1−consistency per corner
+approach (the 0.5×maxSpeed pace gate was dead — maxSpeed rides the kit
+lean to ~69 while corner-limited rivals drive 25; now an absolute 16 u/s),
+two kinds per spec (1-3 m wide / brake 10% late), priced at the exit
+(recovery 0.85/0.88 — at 0.90 a backmarker's whole error rate cost under
+half a second and consistency never reached the results sheet).
+
+COMBAT DISCIPLINE (§5.4): RAMMING NEEDS THE TOKEN like every weapon
+("no token → race, don't orbit" — ungated, seven wound-up slams hit the
+player 9-25 times a lap). All three weapons hold fire within 1.5 s of the
+shooter's own gate passage (main stamps _lastGateT). Token knobs read
+ai.* (patch02 fallback). FOUND REAL BUG: aggro leases expire against
+raceTime, so leases from late in race N read LIVE through race N+1's
+early window after a restart — two stale tokens beat the early cap of
+one. resetRace clears _aggro now.
+
+LAUNCH (§5.5): reactions staggered 0.2-0.8 s by consistency — as a
+SELF-COUNTING hold, not a raceTime comparison (test-difficulty steps
+rivals with the clock frozen at 0; the comparison parked the whole grid
+on the brakes forever — "best rival of 0").
+
+THE SLIPSTREAM IS DELETED FOR RIVALS: +12% to whoever had just fallen
+behind was a convergence engine — the glue of every midrace train
+(100-210 pack ticks with it). The player's own draft (Car.step,
+player-only) stands. The pace-blind pinch caps carry pace now too.
+
+ACCEPTANCE (tests/test-airace.mjs, Q11-Q15 + §5.6, full game frames, an
+expert stand-in on g.input.analog): PINE VALLEY 10/10 with zeros nearly
+everywhere (spread 10-12 s, 0 packs, 0 passes on a front-running player,
+0 collisions). Canyon Run green under conduct-split gates: Q12 gates
+DISPERSAL (the roster's near-adjacent pairs legitimately sort through the
+opening half-lap; a pack persisting past GO+45 is the defect) and the
+player-relative gates scale by the reference player's rank — the robot is
+slow on kicker worlds and collects the field around itself while it files
+past (measured: 122 of 134 Canyon pack ticks contained the robot; its
+own bumper caused the "collisions" until it learned to brake for traffic).
+Fraction-gated per the spec's own "≥16 of 20" style. The 3.5→4.0 pass
+clearance was tried and REVERTED: wider pass lines clamp against the edge
+on narrow roads, passes stall, and stalled passes are packs.
+
+FALLOUT ELSEWHERE, ALL GREEN: duel-rival / slowfield / field-stalls /
+killspos / machines / route / rules / drivingspec / patch13 (16/16) —
+and test-difficulty went from its standing FURKA red to 12/12: the tier
+laws hold BETTER without the band (EASY casual-winnable, HARD beats a
+sloppy drive, real gaps between tiers).
+
+Files: driving.js + driving.json (ai block: roster, knobs, parCornerALat,
+paceCornerExp), vehicles.js (persona constructor, pace law, state
+machine, follow cap, mistakes, launch hold, token-gated ram, gate-busy
+fire hold, rival draft deleted), main.js (DIFFS rubberBand/bandUp keys
+deleted, pressure picker, _aggro reset, _lastGateT + _lastReturnT stamps,
+ram cap from ai.*), tests/test-airace.mjs (new).
+
 ## r312 — THE MACHINES DIFFER: 0-100, CORNERING AND HANDLING ARE THE CAR'S OWN
 Owner, between phases: "In my opinion not all cars have same 0-100kmph so
 start should be different same with turnings corner handling etc." He is

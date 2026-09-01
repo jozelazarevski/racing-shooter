@@ -4511,7 +4511,7 @@ function computeSpeedInv(track, raceLine) {
   return inv;
 }
 
-const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiCorner: 1, aiAggression: 1, rubberBand: 1 };
+const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiCorner: 1, aiAggression: 1 };
 
 // ---------- AI rival ----------
 // The Voxel Racers collection — rival lineup
@@ -4566,12 +4566,31 @@ export class EnemyCar extends Car {
     this.offroadSkill = machine.offroad ?? 0.7;
     this.maxHealth = this.health = 70;
     this.respawnDelay = 5;
-    this.baseMaxSpeed = this.maxSpeed;   // difficulty/rubber-band scale on top of this
-    this.cornerSkill = Math.random();    // 0..1 — how hard this driver leans on the tires
-    this.lane = THREE.MathUtils.randFloatSpread(2.5); // small personal offset off the ideal line
-    this.laneTimer = 3 + Math.random() * 4;
+    this.baseMaxSpeed = this.maxSpeed;   // difficulty scales on top of this
+    // §5.1 (r313): THE DRIVER IS A PERSONA FROM THE ROSTER, NOT A DICE ROLL.
+    // Slot order is roster order — one rabbit, two racers, two mid, two
+    // backmarkers — and "field spread follows from pace spread; no other
+    // mechanism": cornerSkill's random corner budget is deleted with it.
+    const AI = DRIVING.ai ?? {};
+    const persona = AI.roster?.[slot % (AI.roster?.length || 1)] ?? {};
+    this.persona = persona.name ?? `slot${slot}`;
+    this.paceOffset = persona.paceOffset ?? 0;
+    this.consistency = persona.consistency ?? 0.85;
+    this.cutChance = persona.cutChance ?? 0.3;
+    this.defence = persona.defence ?? 0.5;
+    // §5.5: launch reactions staggered 0.2-0.8 s by consistency, so the
+    // field strings out from second one instead of arriving as a box.
+    const rMin = AI.launchReactionMinS ?? 0.2, rMax = AI.launchReactionMaxS ?? 0.8;
+    this._launchReaction = THREE.MathUtils.clamp(
+      rMin + ((0.98 - this.consistency) / 0.33) * (rMax - rMin), rMin, rMax);
+    this._launchHold = this._launchReaction;
+    this._laneSeed = THREE.MathUtils.randFloatSpread(1); // personal line, scaled by section kind
+    this._laneAmp = 1.5;
+    this.lane = 0;                       // legacy name still read at the steer target
+    this._ovState = 'FOLLOW';            // §5.3 overtake machine
+    this._ovT = 0; this._ovSide = 1; this._ovLat = 0;
 
-    this.aggression = 0.7 + Math.random() * 0.7; // angry grid: ~40% above the old 0.5..1.0
+    this.aggression = persona.aggression ?? 0.6; // §5.1 trait, 0..1
     this.mineCooldown = 4 + Math.random() * 5;  // stagger the first drops
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
     this.ramCooldown = 6 + Math.random() * 4;   // deliberate side-slam timer (stagger + skip the start scrum)
@@ -4582,8 +4601,6 @@ export class EnemyCar extends Car {
 
     // ---- driver-feel state (all refreshed by _sense at ~6 Hz, zero allocs) ----
     this._senseT = Math.random() * 0.16; // staggered so the grid never senses in lockstep
-    this._drafting = false;              // tucked behind a car ahead (cone check)
-    this._draftT = 0;                    // draft dwell timer -> _draftOn (+12% window)
     this._avoidSolid = { on: false, lat: 0, r: 0 };            // landed rockfall etc.
     this._avoidHerd = { on: false, lat: 0, r: 0, panic: false }; // livestock in the road
     this._geyserLift = false;            // erupting geyser dead ahead -> ease off
@@ -4603,14 +4620,6 @@ export class EnemyCar extends Car {
   }
 
   /** True when `other` sits in the draft cone directly ahead (3..14u, ~28°). */
-  _draftBehind(other, fwd) {
-    if (!other || other === this || !other.alive) return false;
-    const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
-    const d2 = dx * dx + dz * dz;
-    if (d2 > 196 || d2 < 9) return false;
-    return (dx * fwd.x + dz * fwd.z) / Math.sqrt(d2) > 0.88;
-  }
-
   /** Low-frequency situational awareness (~6 Hz): runtime hazards (landed
    *  fallers, livestock, geysers), mutual slipstream, block re-arm and the
    *  difficulty-scaled human-error roll. No allocations — scratch vectors +
@@ -4679,16 +4688,13 @@ export class EnemyCar extends Car {
         if (((g.raceTime + gy.phase) % 7.5) > 5.2) { this._geyserLift = true; break; }
       }
     }
-    // -- mutual slipstream: the same +12% draft window the player earns.
-    // Cheap: one cone check against the car directly ahead, at sense rate.
-    let drafting = false;
-    if (Math.abs(v) > this.maxSpeed * 0.5) {
-      drafting = this._draftBehind(g.player, fwd);
-      for (let i = 0; i < g.enemies.length && !drafting; i++) {
-        drafting = this._draftBehind(g.enemies[i], fwd);
-      }
-    }
-    this._drafting = drafting;
+    // -- §5 (r313): the mutual slipstream is DELETED for rivals. +12% to
+    // whichever car had just fallen behind was a convergence engine — the
+    // glue that held four-car trains together through the whole midrace
+    // (measured: 100-210 pack ticks per race with it, i.e. a >3-car clump
+    // for a third of the running). "Convergence... is FORBIDDEN." The
+    // player's own slipstream (Car.step, player-only) stands: earning a
+    // tow is the player's skill, not the field's elastic.
     // -- race rank among rivals (0 = leading AI): O(rivals) at sense rate.
     // Gates who carries rockets on NORMAL (front-runners only).
     let rank = 0;
@@ -4699,27 +4705,44 @@ export class EnemyCar extends Car {
     this._aiRank = rank;
     // -- defense re-arm: passing through a real corner grants one new block
     if (t.curvature[this.trackIndex] > CORNER_CURV) this._blockUsed = false;
-    // -- human error roll: heavily on EASY, rarely on NORMAL, never on HARD.
-    // One roll per corner approach (armed on the preceding straight).
-    const diffId = g.difficulty?.id;
-    const errP = diffId === 'easy' ? 0.25 : diffId === 'normal' ? 0.05 : 0;
-    if (errP > 0 && g.raceTime > 5) {
+    // -- §5.3 personal line amp by SECTION KIND: ±4 m on trail, ±12 m in
+    // the open, tight between the facades. Sensed here (6 Hz), applied as
+    // lane = seed × amp each frame; the edge-margin clamp bounds it.
+    const AI = DRIVING.ai ?? {};
+    const secKind = g.route?.kindAtIndex ? g.route.kindAtIndex(this.trackIndex) : 'trail';
+    this._laneAmp = secKind === 'open' ? (AI.lateralNoiseOpenM ?? 12)
+      : secKind === 'trail' ? (AI.lateralNoiseTrailM ?? 4) : 1.5;
+    // -- §5.3 mistake: per corner, P = 1 − consistency. The roll arms on
+    // the preceding straight (one per approach); the difficulty tiers no
+    // longer own the error rate — the DRIVER does. Two kinds, per spec:
+    // run 1-3 m wide, or brake 10% late; recover on line either way.
+    if (g.raceTime > 5) {
       let curvNear = 0;
       for (let k = 10; k <= 40; k += 6) curvNear = Math.max(curvNear, t.curvature[(this.trackIndex + k) % N]);
+      // At PACE is an absolute, not a fraction of maxSpeed: rivals are
+      // corner-limited (~25 u/s here) while maxSpeed rides the kit lean to
+      // ~69, so the old 0.5×maxSpeed gate was true 2 frames in 360 and no
+      // driver ever made a mistake (measured, r313 probe).
       const approaching = t.curvature[this.trackIndex] < 0.012 && curvNear > 0.022
-        && Math.abs(v) > this.maxSpeed * 0.5;
+        && Math.abs(v) > 16;
       if (approaching && this._errArmed) {
         this._errArmed = false;
+        // §5.1 cutChance: this corner, this driver may hug the inside a
+        // little harder than the line — a cut of the apex, not the course
+        this._cutBias = Math.random() < this.cutChance ? 1.6 : 0;
         if (this._mistakeCd <= 0 && this._errT <= 0 && this._errRec <= 0
-            && this.ramTimer <= 0 && this._revT <= 0 && Math.random() < errP) {
-          // misjudged it: brake a touch late, carry too much speed in,
-          // then wobble/slide wide while gathering it back up
-          this._errT = 0.55 + Math.random() * 0.3;
+            && this.ramTimer <= 0 && this._revT <= 0
+            && Math.random() < 1 - this.consistency) {
+          this._errKind = Math.random() < 0.5 ? 'wide' : 'late';
+          this._errMag = 1 + Math.random() * 2;           // wide: 1-3 m
+          this._errT = this._errKind === 'late' ? 0.45 + Math.random() * 0.2 : 0.01;
           this._mistakeCd = 6 + Math.random() * 3;
           this._mistakes++;
           let dirSum = 0; // "wide" = outside of the corner being flubbed
           for (let k = 10; k <= 40; k += 6) dirSum += t._raceLine[(this.trackIndex + k) % N];
           this._errWideDir = dirSum > 0 ? -1 : 1;
+          g.telemetry?.log('mistake', { rival: this.persona, corner: this.trackIndex,
+            kind: this._errKind });
         }
       } else if (!approaching && curvNear < 0.02) {
         this._errArmed = true; // clean straight: armed for the next corner
@@ -4743,29 +4766,31 @@ export class EnemyCar extends Car {
     if (!t._raceLine) t._raceLine = computeRaceLine(t);
     if (!t._speedInv) t._speedInv = computeSpeedInv(t, t._raceLine);
 
-    // ---- rubber band: help when behind, cap when far ahead (both scale with D.rubberBand)
+    // §5 (r313): THE RUBBER BAND IS DELETED. Both halves — the maxSpeed
+    // band and the corner band below it — converged every rival on the
+    // player, which is why the field read as one pack in seven paints
+    // however the machines differed. The spec's words: "Convergence,
+    // catch-up or slow-down toward any other car is FORBIDDEN within 10 s
+    // of a lap boundary, and globally except through the pressure rival's
+    // clamped pace." Each driver now races their roster pace; the ONE
+    // pressure rival (picked by the game at GO+15, re-picked each lap)
+    // may track the player's pace within ±pressureClampPct — and even
+    // that lease switches off near the lap line (fix 16's funnel lesson:
+    // recording C wrecked at the gantry pillar EVERY lap when arrivals
+    // were timed together).
     const gap = g.player.progress - this.progress; // > 0: this car is behind the player
-    let band = 1;
-    // `bandUp` decouples the CHASE from the CAP (r284): one knob scaled
-    // both, so EASY's generous leader-cap (rubberBand 1.25) also handed
-    // trailing rivals +37% toward the player — and a casual leader was
-    // re-passed forever by a field rubber-banding onto their tail. The cap
-    // keeps rubberBand; the chase reads bandUp where a tier provides it.
-    // PATCH_02 §3.3: the catch-up bonus is capped at +8% — the pack locked
-    // four-wide on the recording's player for eight seconds because the band
-    // could hand trailing rivals up to +21%.
-    // PATCH_02 v1.3 fix 16: the CHASE half of the band switches off near the
-    // lap boundary. Convergence is the band's whole design — and at the one
-    // place every lap where the field must funnel through a gate, it timed
-    // the pack's arrival to the player's (recording C: 2nd at 0:56, 7th by
-    // 1:02, wrecked at the gantry pillar at 1:04, EVERY lap). ~10 s of race
-    // line each side of the gate is band-free; the leader CAP stays on.
+    const AI = DRIVING.ai ?? {};
     const Nb = t.center.length;
     const lapF = this.trackIndex / Nb;
     const nearLine = lapF > 0.88 || lapF < 0.06;
-    if (gap > 0.02 && !nearLine) band = Math.min(1.08, 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1));
-    else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
     this._nearLine = nearLine;
+    let pace = 1 - this.paceOffset;
+    if (g._pressureRival === this && !nearLine) {
+      const clamp = (AI.pressureClampPct ?? 3) / 100;
+      // full lease at 0.05 lap of gap — never a teleport, never a force
+      pace *= 1 + THREE.MathUtils.clamp(gap / 0.05, -1, 1) * clamp;
+    }
+    this._paceFactor = pace;
     // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
     // NORMAL into a parade. Rivals bring +2% per player engine level (cap
     // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
@@ -4785,45 +4810,21 @@ export class EnemyCar extends Car {
     // so the beating is legible rather than mysterious. Meet both gates and
     // this is exactly 1 — the balance every other test was tuned against.
     const kit = g.kitHandicap?.() ?? 1;
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * Math.max(0.7, band);
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * pace;
 
-    // THE BAND ALSO HAS TO REACH THE CORNERS, OR IT DOES NOTHING.
-    //
-    // Measured on EASY with the player pulling away: the band above was fully
-    // engaged — sitting at its structural cap of 1.375 for 78% of frames — and
-    // lifted rival `maxSpeed` from 50 to 66.7. Rivals were driving at 37.9.
-    // They are top-speed-limited 4% of the time and CORNER-limited 95%, so the
-    // band was raising a ceiling touched one frame in twenty-five. Sweeping
-    // rubberBand from 0 to 5 moved the player's margin by a few points and
-    // BACK-FIRED past 2.5, because inflating maxSpeed pushed rivals under the
-    // `v > maxSpeed * 0.55` nitro gate and they boosted half as often.
-    //
-    // Pace lives in `aLat` in the braking model, which the band never touched.
-    // It does now. The correction is adaptive by construction: worth nothing
-    // when the player is struggling, growing with how far they actually run
-    // away — which is the property the band was written to have and did not.
-    // The chase side reads `bandUp` here too (r284): this is the band that
-    // actually binds — rivals are corner-limited 95% of the time — so leaving
-    // it on rubberBand kept EASY's +35% catch-up cornering alive after the
-    // maxSpeed band was decoupled, and the casual leader was still re-passed.
-    this._cornerBand = gap > 0.02 && !this._nearLine
-      ? Math.min(1.08, 1 + 0.28 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1))
-      : gap < -0.06
-        ? 1 - 0.14 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1)
-        : 1;
+    // (The corner band — the half of the rubber band that actually bound,
+    // rivals being corner-limited 95% of the time — is deleted with it.
+    // pace reaches the corners through aLat below, squared because corner
+    // speed goes as sqrt(aLat), so a +3% pace lease is +3% corner speed.)
 
-    // ---- refresh the small personal lane bias occasionally
-    // LANE IS A PERSONALITY, NOT A TWITCH. It used to re-roll every 4-8 s,
-    // and at +/-1.25 m it was the same magnitude as the entire racing line —
-    // a second noise source of equal weight, which is half the reason rivals
-    // read as wobbling rather than driving. Measured, freezing it changed race
-    // pace by less than 1%, so it was pure jitter. Set once in the constructor
-    // and left alone; the re-roll below is retired.
-    this.laneTimer -= dt;
-    if (false) {
-      this.laneTimer = 4 + Math.random() * 4;
-      this.lane = THREE.MathUtils.randFloatSpread(2.5);
-    }
+    // LANE IS A PERSONALITY, NOT A TWITCH (kept from the old model: set
+    // once, never re-rolled — re-rolling measured as pure wobble). §5.3
+    // sizes it by SECTION KIND now (±4 m trail, ±12 m open, tight in the
+    // streets) — the amp is sensed at 6 Hz, the seed is the driver's own.
+    // The old fixed ±1.25 m spread was reverted for wall-grinding in r-old;
+    // the difference here is the speed-scaled edge margin clamp below,
+    // which did not exist then and keeps the noise inside the road.
+    this.lane = this._laneSeed * (this._laneAmp ?? 1.5);
 
     const fwd = this.forward;
     const v = this.speedAlong;
@@ -4835,14 +4836,13 @@ export class EnemyCar extends Car {
       this._sense(g, t, fwd, v);
     }
     if (this._mistakeCd > 0) this._mistakeCd -= dt;
-    // mutual slipstream: same 1.1s-tuck -> +12% window the player gets
-    // (step() reads _draftOn when computing topSpeed for any car)
-    this._draftT = this._drafting ? this._draftT + dt : Math.max(0, this._draftT - dt * 2);
-    this._draftOn = this._draftT > 1.1;
     // human error phases: overshoot runs out -> the gather-it-up phase begins
     if (this._errT > 0) {
       this._errT -= dt;
-      if (this._errT <= 0) this._errRec = 0.9;
+      // a late-braked corner is paid at the EXIT: the overshoot itself is
+      // FASTER (that was the whole problem with the old ×1.35 melodrama —
+      // it nearly cancelled on the stopwatch), the gather-up is the cost
+      if (this._errT <= 0) this._errRec = this._errKind === 'late' ? 1.4 : 0.9;
     } else if (this._errRec > 0) this._errRec -= dt;
 
     // ---- steering target: racing line at a speed-scaled lookahead + situational biases
@@ -4882,6 +4882,14 @@ export class EnemyCar extends Car {
     // (boost pads are gone — rivals no longer swerve across the road to farm
     //  chevrons, they just drive the racing line)
 
+    // §5.1 cutChance: hug the apex a touch tighter through this corner —
+    // rolled once per approach in _sense, decays out of the corner
+    if ((this._cutBias ?? 0) > 0) {
+      if (curvHere > CORNER_CURV) {
+        targetLat += Math.sign(t._raceLine[li] || 1) * this._cutBias;
+      } else this._cutBias = Math.max(0, this._cutBias - dt * 2);
+    }
+
     // WHO IS ACTUALLY BEHIND ME — player or rival, whoever is nearest.
     //
     // Defence used to test `g.player` alone. Measured on EASY with the player
@@ -4903,19 +4911,111 @@ export class EnemyCar extends Car {
       if (ax > chaserGap) { chaserGap = ax; chaser = other; }
     }
 
-    // overtake: car ahead within 12 and closing -> swing to the emptier side
+    // §5.3 OVERTAKE IS A PLAN, NOT A TWITCH: FOLLOW / SETUP / COMMIT.
+    // The old rule swung ±3.5 the frame a bumper appeared and re-decided
+    // every frame after — which reads as a wobble and never finishes a
+    // pass. Now: FOLLOW while the gap is over followGapS; at the gap, pick
+    // the side with room ONCE (SETUP, draft ≤ setupMaxS); then hold that
+    // side for commitS with no re-pick (COMMIT); CLEAR when past. Every
+    // transition is telemetry — Q13 audits that no COMMIT happens without
+    // its SETUP.
     let blockedAhead = false;
-    for (const other of [g.player, ...g.enemies]) {
-      if (other === this || !other.alive) continue;
-      const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
-      const along = dx * fwd.x + dz * fwd.z;
-      if (along < 1 || along > 12) continue;
-      const across = dx * fwd.z - dz * fwd.x;
-      if (Math.abs(across) > 3.2) continue;
-      if (v > other.speedAlong - 0.5) {
-        targetLat += other.lateral > this.lateral ? -3.5 : 3.5;
+    {
+      let aheadCar = null, aheadAlong = 1e9;
+      for (const other of [g.player, ...g.enemies]) {
+        if (other === this || !other.alive) continue;
+        const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 0.5 || along > 26 || along >= aheadAlong) continue;
+        const across = dx * fwd.z - dz * fwd.x;
+        if (Math.abs(across) > 3.4) continue;
+        aheadCar = other; aheadAlong = along;
+      }
+      const gapS = aheadCar ? aheadAlong / Math.max(6, Math.abs(v)) : 1e9;
+      const logOv = (phase) => g.telemetry?.log('overtake', {
+        rival: this.persona, phase, side: this._ovSide > 0 ? 'left' : 'right' });
+      const logSt = (state) => g.telemetry?.log('aiState', {
+        rival: this.persona, state, targetId: aheadCar?.name ?? aheadCar?.persona ?? null });
+      if (this._ovState === 'COMMIT') {
+        this._ovT -= dt;
+        targetLat = this._ovLat;
         blockedAhead = true;
-        break;
+        const passed = !aheadCar || aheadAlong > 24
+          || (aheadCar === this._ovTarget
+            && (aheadCar.pos.x - this.pos.x) * fwd.x + (aheadCar.pos.z - this.pos.z) * fwd.z < 0);
+        if (passed || this._ovT <= 0) {
+          this._ovState = 'FOLLOW'; this._ovTarget = null;
+          logOv('CLEAR'); logSt('CLEAR');
+        }
+      } else if (this._ovState === 'SETUP') {
+        this._ovT -= dt;
+        if (!aheadCar || gapS > (DRIVING.ai?.followGapS ?? 0.4) * 2.5) {
+          this._ovState = 'FOLLOW'; this._ovTarget = null; logSt('FOLLOW');
+        } else {
+          targetLat = aheadCar.lateral + this._ovSide * 3.5;
+          blockedAhead = true;
+          this._ovSetupHeld += dt;
+          const setupMax = DRIVING.ai?.setupMaxS ?? 1.5;
+          if (this._ovSetupHeld >= 0.3 && v > aheadCar.speedAlong - 0.5) {
+            this._ovState = 'COMMIT';
+            this._ovT = DRIVING.ai?.commitS ?? 2.0;
+            this._ovLat = THREE.MathUtils.clamp(aheadCar.lateral + this._ovSide * 3.5, -7.4, 7.4);
+            this._ovTarget = aheadCar;
+            logOv('COMMIT'); logSt('COMMIT');
+          } else if (this._ovT <= 0 || this._ovSetupHeld > setupMax) {
+            this._ovState = 'FOLLOW'; this._ovTarget = null;  // YIELD: no room came
+            logOv('YIELD'); logSt('YIELD');
+          }
+        }
+      } else if (aheadCar && gapS <= (DRIVING.ai?.followGapS ?? 0.4)
+          && v > aheadCar.speedAlong - 0.5) {
+        // pick the side with room, once: compare road left of the car ahead
+        // to road right of it at the clamp the steer target will live under
+        const room = 7.4;
+        const left = room - aheadCar.lateral, right = room + aheadCar.lateral;
+        this._ovSide = left > right ? 1 : -1;
+        this._ovState = 'SETUP';
+        this._ovT = DRIVING.ai?.setupMaxS ?? 1.5;
+        this._ovSetupHeld = 0;
+        logOv('SETUP'); logSt('SETUP');
+      }
+      // §5.3 FOLLOW means HOLDING the gap, not just not-steering-into-it:
+      // rivals never slowed for the car ahead (only dodged sideways), so
+      // mixed-speed traffic rear-ended constantly — 16-27 real dents on the
+      // player per lap, measured. The follow cap matches the leader's speed
+      // at the gap; SETUP/COMMIT lift it (a pass needs the speed surplus).
+      // IN TRAFFIC THE GAP DOUBLES: a queue at 0.4 s spacing packs four
+      // cars into Q12's 20 m circle by construction (measured: the whole
+      // field stacked behind a mid-pace player for 20 s on Canyon) — with
+      // two or more cars already close, a driver follows at 0.8 s instead.
+      this._followCapV = null;
+      let nearby = 0;
+      for (const other of [g.player, ...g.enemies]) {
+        if (other === this || !other.alive) continue;
+        if (other.pos.distanceToSquared(this.pos) < 144) nearby++;
+      }
+      // 2.4× not 2×: at 0.8 s a queue spaces ~18 m against Q12's 20 m
+      // radius — the measurement sat on its own threshold and flickered
+      // between 1 and 101 ticks race to race. ~0.95 s spaces past it.
+      const followGap = (DRIVING.ai?.followGapS ?? 0.4) * (nearby >= 2 ? 2.4 : 1);
+      if (this._ovState === 'FOLLOW' && aheadCar && gapS < followGap * 1.6) {
+        const lead = Math.abs(aheadCar.speedAlong);
+        this._followCapV = gapS < followGap ? lead - 1 : lead + 1.5;
+      }
+      // §5.3 separation: push away from cars within separationM — but never
+      // while SETUP/COMMIT owns the line (the plan IS a deliberate approach)
+      if (this._ovState === 'FOLLOW') {
+        const sepM = DRIVING.ai?.separationM ?? 6;
+        for (const other of [g.player, ...g.enemies]) {
+          if (other === this || !other.alive) continue;
+          const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 > sepM * sepM || d2 < 0.01) continue;
+          const d = Math.sqrt(d2);
+          const latDelta = this.lateral - other.lateral;
+          targetLat += Math.sign(latDelta || (this._laneSeed >= 0 ? 1 : -1))
+            * (sepM - d) * 0.5;
+        }
       }
     }
     // defense: leading the player with them tucked within ~10u at pace ->
@@ -4932,10 +5032,10 @@ export class EnemyCar extends Car {
         // on one straight, so this clause was false 86-91% of the time and the
         // whole branch fired ZERO times in a race the player was winning.
         && Math.abs(v) > this.baseMaxSpeed * 0.55
-        // aggression is [0.7, 1.4] and easy.aiAggression is 0.65, so this
-        // needed aggression > 0.846 — permanently disqualifying a fifth of
-        // every grid from ever defending. Tested on the raw trait instead.
-        && this.aggression > 0.85) {
+        // §5.1: DEFENCE is its own trait now — the rabbit (defence 0.8)
+        // shuts the door, the backmarkers (0.3) mostly leave it open.
+        // Rolled per opportunity; max one move per straight holds below.
+        && Math.random() < this.defence * 0.5) {
       const dx = chaser.pos.x - this.pos.x, dz = chaser.pos.z - this.pos.z;
       const along = dx * fwd.x + dz * fwd.z;
       if (along < -2 && along > -11 && Math.abs(chaser.speedAlong) > Math.abs(v) * 0.7) {
@@ -4988,7 +5088,12 @@ export class EnemyCar extends Car {
       const diF = (p.trackIndex - this.trackIndex + t.N) % t.N;
       const di = Math.min(diF, t.N - diF);
       const latGap = Math.abs(p.lateral - this.lateral);
-      if (di < 6 && latGap < 6 && Math.abs(v) > this.maxSpeed * 0.5 && Math.abs(p.speedAlong) > 8) {
+      // §5.4 (r313): a RAM is targeting — it needs the token like every
+      // weapon. Ungated, seven drivers each wound up a slam every ~6 s and
+      // the measured fair-fight race hit the player 9-25 times a lap.
+      // "No token → race, don't orbit."
+      if (di < 6 && latGap < 6 && Math.abs(v) > this.maxSpeed * 0.5 && Math.abs(p.speedAlong) > 8
+          && g.aiCanTarget?.(this)) {
         this.ramTimer = 0.7;
         // angrier drivers (and harder difficulty) wind up again sooner
         this.ramCooldown = (4 + Math.random() * 2)
@@ -5035,8 +5140,9 @@ export class EnemyCar extends Car {
       const side = Math.sign(targetLat - avH.lat) || (avH.lat >= 0 ? -1 : 1);
       targetLat = avH.lat + side * (avH.r + 3.1);
     }
-    // running wide while gathering up a flubbed corner
-    if (this._errRec > 0) targetLat += this._errWideDir * 3 * this._errRec;
+    // running wide while gathering up a flubbed corner — §5.3 sizes the
+    // 'wide' kind at 1-3 m (rolled per mistake), recovering on line
+    if (this._errRec > 0) targetLat += this._errWideDir * (this._errMag ?? 2) * this._errRec;
     // ---- width-variation: the lateral clamp follows the pinched road width
     // (both here and at the lookahead point) so rivals aim through the gap
     // instead of grinding the narrowed edge; defensive on older track builds
@@ -5080,35 +5186,35 @@ export class EnemyCar extends Car {
     // aiCorner is the difficulty's LATERAL budget and is the knob that really
     // sets a rival's pace — vMax below takes a square root of this, so a tier
     // needs a big multiplier here to move at all. See DIFFS in main.js.
-    // THE CORNER BUDGET IS THE WHOLE PERSONALITY, AND IT WAS BARELY A RANGE.
-    //
-    // `30 + 8 * cornerSkill` spans aLat 30..38, and corner speed goes as its
-    // SQUARE ROOT, so the entire spread from the most timid driver to the most
-    // committed was 12% in theory and +2.1% of race pace when measured. The
-    // field's finishing order was set by `baseMaxSpeed`, which ramps with grid
-    // slot — so rivals differed by start position and by nothing a player can
-    // see. Two cars with cornerSkill 0.17 and 0.45 finished dead level.
-    //
-    // It was also far below the physics. A rival's no-slip lateral limit is
-    // about 54 m/s^2; the EASY budget worked out at 23-29, and rivals were
-    // measured pulling 19.5-25.8 at an apex while the player pulls 44-47.
-    // Raising it to 47 gained 11% of race pace with ZERO off-road frames, zero
-    // stuck frames, no damage and slip still at 0.05 — it was free.
-    const aLat = (26 + 26 * this.cornerSkill) * D.aiSpeed * (D.aiCorner ?? 1) * (this._cornerBand ?? 1);
+    // §5 (r313): the random cornerSkill spread is DELETED — "field spread
+    // follows from pace spread; no other mechanism". Par is one number
+    // (ai.parCornerALat). The persona's pace reaches the corner budget at
+    // paceCornerExp, NOT the naive square: lap time dilutes the budget
+    // hard (this file's own r285 measurement: lap ∝ aLat^0.26, the clamps
+    // and straights absorbing the rest), so pace² delivered barely half
+    // the roster's spread on the stopwatch (5.3-7.4 s measured against
+    // Q11's 8-25). The exponent is the calibration of that dilution, and
+    // the mechanism is still pace and nothing else.
+    const aLat = (DRIVING.ai?.parCornerALat ?? 44)
+      * Math.pow(pace, DRIVING.ai?.paceCornerExp ?? 4)
+      * D.aiSpeed * (D.aiCorner ?? 1);
     const sqA = Math.sqrt(aLat);
     // 15, down from 26 (r288): the player's brake learned its real-world cap
     // (~1.5g = 14.7 u/s²), and a field that PLANS 2.65g stops would outbrake
     // every human into every corner by physics the player no longer has.
     // Rivals drive in the same world now.
     const DECEL = 15;
-    let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
+    let vAllowed = this.maxSpeed;
     for (let k = 0; k <= 90; k += 5) {
       const j = (this.trackIndex + k) % t.N;
       let vMax = sqA * t._speedInv[j];
       // ---- width-variation: a pinch caps corner speed like a real corner,
-      // so rivals brake in and thread it instead of wall-grinding through
+      // so rivals brake in and thread it instead of wall-grinding through.
+      // §5 (r313): the cap carries the persona's pace — a pace-blind
+      // constant here compressed the roster's whole spread on the narrow
+      // worlds (everyone threaded every pinch at the same 16 + 3.6w).
       const wj = t.widthAt ? t.widthAt(j) : ROAD_HALF;
-      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, 16 + 3.6 * wj);
+      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, (16 + 3.6 * wj) * pace);
       // ---- viz-zones: rivals can't see through fog/trees either
       if (t.vizZones && t.vizZones.length) {
         for (const z of t.vizZones) {
@@ -5131,10 +5237,18 @@ export class EnemyCar extends Car {
     else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
     if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
-    // human error: braking a touch late — carry too much speed in (overshoot),
-    // then brake harder than clean driving would while gathering it back up
-    if (this._errT > 0) vAllowed = Math.min(this.maxSpeed, vAllowed * 1.35);
-    else if (this._errRec > 0) vAllowed *= 0.78;
+    // §5.3 mistake, 'late' kind: brake 10% late — carry a tenth too much
+    // speed in, then pay it back at the exit. The recovery factors are the
+    // stopwatch price of a mistake (r313 tuning: at ×0.90 a backmarker's
+    // whole error rate cost under half a second a lap and consistency never
+    // reached the results sheet).
+    if (this._errT > 0 && this._errKind === 'late') {
+      vAllowed = Math.min(this.maxSpeed, vAllowed * 1.10);
+    } else if (this._errRec > 0) vAllowed *= this._errKind === 'late' ? 0.85 : 0.88;
+    // §5.3 FOLLOW: hold the gap to the car ahead (set by the state machine)
+    if (this._followCapV !== null && this._followCapV !== undefined) {
+      vAllowed = Math.min(vAllowed, Math.max(8, this._followCapV));
+    }
     // livestock dead ahead: the swerve is already set — scrub to below the
     // herd's own flee speed so contact can't happen. Swerve, never plough.
     if (this._avoidHerd.panic) vAllowed = Math.min(vAllowed, 9);
@@ -5200,6 +5314,17 @@ export class EnemyCar extends Car {
       throttle = 0; brake = 1;
       steer = v < -0.5 ? -Math.sign(dh) : 0;
     }
+    // §5.5: LAUNCH REACTIONS ARE HUMAN. Each driver sits on the lights for
+    // their own 0.2-0.8 s (by consistency), so the field strings out from
+    // second one and turn 1 stops being a box. A SELF-COUNTING hold, not a
+    // raceTime comparison: harnesses step rivals with raceTime frozen at 0
+    // (test-difficulty does), and a frozen clock parked the whole grid on
+    // the brakes forever. The (raceTime < 3) gate stops a mid-race respawn
+    // from re-arming it.
+    if ((this._launchHold ?? 0) > 0 && (g.raceTime ?? 0) < 3) {
+      this._launchHold -= dt;
+      throttle = 0; brake = 1; steer = 0;
+    }
     // a brief slide moment at the start of a mistake correction reads as a car
     // caught sideways, not a scripted wiggle
     const errSlide = this._errRec > 0.62 && this._revT <= 0;
@@ -5222,10 +5347,14 @@ export class EnemyCar extends Car {
       g.particles.exhaust(tail, back, this.glowColor, this.boostTimer > 0);
     }
 
+    // §5.4: a driver threading their own gate is DRIVING, not shooting —
+    // all three weapons hold fire within 1.5 s of this car's gate passage
+    // (main.js stamps _lastGateT on every route gate pass).
+    const gateBusy = (g.raceTime ?? 0) - (this._lastGateT ?? -9) < 1.5;
     // take shots at the player when lined up (rate scales with aggression + difficulty)
     const toPlayer = g.player.pos.clone().sub(this.pos);
     const dist = toPlayer.length();
-    if (g.player.alive && dist < 70 && this.fireCooldown <= 0 && g.aiCanTarget?.(this)) {
+    if (g.player.alive && dist < 70 && this.fireCooldown <= 0 && !gateBusy && g.aiCanTarget?.(this)) {
       const angle = Math.abs(Math.atan2(toPlayer.x, toPlayer.z) - this.heading);
       const norm = Math.min(angle, Math.PI * 2 - angle);
       if (norm < 0.32) {
@@ -5241,7 +5370,7 @@ export class EnemyCar extends Car {
 
     // drop a mine in the player's path: player 6..18 behind and roughly in-line
     this.mineCooldown -= dt;
-    if (this.mineCooldown <= 0 && g.player.alive) {
+    if (this.mineCooldown <= 0 && g.player.alive && !gateBusy) {
       if (alongP < -6 && alongP > -18 && Math.abs(acrossP) < 3.5
           && g.aiCanTarget?.(this)
           && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
@@ -5320,7 +5449,7 @@ export class EnemyCar extends Car {
       if (oldCarrier && oldWindow) fp.oldShot = (fp.oldShot ?? 0) + 1;
       if (mRangeOk && mConeOk) fp.newShot = (fp.newShot ?? 0) + 1;
     }
-    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk && g.aiCanTarget?.(this)) {
+    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk && !gateBusy && g.aiCanTarget?.(this)) {
       // front-runners reload faster; everyone can pull the trigger. Kept short
       // (the pack budget is the real rate limit) so a long reload can't swallow
       // the one window a chaser gets.
