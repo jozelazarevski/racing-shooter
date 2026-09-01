@@ -10647,9 +10647,26 @@ class Game {
     // same spot. Modes that ask for it rise between the walls rather than being
     // unusable on a third of the worlds.
     const lift = (M.cliffLift && this.track?.T?.cliffWalls) ? M.cliffLift : 0;
+    // r306 ("clean this up", CANYON RUN screenshot): a TOP camera never
+    // dives into a gorge. The jump gorges drop the deck ~26 u below the
+    // rim for a few samples, and an overhead boom that follows the car
+    // down spends those seconds inside the slot — wall faces filling the
+    // whole frame. The overhead family (roadYaw modes) floors its HEIGHT
+    // anchor at the local road datum's rim, so a dip is seen from above:
+    // the slot, the walls and the car in plan, not the wall's interior.
+    // The look target still follows the car, so the eye tracks it down.
+    let gorgeLift = 0;
+    if (M.roadYaw && this.track?.center && p.trackIndex !== undefined) {
+      const Nc = this.track.center.length;
+      let rim = -Infinity;
+      for (let q = -12; q <= 12; q += 3) {
+        rim = Math.max(rim, this.track.center[(p.trackIndex + q + Nc) % Nc].y);
+      }
+      if (rim > p.pos.y + 1) gorgeLift = Math.min(30, rim - p.pos.y);
+    }
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
-      .add(new THREE.Vector3(0, M.h + lift + speedZoom * (M.spdH || 0), 0));
+      .add(new THREE.Vector3(0, gorgeLift + M.h + lift + speedZoom * (M.spdH || 0), 0));
     const targetLook = p.pos.clone()
       .addScaledVector(fwd, M.look)
       .add(new THREE.Vector3(0, M.lookH || 0, 0));
@@ -10818,7 +10835,11 @@ class Game {
       // camera y 54), so the allowance is the mode's own height plus room for
       // a reasonable lift — and never below the old 13, so the chase family
       // keeps exactly the behaviour it was tuned with.
-      const MAX_UP = Math.max(13, (M.h || 0) + (lift > 0 ? 4 : 0.5));
+      // ...and the r306 gorge floor is a DELIBERATE lift: over a gorge dip
+      // the overhead anchor rides the rim, so the allowance carries it —
+      // without this the cap clipped the camera right back into the slot
+      // (measured: target 54.8, capped to 27.3, wall interiors again).
+      const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift + (lift > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
         for (let k = 0; k < 6; k++) {

@@ -2412,10 +2412,17 @@ export class Car {
     // capped near the same budget that broke it loose (a touch above, so
     // recovery beats breakaway and the slide never oscillates). Small
     // corrections sit below the cap and keep today's proportional feel.
-    const aScrub = Math.min(Math.abs(vl) * grip, 4.4 * gripBudget);
+    // r307: WITH the handbrake held the kinetic ceiling drops — locked rear
+    // tyres are unloaded, and the 4.4x ceiling was burning ~2.3 g of slide
+    // per second, parking a 70 km/h drift in two seconds ("just sliding").
+    const scrubCap = inputs.drift ? (DRIVING.driftScrubCap ?? 2.1) : 4.4;
+    const aScrub = Math.min(Math.abs(vl) * grip, scrubCap * gripBudget);
     vl -= Math.sign(vl) * Math.min(Math.abs(vl), aScrub * dt);
-    // drift reward: convert a slice of the scrubbed-off slide back into forward speed
-    if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * 0.35 * (vf >= 0 ? 1 : -1));
+    // drift reward: convert a slice of the scrubbed-off slide back into
+    // forward speed — a bigger slice while the handbrake is deliberately
+    // held, so a drift carries its momentum through the corner
+    const reward = inputs.drift ? (DRIVING.driftReward ?? 0.5) : 0.35;
+    if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * reward * (vf >= 0 ? 1 : -1));
 
     // ---- IN THE AIR THERE ARE NO TYRES ----
     //
@@ -2571,6 +2578,16 @@ export class Car {
       }
       if ((this._wallTouchT ?? 0) > 0) this._wallTouchT -= dt;
       const beta = Math.atan2(Math.abs(vl), Math.max(0.5, Math.abs(vf)));
+      // CLAUDE.md §4.4 (r307): drift ASSIST, 15°-65° slip, handbrake held —
+      // rotation help TOWARD the steer. The entry kick (§8.2 above) starts
+      // the tail; nothing sustained the rotation after it decayed, so a
+      // held drift was a slide the nose never followed. Past the spin
+      // angle the help stops: the player crossed the line, the game lets
+      // them spin — same law as counter-steer assist, opposite sign.
+      if (inputs.drift && steer !== 0 && beta > 0.26 && beta < DRIVING.spinSlipAngle) {
+        dTheta += steer * dir * (DRIVING.driftYawAssist ?? 0.85)
+          * THREE.MathUtils.clamp(sp / 8, 0, 1) * dt;
+      }
       if (this.slip > DRIVING.csAssistSlipMin && beta < DRIVING.spinSlipAngle && !inputs.drift) {
         // sign: +dTheta with steer + leaves velocity on the vl<0 side (this
         // engine's right-vector convention), so re-aligning the nose to the
@@ -4155,6 +4172,18 @@ export class Car {
    *  same outcome (dead, respawn on the timer) presented as what it is. */
   drown() {
     if (!this.alive) return;
+    // CLAUDE.md §3.3 (r306): in a race, deep water is a KILL VOLUME —
+    // returnToGate(lastPassed), free, no hull. CANYON RUN's gorge floors
+    // sit below the water line, so a short jump drowned the car and cost
+    // a hull, over and over ("clean this up" traced here). The full
+    // run-up from the previous gate is the point: a return just before
+    // the lip at 40 km/h could never make the jump and would loop.
+    // Roam, missions and rivals keep the honest sinking.
+    if (this._returnFromKill()) {
+      this.game.particles?.splash?.(this.pos, 2.2);
+      this.game.audio?.splash?.();
+      return;
+    }
     this.health = 0;
     this.alive = false;
     this.mesh.visible = false;
@@ -4178,8 +4207,24 @@ export class Car {
    *  `trackIndex` and that index is in mid-air over the chasm. Without the
    *  hand-off the car respawns in the hole, falls again on the next frame, and
    *  burns all three hulls in under a second. */
+  /** §3.3 kill volumes, the shared half: a racing player is RETURNED to
+   *  the gate they last passed instead of wrecked. True if handled. */
+  _returnFromKill() {
+    const g = this.game;
+    if (this !== g.player || g.state !== 'race' || g.freeRoam || g.missionMode) return false;
+    const gates = g.route?.gates;
+    if (!gates?.length || !g.returnToGate) return false;
+    const last = ((this._nextGate ?? 0) - 1 + gates.length) % gates.length;
+    g.returnToGate(this, last, 'kill');
+    return true;
+  }
+
   intoChasm(exitIndex) {
     if (!this.alive) return;
+    if (this._returnFromKill()) {
+      this.game.particles?.explosion?.(this.pos, true);
+      return;
+    }
     if (exitIndex != null) this.trackIndex = exitIndex;
     this.health = 0;
     this.alive = false;

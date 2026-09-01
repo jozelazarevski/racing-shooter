@@ -4161,6 +4161,71 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r307 — THE DRIFT FINALLY TURNS THE CAR
+User: "When I drift it does not seem it helping me turn. But just
+sliding." Measured to the number before touching anything: a 2 s
+handbrake drift at 70 km/h, full steer, yawed the nose 52° while
+scrubbing 70 → 2 km/h. The slide existed; the turn did not. Cause,
+three-part:
+- the KINETIC SCRUB CEILING (4.4 × budget, r-era anti-oscillation cap)
+  applied unchanged during a handbrake drift — ~2.3 g burning the slide
+  and, through the lag spill, all the car's speed;
+- the drift reward returned only 35% of the scrubbed slide as forward
+  speed — the drift bled momentum it should carry;
+- §8.2's ENTRY KICK started the tail but nothing sustained rotation
+  after its 0.3 s decay, and the counter-steer assist is (rightly)
+  drift-gated OFF — so a held drift had no yaw help at all.
+Laws (keys in driving.js + driving.json):
+- driftScrubCap 2.1: the ceiling drops while the handbrake is held —
+  locked tyres are unloaded, not an anchor;
+- driftReward 0.5 (0.35 free): held drifts carry momentum;
+- driftYawAssist 0.85 rad/s (CLAUDE.md §4.4, at last): 15°-65° slip
+  with the handbrake held adds rotation TOWARD the steer, fading in
+  from walking pace; past the spin angle it stops — same shape as the
+  counter-steer assist, opposite sign. Self-limiting: maxSlip measured
+  80°, no spiral.
+After: 168° of turn and a 45 km/h exit at 70 (139°/81 at 110); FT3
+slip 72° at 0.5 s; PLAIN steering byte-identical (34°/25°, untouched
+paths). NEW test-drift.mjs 6/6 pins all of it; drivingspec/rules/
+patch02 regression. Tag r307.
+
+## r306 — "CLEAN THIS UP": THE GORGE WAS THREE BUGS WEARING ONE SCREENSHOT
+The user's CANYON RUN photo (giant wall faces filling the frame, road
+patches bleeding through rock, a shard through the carriageway) was
+measured before anything was touched. The road itself is CLEAN — no
+solids on the deck, no terrain above it outside the two JUMP GORGES
+(samples 107-113 and 305-311, deck dives ~26 u below the rim by
+design). What the photo actually shows is what happens to a SLOW car
+at a gorge, in sequence:
+
+1. Enter under jump speed → drop to the gorge floor → the floor sits
+   below the datum/water rules → INSTANT WRECK (a hull gone, every
+   time — measured: hp 0 in under a second, invuln irrelevant).
+2. The DEATH CAMERA then sits inside the slot: wall interiors fill the
+   frame — the photo.
+3. Even alive, the overhead camera followed the car below the rim.
+
+Fixes, in the same order:
+1. CLAUDE.md §3.3 KILL VOLUMES at last (deferred in r301): a RACING
+   player who drowns or drops into a chasm is RETURNED — free, no hull,
+   via the same returnToGate everything else uses, to the gate LAST
+   PASSED (the full run-up is the point: a return just before the lip
+   at 40 km/h could never make the jump and would loop). Splash/boom
+   feedback kept, telemetry `return {reason:'kill'}`. Roam, missions
+   and rivals keep the honest sinking (`_returnFromKill` is the gate).
+2/3. A TOP CAMERA NEVER DIVES INTO A GORGE: the overhead family
+   (roadYaw modes) floors its height anchor at the local road-datum
+   rim (±12 samples, lift capped 30). TRAP INSIDE THE CAMERA: the
+   MAX_UP cap measures against the CAR, so it clipped the rim floor
+   straight back into the slot (target 54.8 → capped 27.3) — the
+   allowance now carries gorgeLift. Chase family untouched: diving
+   through the slot in chase is the fun part.
+
+Gates: NEW test-gorge.mjs 4/4 (no hull cost + real return + camera at
+rim over the slot, dead-cam baseline 27 recorded), camera/patch13/
+reverse/corridor2/goat regression. Flythrough screenshot verified at
+90 km/h: road, slot in plan, continuation — no interiors. Tag r306.
+
 ## r305 — THE WEAPONS BECOME ONE LINE, AND THE BOTTOM EDGE IS RENEGOTIATED
 User (with a live one-thumb screenshot): "Make the fire bombs rocket and
 all at one line at the bottom, increase the buttons a bit." The r300
