@@ -4155,6 +4155,18 @@ export class Car {
    *  same outcome (dead, respawn on the timer) presented as what it is. */
   drown() {
     if (!this.alive) return;
+    // CLAUDE.md §3.3 (r306): in a race, deep water is a KILL VOLUME —
+    // returnToGate(lastPassed), free, no hull. CANYON RUN's gorge floors
+    // sit below the water line, so a short jump drowned the car and cost
+    // a hull, over and over ("clean this up" traced here). The full
+    // run-up from the previous gate is the point: a return just before
+    // the lip at 40 km/h could never make the jump and would loop.
+    // Roam, missions and rivals keep the honest sinking.
+    if (this._returnFromKill()) {
+      this.game.particles?.splash?.(this.pos, 2.2);
+      this.game.audio?.splash?.();
+      return;
+    }
     this.health = 0;
     this.alive = false;
     this.mesh.visible = false;
@@ -4178,8 +4190,24 @@ export class Car {
    *  `trackIndex` and that index is in mid-air over the chasm. Without the
    *  hand-off the car respawns in the hole, falls again on the next frame, and
    *  burns all three hulls in under a second. */
+  /** §3.3 kill volumes, the shared half: a racing player is RETURNED to
+   *  the gate they last passed instead of wrecked. True if handled. */
+  _returnFromKill() {
+    const g = this.game;
+    if (this !== g.player || g.state !== 'race' || g.freeRoam || g.missionMode) return false;
+    const gates = g.route?.gates;
+    if (!gates?.length || !g.returnToGate) return false;
+    const last = ((this._nextGate ?? 0) - 1 + gates.length) % gates.length;
+    g.returnToGate(this, last, 'kill');
+    return true;
+  }
+
   intoChasm(exitIndex) {
     if (!this.alive) return;
+    if (this._returnFromKill()) {
+      this.game.particles?.explosion?.(this.pos, true);
+      return;
+    }
     if (exitIndex != null) this.trackIndex = exitIndex;
     this.health = 0;
     this.alive = false;

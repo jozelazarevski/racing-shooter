@@ -4161,6 +4161,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r306 — "CLEAN THIS UP": THE GORGE WAS THREE BUGS WEARING ONE SCREENSHOT
+The user's CANYON RUN photo (giant wall faces filling the frame, road
+patches bleeding through rock, a shard through the carriageway) was
+measured before anything was touched. The road itself is CLEAN — no
+solids on the deck, no terrain above it outside the two JUMP GORGES
+(samples 107-113 and 305-311, deck dives ~26 u below the rim by
+design). What the photo actually shows is what happens to a SLOW car
+at a gorge, in sequence:
+
+1. Enter under jump speed → drop to the gorge floor → the floor sits
+   below the datum/water rules → INSTANT WRECK (a hull gone, every
+   time — measured: hp 0 in under a second, invuln irrelevant).
+2. The DEATH CAMERA then sits inside the slot: wall interiors fill the
+   frame — the photo.
+3. Even alive, the overhead camera followed the car below the rim.
+
+Fixes, in the same order:
+1. CLAUDE.md §3.3 KILL VOLUMES at last (deferred in r301): a RACING
+   player who drowns or drops into a chasm is RETURNED — free, no hull,
+   via the same returnToGate everything else uses, to the gate LAST
+   PASSED (the full run-up is the point: a return just before the lip
+   at 40 km/h could never make the jump and would loop). Splash/boom
+   feedback kept, telemetry `return {reason:'kill'}`. Roam, missions
+   and rivals keep the honest sinking (`_returnFromKill` is the gate).
+2/3. A TOP CAMERA NEVER DIVES INTO A GORGE: the overhead family
+   (roadYaw modes) floors its height anchor at the local road-datum
+   rim (±12 samples, lift capped 30). TRAP INSIDE THE CAMERA: the
+   MAX_UP cap measures against the CAR, so it clipped the rim floor
+   straight back into the slot (target 54.8 → capped 27.3) — the
+   allowance now carries gorgeLift. Chase family untouched: diving
+   through the slot in chase is the fun part.
+
+Gates: NEW test-gorge.mjs 4/4 (no hull cost + real return + camera at
+rim over the slot, dead-cam baseline 27 recorded), camera/patch13/
+reverse/corridor2/goat regression. Flythrough screenshot verified at
+90 km/h: road, slot in plan, continuation — no interiors. Tag r306.
+
 ## r305 — THE WEAPONS BECOME ONE LINE, AND THE BOTTOM EDGE IS RENEGOTIATED
 User (with a live one-thumb screenshot): "Make the fire bombs rocket and
 all at one line at the bottom, increase the buttons a bit." The r300
