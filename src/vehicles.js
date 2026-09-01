@@ -2154,9 +2154,21 @@ export class Car {
     // PATCH_02 §3.7: nitro adds at most +40 km/h (11.1 u/s) over the top
     // speed — the old 1.4x handed +80 on a fast car and made the drivetrain
     // irrelevant for half a lap.
-    const nitroCapMul = boosting
+    let nitroCapMul = boosting
       ? Math.min(1.4, (this.maxSpeed + ((window.__DRIVING?.patch02?.nitroBonusKmh ?? 40) / 3.6)) / this.maxSpeed)
       : 1;
+    // v1.5 §11.5/§6.6 (r310): AND the STAGE has a speed budget. Recording E
+    // hit 205-213 in streets built for 140 — "that number is the root of
+    // both offs at the finish". The ceiling is derived from the template
+    // (street 160 absolute) in DISPLAYED km/h; main computes it per level
+    // as game._nitroCeilU (u/s). It caps NITRO's contribution only — the
+    // drivetrain's own top stands.
+    if (boosting) {
+      const ceilU = this.game._nitroCeilU;
+      if (ceilU && this.maxSpeed * nitroCapMul > ceilU) {
+        nitroCapMul = Math.max(1, ceilU / this.maxSpeed);
+      }
+    }
     const topSpeed = this.maxSpeed * nitroCapMul * offMult * (this._draftOn ? 1.12 : 1);
 
     // ---- longitudinal ----
@@ -2299,8 +2311,23 @@ export class Car {
     let vCap = topSpeed;
     if (slope > 0) vCap = Math.max(topSpeed * 0.55, topSpeed - (GRADE * slope) / 0.55);
     else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
+    // v1.5 §11.5/§6.6 (r310): while BOOSTING the stage ceiling binds the
+    // WHOLE cap — the downhill extension and the boost floor included, or
+    // the ceiling leaks exactly where recording E measured it (205-213 in
+    // streets on the downhill to the line). It never cuts below the car's
+    // own unboosted top: nitro must not act as a brake on an upgraded car.
+    if (boosting && this.game._nitroCeilU) {
+      // ...bounded by the ceiling OR the speed already carried, whichever
+      // is higher: nitro may never PUSH a car past the stage budget (the
+      // absolute 160 in streets, §6.6), but it must not confiscate
+      // momentum the drivetrain or a hill already earned.
+      // (measured against LAST frame's committed speed — reading this
+      // frame's vf let the throttle ratchet 0.05 u/s past the cap per
+      // frame, and Il Budello sailed to 186 anyway)
+      vCap = Math.min(vCap, Math.max(this.game._nitroCeilU, Math.abs(this.speedAlong ?? 0)));
+    }
     vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);
-    if (boosting) vf = Math.max(vf, this.maxSpeed * 1.05 * offMult);
+    if (boosting) vf = Math.max(vf, Math.min(this.maxSpeed * 1.05 * offMult, vCap));
     // FREEZE STRIKE / JUNGLE FURY: the slow field is physical — it stomps
     // in-flight boosts too, so rivals really do crawl at half pace
     if (this !== this.game.player && this.game.enemySlowUntil
@@ -2674,6 +2701,25 @@ export class Car {
     const nf = this.forward;
     const ns = new THREE.Vector3(nf.z, 0, -nf.x);
     this.vel.copy(nf).multiplyScalar(vf).addScaledVector(ns, vl);
+    // v1.5 §11.5 (r310): the nitro ceiling, enforced ONCE at the final
+    // velocity write. Every earlier clamp leaked — the steering block's
+    // lag recomposition adds to vf after the longitudinal clamp, so a
+    // per-frame cap read from live speed simply ratcheted (measured:
+    // Il Budello crept 47.8 → 55.9 u/s straight through a 51.6 ceiling).
+    // The bound is anchored when the boost FIRES: the ceiling, or the
+    // speed already carried, whichever is higher — nitro never pushes
+    // past the stage budget and never confiscates momentum.
+    if (this.boostTimer > 0 && !this.airborne) {
+      if (!this._boostCeilU) {
+        this._boostCeilU = Math.max(this.game._nitroCeilU ?? 1e9,
+          Math.hypot(this.vel.x, this.vel.z));
+      }
+      const hv = Math.hypot(this.vel.x, this.vel.z);
+      if (hv > this._boostCeilU) {
+        const s = this._boostCeilU / hv;
+        this.vel.x *= s; this.vel.z *= s;
+      }
+    } else this._boostCeilU = 0;
     this.pos.addScaledVector(this.vel, dt);
 
     // surface spray: rooster tails of powder snow or water off the tires.

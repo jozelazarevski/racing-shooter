@@ -115,6 +115,35 @@ export const DRIVING = {
   // recovery in 4, cuts and rivals in 5-6). They are declared now because
   // the spec is the authority on their values, and each step wiring one in
   // must not also be the round that invents its number.
+  // CLAUDE.md v1.5 §12 — STAGE TEMPLATES. Every world declares exactly one
+  // template kind; the generator takes these as inputs and §11 checks the
+  // output regardless. designSpeedKmh drives the derived nitro ceiling
+  // (§11.5): nitroCeilingKmh = min(designSpeedKmh + 20, gearTop + 40) —
+  // derived, never set by hand. Ceilings are in DISPLAYED km/h (the spec's
+  // numbers come from recordings of the HUD; recording E read 205-213 in
+  // streets built for 140).
+  templates: {
+    street:  { designSpeedKmh: 140 },
+    canyon:  { designSpeedKmh: 170 },
+    forest:  { designSpeedKmh: 160 },
+    circuit: { designSpeedKmh: 190 },
+    open:    { designSpeedKmh: 200 },
+    snow:    { designSpeedKmh: 150 },
+  },
+  // theme -> template kind. Anything unlisted is 'forest' (160): the middle
+  // of the table, and the roster's most common shape.
+  templateOf: {
+    riviera: 'street', genova: 'street', sanremo: 'street', oldtown: 'street',
+    monteCarlo: 'street', harbor: 'street', citadel: 'street', neon: 'street',
+    undercity: 'street', liguria: 'street', brava: 'street', dalmatia: 'street',
+    azur: 'street', aegean: 'street', medterrace: 'street', olivecountry: 'street',
+    canyon: 'canyon', desert: 'canyon', ravine: 'canyon', tremola: 'canyon',
+    furka: 'canyon', pass: 'canyon', dolomiti: 'canyon', mountainsea: 'canyon',
+    outback: 'open', dunes: 'open', savanna: 'open', oasis: 'open',
+    snow: 'snow', glacial: 'snow', sheetice: 'snow', avalanche: 'snow',
+    alpine: 'forest', farmland: 'forest', vineyard: 'forest',
+  },
+
   route: {
     streetPadM: 2,
     trailPadM: 12,
@@ -165,6 +194,26 @@ export async function loadDrivingOverrides(url = './driving.json') {
     }
     return true;
   } catch { return false; }
+}
+
+/** §12: resolve a level to its template kind. The GRAND CIRCUITS chapter is
+ *  circuit-kind BY REGION whatever its theme dresses it as; everything else
+ *  resolves by theme, defaulting to forest (the roster's common shape). */
+export function stageTemplate(level) {
+  if (!level) return 'forest';
+  if (level.region === 'GRAND CIRCUITS') return 'circuit';
+  return DRIVING.templateOf?.[level.theme] ?? 'forest';
+}
+
+/** §11.5: the nitro ceiling, DERIVED, in displayed km/h — never hand-set.
+ *  gearTop is the car's showroom top in the same displayed unit. A stage may
+ *  override designSpeedKmh by ±10 via level.tune.designSpeedKmh (§12). */
+export function nitroCeilingKmh(level, gearTopKmh) {
+  const kind = stageTemplate(level);
+  let design = DRIVING.templates?.[kind]?.designSpeedKmh ?? 160;
+  const o = level?.tune?.designSpeedKmh;
+  if (Number.isFinite(o)) design = Math.max(design - 10, Math.min(design + 10, o));
+  return Math.min(design + 20, (gearTopKmh ?? 200) + 40);
 }
 
 if (typeof window !== 'undefined') window.__DRIVING = DRIVING;

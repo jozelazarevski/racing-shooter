@@ -10,7 +10,8 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
-import { loadDrivingOverrides } from './driving.js';
+import { loadDrivingOverrides, nitroCeilingKmh, stageTemplate } from './driving.js';
+import { runStageValidator } from './stagecheck.js';
 import { installRally } from './telemetry.js';
 import { Route } from './route.js';
 // RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
@@ -6425,6 +6426,25 @@ class Game {
     // shield orbs: brief invulnerability, two per lap
     defs.push({ type: 'shield', index: Math.floor(t.N * 0.30), lateral: 2.5 });
     defs.push({ type: 'shield', index: Math.floor(t.N * 0.80), lateral: -2.5 });
+    // v1.5 §11.2 (r310), GENERATOR-SIDE: nitro pickups per lap follow the
+    // template (street-kind 1, everything else 2 — the round-robin above
+    // dealt 3), and NO nitro lives within 80 m of the finish line in either
+    // direction (recording E: a charge on the finish straight fed the 205
+    // km/h offs). Extras become hull pickups — the slot stays interesting,
+    // the speed stays budgeted. The validator re-checks this output.
+    {
+      const cap = stageTemplate(this.level) === 'street' ? 1 : 2;
+      const sampleLen = Math.max(1, Math.hypot(
+        t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
+      const guard = Math.round(80 / sampleLen);
+      const nitros = defs.filter((d) => d.type === 'nitro')
+        .sort((a, b) => Math.abs(a.index - t.N / 2) - Math.abs(b.index - t.N / 2));
+      for (let k = 0; k < nitros.length; k++) {
+        if (k >= cap || Math.min(nitros[k].index, t.N - nitros[k].index) <= guard) {
+          nitros[k].type = 'health';
+        }
+      }
+    }
     const glow = glowTexture();
     for (const d of defs) {
       const color = COLORS[d.type];
@@ -9821,6 +9841,11 @@ class Game {
     this.kills = 0;
     this.deaths = 0;
     this.raceTime = 0;
+    // v1.5 §11.5 (r310): the stage's derived nitro ceiling, in u/s. gearTop
+    // is the SHOWROOM top in displayed km/h (x3.1, the HUD's own unit —
+    // the spec's numbers come from recordings of the HUD).
+    this._nitroCeilU = nitroCeilingKmh(this.level,
+      (this.player?.baseMaxSpeed ?? this.player?.maxSpeed ?? 52) * 3.1) / 3.1;
     this.countdown = 0;
     this.raceOver = false;
     if (this.player) this.player.outOfHulls = false;
@@ -10415,6 +10440,11 @@ class Game {
     if (!this.track._densityDone) {
       this.track._densityDone = true;
       this.track.applyRouteDensity?.(this.route);
+      // v1.5 §11 (r310): the stage validator runs on the same first race
+      // frame — same reason (the prop lists fill late), same world state
+      // the race will actually be run on. Auto-fixes apply; the rest is
+      // logged as stageViolation for the generator round (§13.3).
+      try { runStageValidator(this); } catch (e) { console.warn('[stagecheck]', e); }
     }
     for (const car of [this.player, ...this.enemies]) {
       if (!car.alive) continue;
@@ -10807,11 +10837,40 @@ class Game {
       // FURKA's tunnel mouth, where the ridge stands over the road by design.
       // Samples inside a bore are not obstacles, they are the roof: skip them.
       const probe = this._camProbe || (this._camProbe = new THREE.Vector3());
+      // v1.5 §6.8 (r310): BUILDINGS ARE IN THE PROBE. The sight line only
+      // ever asked the terrain, so in towns the boom sank into facades and
+      // hut roofs (recording E: "camera enters buildings and walls"). A
+      // 20 Hz-refreshed cache of the tall solids near the player keeps the
+      // per-frame cost at ~a dozen circle tests; solids carry no height,
+      // so a building-ish radius stands in for one (a 3 u+ solid is a
+      // structure, not a bollard).
+      if (!this._camSolids || (this._camSolidsAge = (this._camSolidsAge ?? 0) + 1) > 12) {
+        this._camSolidsAge = 0;
+        const near = [];
+        for (const sld of tk.solids ?? []) {
+          // 3-20 u: buildings, huts, towers. Below is a bollard; above is
+          // LANDSCAPE (massif cones, cliff anchors) that the terrain probe
+          // already owns — a 396 u cone in this cache lifted the boom
+          // everywhere near town.
+          if ((sld.r ?? 0) < 3 || sld.r > 20 || sld.y === -9999) continue;
+          const d2 = (sld.x - pp.x) * (sld.x - pp.x) + (sld.z - pp.z) * (sld.z - pp.z);
+          if (d2 < 70 * 70) near.push(sld);
+        }
+        this._camSolids = near;
+      }
       for (let s = 1; s <= STEPS; s++) {
         const f = s / (STEPS + 1);
         const sx = cp.x + dx * f, sz = cp.z + dz * f;
         if (tk.tunnelAt && tk.tunnelAt(probe.set(sx, 0, sz), p.trackIndex, 10)) continue;
-        const gh = tk.terrainHeight(sx, sz) + 1.1;
+        let gh = tk.terrainHeight(sx, sz) + 1.1;
+        for (const sld of this._camSolids) {
+          const dxs = sx - sld.x, dzs = sz - sld.z;
+          if (dxs * dxs + dzs * dzs < sld.r * sld.r) {
+            const top = (sld.y ?? tk.terrainHeight(sld.x, sld.z))
+              + (sld.h ?? Math.min(14, sld.r * 1.6)) + 1.1;
+            if (top > gh) gh = top;
+          }
+        }
         const sy = cp.y + dy * f;
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }

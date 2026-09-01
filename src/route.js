@@ -65,7 +65,24 @@ export class Route {
     const kinds = LAYOUTS[levelId] ?? DEFAULT_LAYOUT;
     const N = track.center.length;
     this.gates = kinds.map((kind, i) => {
-      const si = Math.round((i * N) / kinds.length) % N;
+      let si = Math.round((i * N) / kinds.length) % N;
+      // v1.5 §11.1 (r310): A GATE STANDS ON SOUND ROAD. The even spacing
+      // can land a gate inside a jump gorge — there the DECK dives ~26 u
+      // below the datum the gate is built from, the crossing's vertical
+      // guard (|Δy| > 10) refuses every honest pass, and the lap jams on
+      // an impossible gate (found by R1 the moment the start rotation
+      // moved Canyon's fractions onto its gorge). Walk to the nearest
+      // sample where the deck and the datum agree.
+      if (track.groundHeightAt) {
+        for (let step = 0; step <= 30; step++) {
+          for (const dir of step === 0 ? [0] : [step, -step]) {
+            const cand = (si + dir + N) % N;
+            if (Math.abs(track.center[cand].y - track.groundHeightAt(cand, 0)) < 6) {
+              si = cand; step = 31; break;
+            }
+          }
+        }
+      }
       const c = track.center[si], t = track.tan[si], n = track.nrm[si];
       const roadHalf = track.widthAt?.(si) ?? ROAD_HALF;
       const halfWidth = kind === 'street' ? roadHalf + (R.streetPadM ?? 2)
