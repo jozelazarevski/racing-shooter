@@ -17,8 +17,11 @@
  *             world, JS frame p95 < 8 ms (the measurable half of the
  *             18 ms phone budget — swiftshader GPU time is not a phone's;
  *             buildings are instanced, five batches per district).
- *   P5 / §6.3 DRIVER'S VIEW meets the re-add bar it ships under: the
- *             seat gets its own 0.3 near plane and the cockpit renders.
+ *   P5 / §6.3 (v2.3 §6.8) DRIVER'S VIEW meets the re-add bar: the seat
+ *             gets its own 0.3 near plane, the BONNET renders (r325 —
+ *             "bonnet visible" is the spec's own acceptance; the interior
+ *             furniture stood down with the hood's return), and the roof
+ *             is off from the seat so a pitched-down aim never letterboxes.
  */
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
@@ -196,13 +199,16 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
     g.camMode = G.DRIVER_MODE ?? g.camMode;
     for (let k = 0; k < 10; k++) g.frame();
     return { near: g.camera.near,
-      cockpit: g.player.mesh?.userData?.cockpit?.visible === true,
+      cockpitDown: g.player.mesh?.userData?.cockpit?.visible !== true,
+      roofOff: (g.player.mesh?.userData?._capParts ?? []).length > 0
+        && (g.player.mesh?.userData?._capParts ?? []).every((c) => !c.visible),
+      hoodOn: !(g.player.mesh?.userData?._hoodParts ?? []).some((c) => !c.visible),
       carVisible: g.player.mesh?.visible === true };
   });
   check("§6.3 driver's view: dedicated near plane at or inside the 0.3 bar",
     r.near > 0 && r.near <= 0.3, `near ${r.near} (the seat runs 0.12 — stricter than the bar)`);
-  check("§6.3 driver's view: the cockpit renders from the seat",
-    r.cockpit && r.carVisible, JSON.stringify(r));
+  check("§6.8 driver's view: bonnet drawn, roof off, interior stood down",
+    r.carVisible && r.hoodOn && r.roofOff && r.cockpitDown, JSON.stringify(r));
   await p.close();
 }
 

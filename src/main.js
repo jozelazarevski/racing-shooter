@@ -11094,9 +11094,10 @@ class Game {
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
       const pit = p.mesh?.userData?.cockpit;
       if (pit) pit.visible = false;
-      // ...and the hood comes back. It is removed for the seat only (see
-      // `_driverCamera`); a chase camera looking at a car with no front half
+      // ...and the roof comes back. It is removed for the seat only (see
+      // `_driverCamera`); a chase camera looking at a car with no roof
       // would be a far worse bug than the one that removal fixes.
+      for (const c of p.mesh?.userData?._capParts ?? []) c.visible = true;
       for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = true;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
@@ -11589,38 +11590,34 @@ class Game {
     // the model, which does not change — and it is stored as the parts to hide
     // rather than the parts to show, so anything added to the car later shows
     // by default instead of silently vanishing.
-    if (p.mesh && !p.mesh.userData._hoodParts) {
-      const eyeCut = (p.mesh.userData.rig?.cabZ ?? 0) + (p.mesh.userData.rig?.cabL ?? 2) * 0.30;
-      const bb = new THREE.Box3();
-      p.mesh.userData._hoodParts = p.mesh.children.filter((c) => {
-        if (c === p.mesh.userData.cockpit) return false;
-        bb.setFromObject(c);
-        if (!Number.isFinite(bb.min.z)) return false;
-        // the local box is in world space here; fall back to the object's own
-        // position when the mesh has not been placed yet
-        const z = c.position.z;
-        return z > eyeCut;
-      });
-    }
-    for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = false;
-    // ONE THING DOES HAVE TO GO, AND IT IS NOT BODYWORK. The brand decal is a
-    // textured plane laid on the hood slope "reading right-side-up from the
-    // car's FRONT" (vehicles.js). A driver sits behind it and reads it
-    // backwards — measured as a white mapped plane at 71% of a 430x932 frame,
-    // and it is the APEX-in-mirror-writing in the report. Back-face culling
-    // cannot help: this is the decal's front face. Hidden for the seat only.
+    // r325 ("Fix drive view", and CLAUDE.md §6.8's own acceptance: "bonnet
+    // visible"): THE BONNET IS BACK ON. Hiding the hood was the r30x answer
+    // to it eating a third of a portrait frame — but that measurement was
+    // taken from the low interior seat (up 0.18), and the sweep tables above
+    // already recorded the answer that keeps both: at up 0.45 / fwd 0.42 /
+    // fov +12 the drawn bonnet takes 19.3% of the frame with 46.6% road,
+    // which is MORE road than the hoodless interior showed. The bonnet is
+    // what anchors the frame — the owner's screenshot was sky over anonymous
+    // dark bands with no car in it at all. The interior furniture existed to
+    // replace the hood and stands down with it (its build stays in
+    // vehicles.js for a future furnished pass).
     for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = false;
-    // AND THE INSIDE OF THE CAR COMES ON. Built with the body (vehicles.js) and
-    // hidden everywhere else, because from a chase camera a dashboard sitting
-    // in the middle of the shell is visible through the windows.
     const pit = p.mesh?.userData?.cockpit;
-    if (pit) pit.visible = true;
-    // The wheel is the one piece that is not furniture: it answers the steering
-    // the way the car does, off the SMOOTHED input rather than the raw axis, so
-    // it does not twitch. ~1.6 rad of lock each way reads as a wheel being
-    // turned rather than a dial being spun.
-    const w = p.mesh?.userData?.wheel;
-    if (w) w.rotation.y = -(p.steerSmooth ?? 0) * 1.6;
+    if (pit) pit.visible = false;
+    // ...AND THE ROOF COMES OFF (r325). With the eye at the glasshouse
+    // ceiling and the aim riding a -23% descent, the roof cap, racks and
+    // light pods enter the TOP of the frame as a black band — measured as a
+    // letterboxed descent on the report world. No cockpit renders its own
+    // roof. Everything wholly above the glasshouse hides for the seat and
+    // comes back with the outside view; computed once per mesh, stored as
+    // parts-to-hide so later additions show by default.
+    if (p.mesh && !p.mesh.userData._capParts) {
+      const rig2 = p.mesh.userData.rig;
+      const lid = (rig2?.cabY ?? 1.2) + (rig2?.cabH ?? 0.7) * 0.55;
+      p.mesh.userData._capParts = p.mesh.children.filter(
+        (c) => c !== p.mesh.userData.cockpit && c.position.y > lid);
+    }
+    for (const c of p.mesh?.userData?._capParts ?? []) c.visible = false;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.
@@ -11733,7 +11730,9 @@ class Game {
     // What made the first cut fail was never the eye being forward — it was
     // modelling a roof lining and a deep dash BEHIND and BELOW the eye, which
     // are a hand's breadth away wherever it sits. Those are gone.
-    const T = (this._driverTune ??= { up: 0.18, fwd: 0.38, lookH: 1.15, fov: 12 });
+    // r325: back to the measured hood-on seat (the 19.3% bonnet / 46.6% road
+    // row of the sweep above) now the bonnet is drawn again per §6.8.
+    const T = (this._driverTune ??= { up: 0.45, fwd: 0.42, lookH: 1.15, fov: 12 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
@@ -11755,13 +11754,27 @@ class Game {
     // ---- the look-point -----------------------------------------------------
     const look = M.look ?? 34;
     let roadY = p.pos.y;
+    let grade = 0;
     if (tk?.center && tk.center.length && p.trackIndex !== undefined && tk.segLen > 0) {
       const N = tk.center.length;
+      const i0 = ((Math.round(p.trackIndex) % N) + N) % N;
       const j = ((Math.round(p.trackIndex + look / tk.segLen) % N) + N) % N;
       const cy = tk.center[j]?.y;
       // Weighted toward the road but never entirely: off the carriageway the
       // lap index is a guess and the car's own height is the honest number.
       if (Number.isFinite(cy)) roadY = p.pos.y * 0.35 + cy * 0.65;
+      // r325 "Fix drive view" — HORIZON STABILISED MEANS THE CONE RIDES THE
+      // ROAD (§6.8). The cone below was centred on LEVEL, capped +10.4%
+      // rise — and PIKES PEAK's climbs run 20% over the same look distance,
+      // so the road ahead sat physically above the highest permitted aim
+      // and the seat showed bodywork and sky with not one pixel of road
+      // (the owner's screenshot, measured at station 206: grade 0.200
+      // against the 0.104 cap). Centre the cone on the grade the road is
+      // actually running at; flat worlds are arithmetically unchanged.
+      const cy0 = tk.center[i0]?.y;
+      if (Number.isFinite(cy) && Number.isFinite(cy0)) {
+        grade = clamp((cy - cy0) / look, -0.30, 0.30);
+      }
     }
     let lookY = roadY + (this._driverTune?.lookH ?? M.lookH ?? 1.15);
     // THE HOOD SILHOUETTE IS NOT THE BINDING CONSTRAINT — MEASURED, AND
@@ -11772,9 +11785,10 @@ class Game {
     // on the roster grazes at 23 degrees and the aim is already capped at
     // 17.8, so the clamp could never bind. What actually sets the top edge of
     // the interior is the DASH — see `_driverTune` and vehicles.js.
-    // The cone. Up is tight (5.9°) because sky is never information; down is
-    // looser (17.7°) because that is where a compression puts the road.
-    lookY = clamp(lookY, cp.y - look * 0.32, cp.y + look * 0.104);
+    // The cone, centred on the local grade. Up is tight (5.9° over the road's
+    // own pitch) because sky is never information; down is looser (17.7°)
+    // because that is where a compression puts the road.
+    lookY = clamp(lookY, cp.y + look * (grade - 0.32), cp.y + look * (grade + 0.104));
     this.camLook.set(cp.x, lookY, cp.z)
       .addScaledVector(fwd, look)
       // lead the slide by a little more than the yaw blend already does: at
