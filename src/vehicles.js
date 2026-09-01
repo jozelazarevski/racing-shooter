@@ -4545,18 +4545,18 @@ const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiCorner: 1, aiAggression: 1 };
 // ---------- AI rival ----------
 // The Voxel Racers collection — rival lineup
 const AI_COLORS = [
-  { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [0xf2f0e8, 0xd8342a], number: 77, brand: 'VOLT' },
-  { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, number: 3, brand: 'ECO-PWR' },
-  { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [0x4a9ad8], number: 12, brand: 'RAIDER' },
-  { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [0x2f9e44, 0xd8342a], number: 4, brand: 'GEARHD' },
-  { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [0xe8b83a], number: 99, brand: 'SCORP' },
+  { name: 'CROWN', driver: 'R. VOSS', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [0xf2f0e8, 0xd8342a], number: 77, brand: 'VOLT' },
+  { name: 'SLEEK', driver: 'K. MARIC', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, number: 3, brand: 'ECO-PWR' },
+  { name: 'DUNE', driver: 'T. OKADA', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [0x4a9ad8], number: 12, brand: 'RAIDER' },
+  { name: 'ALPINE', driver: 'A. LINDQVIST', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [0x2f9e44, 0xd8342a], number: 4, brand: 'GEARHD' },
+  { name: 'PIT-99', driver: 'S. FERRO', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [0xe8b83a], number: 99, brand: 'SCORP' },
   // EIGHT ON THE GRID NEEDS SEVEN RIVALS. At five entries the roster wrapped
   // — `slot % AI_COLORS.length` put a second CROWN and a second SLEEK on the
   // line, identical in name, number and paint, which is exactly the thing a
   // race result screen must never contain. These two take the last unused
   // body styles in the catalogue, so no rival is a repaint of another.
-  { name: 'FLATSIX', style: 'flatsix', body: 0xc4342a, accent: 0x2a2d33, stripe: [0xf2f0e8], number: 23, brand: 'ZENITH' },
-  { name: 'BASTION', style: 'bastion', body: 0x1f6a4a, accent: 0xc8ccd2, stripe: [0xc8ccd2], number: 46, brand: 'ZENITH' },
+  { name: 'FLATSIX', driver: 'J. DUARTE', style: 'flatsix', body: 0xc4342a, accent: 0x2a2d33, stripe: [0xf2f0e8], number: 23, brand: 'ZENITH' },
+  { name: 'BASTION', driver: 'E. KOVACS', style: 'bastion', body: 0x1f6a4a, accent: 0xc8ccd2, stripe: [0xc8ccd2], number: 46, brand: 'ZENITH' },
 ];
 
 export class EnemyCar extends Car {
@@ -4592,6 +4592,9 @@ export class EnemyCar extends Car {
     });
     this.spec = spec;
     this.name = spec.name;
+    // r317 CAREER: the persona-machine pair is a DRIVER with a name — the
+    // championship table, the rival call and the feed all speak it.
+    this.driverName = spec.driver ?? spec.name;
     this.offroadSkill = machine.offroad ?? 0.7;
     this.maxHealth = this.health = 70;
     this.respawnDelay = 5;

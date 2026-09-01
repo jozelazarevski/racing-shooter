@@ -3265,6 +3265,86 @@ class Game {
     return -1;
   }
 
+  /** r317 CAREER — THE CHAMPIONSHIP SEASONS. Every chapter is a season, its
+   *  worlds the rounds; the whole field scores rally points from the real
+   *  finishing order at the flag (the grid genuinely races since r313).
+   *  Replaying a round keeps the record from the run that set your BEST
+   *  points, so grinding a favourite world improves the season instead of
+   *  farming it. `career.seasons[chapter][levelId] = { you, place, drivers }`. */
+  static SEASON_PTS = [25, 18, 15, 12, 10, 8, 6, 4];
+
+  _recordSeasonRound(rank) {
+    if (this.freeRoam || this.missionMode) return;
+    const k = this.chapterOf(this.level.id);
+    if (k < 0) return;
+    const P = Game.SEASON_PTS;
+    const pts = (pos) => P[Math.min(pos, P.length) - 1] ?? P[P.length - 1];
+    // the field's order at the flag: rivals by progress, the player at `rank`
+    const order = [...this.enemies].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0));
+    const drivers = {};
+    let pos = 1;
+    for (const e of order) {
+      if (pos === rank) pos++;                 // the player's slot
+      drivers[e.driverName ?? e.name] = pts(pos);
+      pos++;
+    }
+    const rec = { you: pts(rank), place: rank, drivers };
+    const ss = ((this.career.seasons ??= {})[k] ??= {});
+    const old = ss[this.level.id];
+    if (!old || rec.you > old.you) ss[this.level.id] = rec;
+    // the table after this round, spoken like a championship
+    const table = this.seasonTable(k);
+    const meAt = table.findIndex(([n]) => n === 'YOU') + 1;
+    this.hud.feed(`CHAMPIONSHIP: P${meAt} — ${table[meAt - 1]?.[1] ?? 0} PTS (+${rec.you})`,
+      meAt <= 3 ? 'good' : 'info');
+    this._renderSeasonBoard(k, meAt);
+  }
+
+  /** The season standings for a chapter: [[name, pts], ...] best first.
+   *  YOU is always present (0 points before the first round). */
+  seasonTable(k) {
+    const rounds = this.career.seasons?.[k] ?? {};
+    const pts = { YOU: 0 };
+    for (const r of Object.values(rounds)) {
+      pts.YOU += r.you ?? 0;
+      for (const [d, p] of Object.entries(r.drivers ?? {})) pts[d] = (pts[d] ?? 0) + p;
+    }
+    return Object.entries(pts).sort((a, b) => b[1] - a[1]);
+  }
+
+  /** The career door (§C3): every round of the chapter run, and the player
+   *  on the podium of its championship. */
+  seasonPodium(k) {
+    const c = this.chapters()[k];
+    if (!c) return false;
+    const rounds = this.career.seasons?.[k] ?? {};
+    if (!c.levels.every((l) => rounds[l.id])) return false;
+    const table = this.seasonTable(k);
+    return table.findIndex(([n]) => n === 'YOU') < 3;
+  }
+
+  /** A compact standings board on the results card — built here, not in the
+   *  frozen race HUD (the results screen is a menu). */
+  _renderSeasonBoard(k, meAt) {
+    const host = document.getElementById('credit-breakdown')?.parentElement;
+    if (!host) return;
+    let box = document.getElementById('season-board');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'season-board';
+      box.style.cssText = 'margin-top:10px;padding:8px 12px;background:rgba(0,0,0,.25);'
+        + 'border-radius:8px;font-size:13px;text-align:left';
+      host.appendChild(box);
+    }
+    const name = this.chapters()[k]?.name ?? `CHAPTER ${k + 1}`;
+    const rows = this.seasonTable(k).map(([n, p], i) =>
+      `<div style="display:flex;justify-content:space-between;${n === 'YOU'
+        ? 'color:var(--yellow,#e8b83a);font-weight:800' : 'opacity:.85'}">`
+      + `<span>${i + 1}. ${n}</span><b>${p}</b></div>`).join('');
+    box.innerHTML = `<div style="letter-spacing:1.5px;font-weight:800;margin-bottom:4px">`
+      + `🏁 ${name} CHAMPIONSHIP</div>${rows}`;
+  }
+
   /** Stars banked inside one chapter, and the most it can hold. */
   chapterStars(k) {
     const c = this.chapters()[k];
@@ -3306,6 +3386,10 @@ class Game {
     const prev = this.chapters()[k - 1];
     if (!prev) return true;
     if (this.chapterStars(k - 1) >= this.chapterNeed(k - 1)) return true;
+    // r317 CAREER — the second door: podium the previous chapter's
+    // championship. Neither door closes the other; stars stay the casual
+    // path, the season table is the racer's.
+    if (this.seasonPodium(k - 1)) return true;
     return prev.levels.every((l) => this.career.finished[l.id]);   // the floor
   }
 
@@ -10144,7 +10228,7 @@ class Game {
       this.player.nitro = Math.min(1, this.player.nitro + 0.25 * (this.player.nitroRate || 1));
       this.buzz(45);
       this.hud.centerMsg('DESTROYED');
-      this.hud.feed(`${enemy.name} DESTROYED  +250`, 'good');
+      this.hud.feed(`${enemy.driverName ?? enemy.name} DESTROYED  +250`, 'good');
       this.shake = Math.min(1, this.shake + 0.5);
     } else if (source === 'missile') {
       this.shake = Math.min(1, this.shake + 0.2);
@@ -10369,6 +10453,9 @@ class Game {
       bestLap: Number.isFinite(lapRec) ? Math.round(lapRec * 10) / 10 : 0,
       stars: bestStars,
     };
+    // r317 CAREER: the round scores the championship (before the save, so
+    // the season rides the same write the stars do)
+    this._recordSeasonRound(rank);
     saveJSON(this._pkey('career'), this.career);
     this._showStars(bestStars, hadStars, starsBefore, rank, chapBefore);
     this.renderGarage();
@@ -10526,6 +10613,8 @@ class Game {
           this._pressureRival = best;
           this.telemetry?.log('aiState', { rival: best.persona ?? best.name,
             state: 'PRESSURE', targetId: 'player' });
+          // r317 CAREER: the rival has a NAME now, and the career says it
+          this.hud.feed(`${best.driverName ?? best.name} IS HUNTING YOU`, 'info');
         }
         this._pressurePickedLap = plLap;
       }

@@ -4161,6 +4161,44 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r316 — CAREER MODE, THE CHAMPIONSHIP SEASONS (C1-C3)
+Owner: "Think about creating a career mode." Design first, then the core.
+The full proposal is published (championship seasons over chapters, named
+drivers, promotion doors, purse, sponsors) — this build ships its heart.
+
+EVERY CHAPTER IS A SEASON. finishRace records the round into
+career.seasons[chapter][levelId]: the whole 8-car field scores rally
+points (25·18·15·12·10·8·6·4) from the REAL finishing order at the flag —
+the grid genuinely races since r313, so the table writes itself. Replays
+keep the record from the run that set your BEST points (grinding a world
+improves the season, never farms it — asserted).
+
+THE SEVEN HAVE NAMES. The persona-machine pairs become drivers: R. VOSS
+(Crown, the rabbit), K. MARIC (Sleek), T. OKADA (Dune), A. LINDQVIST
+(Alpine), S. FERRO (Pit-99), J. DUARTE (Flatsix), E. KOVACS (Bastion) —
+original surnames, §11.10-clean (the suite greps for real racing names).
+The names speak everywhere the career does: the standings board on the
+results card, the feed's CHAMPIONSHIP line ("P2 — 76 PTS (+18)"), kills
+("K. MARIC DESTROYED"), and the pressure lease announces itself —
+"MARIC IS HUNTING YOU" — the moment §5.2 picks its rival.
+
+THE SECOND DOOR. isChapterOpen gains the career path: podium the previous
+chapter's championship (every round run, top-3 on points) and the next
+chapter opens — beside the 60% star gate and the raced-out floor, closing
+neither. A racer chases the table, a casual keeps banking stars, most
+players will walk through both without noticing there are two doors.
+
+tests/test-career.mjs, 9 checks: round record shape (8 scorers, winner on
+25, the player's slot at their real rank), best-not-latest on replays
+both directions, table sorted with YOU always present, the podium door
+opening on zero stars, named + no-real-names, the results board renders.
+Finish-path fallout: ladder and jobs green; economy and feats hold their
+exact pre-existing counts (1 and 2).
+
+NEXT (per the published design): C4 purse (position pay + season prize +
+rival bonus, tuned against the economy laws), C5 sponsors on the quest
+machinery + a season recap at chapter completion + calendar strip.
+
 ## r315 — THREE FROM THE OWNER: HIT DEBRIS, THE MOUNTAIN LAW, THE COPILOT
 One message, three asks, one build (the r302/r309 batching precedent).
 
