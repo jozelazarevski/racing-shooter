@@ -89,7 +89,7 @@ export const DRIVING = {
     nitroBonusKmh: 40,
     camHeightMaxMul: 1.35,
     camEaseMs: 400,
-    speedLinesFromKmh: 150,
+    speedLinesFromKmh: 95,   // r309 "do not feel I go 70": speed must LOOK like speed well before 150
   },
 
   // RALLY_PATCH_02 v1.2 §9 — recording B (Glacier Col) constants. Only the

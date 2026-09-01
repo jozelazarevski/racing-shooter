@@ -130,7 +130,11 @@ export class Hud {
       if (gi < 0) gi = GB.tops.length - 1;
       gear = String(gi + 1);
       const lo = gi > 0 ? GB.tops[gi - 1] : 0;
-      rpm = GB.launch + ((kmh - lo) / (GB.tops[gi] - lo)) * (GB.redline - GB.launch);
+      // r309 (user): "if I don't press the gas the rpms should not stay
+      // up." Off the pedal the needle sags to a third of the band — the
+      // engine-braking murmur — and swells back with the throttle.
+      const drive = 0.33 + 0.67 * Math.min(1, Math.max(0, throttle));
+      rpm = GB.launch + ((kmh - lo) / (GB.tops[gi] - lo)) * (GB.redline - GB.launch) * drive;
     }
     if (p.boostTimer > 0) rpm = GB.redline + 400;    // nitro pins it past the line
     rpm = Math.max(GB.idle, Math.min(GB.max, rpm));
