@@ -4161,6 +4161,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r325 — THE SEAT SEES THE ROAD (owner: "Fix drive view")
+
+Phone screenshot from PIKES PEAK: the driver's view showing sky over
+anonymous dark bands, no road, no car. Reproduced from the ravine
+bottom (the r320 fall site) and at the climb stations, and the causes
+were compositional, not a broken lens:
+
+- THE AIM CONE WAS CENTRED ON LEVEL. It capped +10.4% of rise while the
+  report world's climbs run 20% over the same look distance (measured
+  at station 206: grade 0.200 vs the 0.104 cap) — the road ahead sat
+  PHYSICALLY ABOVE the highest permitted aim, so a climb showed
+  bodywork and sky with not one pixel of carriageway. The cone is now
+  centred on the local road grade (clamped ±0.30), so it rides climbs
+  and descents; flat worlds are arithmetically unchanged.
+- NO CAR IN THE FRAME. The bonnet had been hidden since r30x (it ate a
+  third of a portrait frame from the LOW interior seat), replaced by
+  dash furniture — and the result was a frame with nothing anchoring
+  it. v2.3 §6.8's own acceptance says BONNET VISIBLE, and the old sweep
+  tables already recorded the seat that affords it: up 0.45 / fwd 0.42
+  / fov +12 = 19.3% bonnet, 46.6% road — MORE road than the hoodless
+  interior showed. The bonnet is back; the interior stands down with it
+  (its build stays in vehicles.js for a furnished pass later).
+- THE ROOF ENTERED THE FRAME ON DESCENTS. With the eye at the
+  glasshouse ceiling and the aim riding a −23% grade, the roof cap and
+  racks letterboxed the top of the frame black. No cockpit renders its
+  own roof: everything wholly above the glasshouse hides for the seat
+  (parts-to-hide, computed once) and returns with the outside view.
+
+Near plane stays 0.12 (inside the spec's 0.3 bar). Verified by
+screenshots at the steepest climb (grade +0.20), the steepest descent
+(−0.23), the flattest station and the ravine floor: road in frame on
+all three road stations, bonnet anchoring the bottom, no letterbox.
+The ravine frame is still DARK — correctly: it faces an unlit
+mountainside, which is §7.9's readability territory (the B6 pass), not
+the camera's. test-phase4's P5 law re-anchored to §6.8 (bonnet drawn,
+roof off, interior down, near ≤ 0.3) — suite green; HUD freeze green.
+
 ## r324 — A RESTARTED CAR STANDS STILL
 
 Owner: "When car restarts after selecting goes straight to nitro. Should
