@@ -4161,6 +4161,30 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r326 — THE TUNNEL CAMERA, AS A CHOICE
+
+Owner: "Add camera that is when I enter in the tunel as choice." There
+was never a coded tunnel cut in this engine to restore — the look the
+owner remembers is the chase camera being CLAMPED under a bore's roof
+(`tunnelAt` pulls the eye to apex − 0.5), which turns it into a low,
+road-level pursuit shot. That clamp is now the SEVENTH camera mode:
+
+  TUNNEL — back 14, h 5.2, look 7 / lookH 1.5, chase yaw, steer 0.76.
+  Eye ~5.5 u over the road at pace (CHASE runs ~13+), close in, aim low
+  down the carriageway: every straight reads like the inside of a bore.
+
+§6.4 stands untouched — it banned AUTOMATIC cuts, and this mode changes
+only through the cycle button / pause menu like every other. Appended
+LAST in CAM_MODES so saved camera preferences keep their indices,
+DRIVER stays found by its flag, and the `?? 3` CHASE fallback stays
+honest.
+
+tests/test-tunnelcam.mjs, 4 checks on CANYON RUN: the cycle has seven
+stops and wraps; TUNNEL settles at 5.6 u over the car at pace; and the
+§6.4 pin — a car parked INSIDE a real bore in CHASE never has its mode
+moved by anything but the player. Gates: test-tunnels 34/34 bores in
+one portal and out the other, HUD freeze green.
+
 ## r325 — THE SEAT SEES THE ROAD (owner: "Fix drive view")
 
 Phone screenshot from PIKES PEAK: the driver's view showing sky over
