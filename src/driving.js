@@ -43,6 +43,13 @@ export const DRIVING = {
   offRoadClimbDiv: 0.14,
   offRoadClimbBleed: 14,     // u/s² toward the climb cap: banks cross, charges die
   offRoadClimbFreeGrade: 0.15, // rolling grass under this grade climbs free (F7)
+  fallEdgeDrop: 3,           // ground this far below the car is a FALL, not a slope:
+                             // the car goes ballistic and onLand prices the impact
+                             // (the r320 cliff report — the ease was rappelling
+                             // cars down 30 u walls at 11 u/s, unhurt)
+  fallWreckOver: 16,         // impact past free+this wrecks outright, any hull
+                             // (free 22 + 16 = 38 u/s ≈ a 28 u drop on stock
+                             // dampers; dampers raise the bar through `free`)
 
   // §8.1 / test 12.3 — 100-0 km/h in 42 m ± 3 (≈0.94 g). All four tyres.
   brakeCap: 2.6,            // brake decel cap = this × gripBudget (was 4.2)

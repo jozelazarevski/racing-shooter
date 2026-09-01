@@ -3838,22 +3838,42 @@ export class Car {
       // the carriageway; a face you can pass inside of is a mountain,
       // hundreds out. Sixty units of lateral is the fence between them.
       const gap = gY - this.y;
-      if (gap > 2.5 && this._wilds && t.terrainHeight) {
-        const E = 2.2;
-        const dhdx = (t.terrainHeight(this.pos.x + E, this.pos.z)
-          - t.terrainHeight(this.pos.x - E, this.pos.z)) / (2 * E);
-        const dhdz = (t.terrainHeight(this.pos.x, this.pos.z + E)
-          - t.terrainHeight(this.pos.x, this.pos.z - E)) / (2 * E);
-        const gm2 = Math.hypot(dhdx, dhdz);
-        if (gm2 > 0.9) {
-          const gx2 = dhdx / gm2, gz2 = dhdz / gm2;
-          const vin = this.vel.x * gx2 + this.vel.z * gz2;
-          if (vin > 0) { this.vel.x -= gx2 * vin; this.vel.z -= gz2 * vin; }
+      // A CLIFF UNDER YOU IS A FALL, NOT A SERVICE LIFT. The ease below is
+      // clamped to VY_CAP, so a car that left a shelf edge slowly was
+      // RAPPELLED down any wall at a serene 11 u/s — never airborne, so
+      // `onLand` never priced the drop. Reproduced on the biggest shelf on
+      // the report's world (deck 32.8 u over the ravine): placed one step
+      // past the deck, the car descended the whole wall at hull 100, which
+      // is the phone screenshot ("should be wrecked at this kind of
+      // falls"). When the ground is more than a suspension-length below,
+      // the car is not ON it: go ballistic and let the landing law price
+      // the impact. Ordinary descents never trip this — the 12/s
+      // proportional ease holds the gap near zero on any slope it can
+      // actually follow — and the on-road/ramp launch paths are untouched.
+      if (gap < -(DRIVING.fallEdgeDrop ?? 3)) {
+        this.airborne = true;
+        this.vy = 0;
+        this._airT = 0;
+        this._climbRate = 0;
+        this._lastGY = this.y;
+      } else {
+        if (gap > 2.5 && this._wilds && t.terrainHeight) {
+          const E = 2.2;
+          const dhdx = (t.terrainHeight(this.pos.x + E, this.pos.z)
+            - t.terrainHeight(this.pos.x - E, this.pos.z)) / (2 * E);
+          const dhdz = (t.terrainHeight(this.pos.x, this.pos.z + E)
+            - t.terrainHeight(this.pos.x, this.pos.z - E)) / (2 * E);
+          const gm2 = Math.hypot(dhdx, dhdz);
+          if (gm2 > 0.9) {
+            const gx2 = dhdx / gm2, gz2 = dhdz / gm2;
+            const vin = this.vel.x * gx2 + this.vel.z * gz2;
+            if (vin > 0) { this.vel.x -= gx2 * vin; this.vel.z -= gz2 * vin; }
+          }
         }
+        this.y += THREE.MathUtils.clamp((gY - this.y) * Math.min(1, 12 * dt), -lift, lift);
+        this._climbRate = 0;
+        this._lastGY = this.y;
       }
-      this.y += THREE.MathUtils.clamp((gY - this.y) * Math.min(1, 12 * dt), -lift, lift);
-      this._climbRate = 0;
-      this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
       const newClimb = dt > 0 ? (gY - this._lastGY) / dt : 0;
@@ -4068,12 +4088,23 @@ export class Car {
     const impact = Math.abs(this._impactVy || 0);
     this._impactVy = 0;
     if (impact > free && this.alive) {
+      // A GENUINE CLIFF WRITES THE CAR OFF — absolutely, not per hull point
+      // (r320, phone report: "should be wrecked at this kind of falls").
+      // The linear band below is scaled by difficulty and plating, so on
+      // NORMAL a 33 u shelf drop left 21 of a stock hull and barely dented
+      // a 149-point one. Past the wreck bar (free + 16 ≈ a 28 u drop on
+      // stock dampers, and dampers raise it with `free`) the landing is not
+      // a damage event but an outcome: raw, past any hull. Designed jumps
+      // never reach it — a ramp launch is capped at vy 11 and the gorge
+      // decks land in the free band.
+      const wreckAt = free + (DRIVING.fallWreckOver ?? 16);
       if (this === this.game.player) {
         this.game.hud?.feed?.(impact > free + 11 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
         this.game.shake = Math.min(1, (this.game.shake || 0) + 0.55);
       }
       this.game.particles?.debris?.(this.pos, impact > free + 11 ? 4 : 2);
-      this.damage((impact - free) * perUnit, null);
+      if (impact > wreckAt) this.damage(this.health + 1, null, true);
+      else this.damage((impact - free) * perUnit, null);
       if (!this.alive) return;    // wrecked on touchdown: skip the style pay
     }
     // hang time pays style: a real jump (not a curb hop) scores BIG AIR

@@ -4161,6 +4161,42 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r320 — THE CLIFF COLLECTS (phone report, PIKES PEAK)
+
+Screenshot from the phone: the car at the bottom of the ravine under the
+PIKES PEAK shelf, hull untouched, 3 km/h in reverse — "Should be wrecked
+at this kind of falls." Measured and reproduced exactly: the off-road
+grounded branch HAD NO AIRBORNE ENTRY. Its ease is clamped to VY_CAP, so
+a car that left a shelf edge slowly was rappelled down the whole wall at
+a serene 11 u/s — never airborne, so `onLand`'s existing impact law
+(free to 22 u/s, 6.5 hull per unit past, dampers move both) never fired.
+Placed one step past the deck of the report world's biggest shelf
+(32.8 u): descended to the floor at hull 100. That is the screenshot.
+
+TWO CHANGES, BOTH IN THE LAW'S OWN TERMS:
+- `fallEdgeDrop 3`: ground more than a suspension-length below the car
+  is a FALL, not a slope — the car goes ballistic and the landing law
+  prices the drop. Ordinary descents never trip it (the 12/s
+  proportional ease holds the gap near zero on any slope it can
+  follow); ramps and crests use the untouched on-road launch paths;
+  rivals never leave the road, so the AI is untouched by construction.
+- `fallWreckOver 16`: past free + 16 (38 u/s ≈ a 28 u drop on stock
+  dampers) the landing is an OUTCOME, not a damage event — raw, past
+  any hull. The linear band was difficulty-scaled, so on NORMAL the
+  33 u drop left 21 of a stock hull and barely dented the report car's
+  149. Designed jumps cannot reach the bar (ramp launches cap at vy
+  11); LONG-TRAVEL DAMPERS still move it, since it rides `free`.
+
+tests/test-cliff.mjs, 7 checks: the report replayed (ballistic + wreck),
+the free band still free, the hard-landing band priced not wrecked, the
+wreck bar absolute on stock and moved by level-5 dampers, the rival
+untouched at the same edge. Fallout gates: goat 25/26 (the standing
+FURKA rejoin 23% only), sinking/unstuck/drivingspec/shortcut/difficulty
+all green, round-fixes' ramp-cap check green (its two obsolete-law reds
+stand; note its staged economy figure moved 2426 -> 2786 because the C4
+purse now pays in that staged finish — same obsolete expectation, new
+constant).
+
 ## r319 — ELEVEN STANDING REDS, ONE ROOT CAUSE EACH (THE GEOMETRY LEDGER)
 
 The oldest pre-existing reds in the battery — nature 6, sinking 1, water
