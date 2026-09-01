@@ -4161,6 +4161,23 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r323 — THE HOOD PLATE COMES OFF
+
+Owner, with a marked-up zoom of the turntable: "Remove this ugly plate
+from the car hoods." The `brand-decal` — a white rounded rect with a
+brand word, laid on the hood slope of the brawler/sleek and the roof
+cap of everything else — read as a sticker pasted over the machine, not
+livery painted on it. Deleted per the standing rule: the mesh block,
+`roofDecalTexture`, its cache and the BRANDS list are all gone, plus a
+dead `numberPlateTexture` import found alongside. What stays is the
+livery that looks like livery — the door roundels and the painted door
+sponsor panels — and `spec.brand` as DATA (the ZENITH quest and the
+badge job read it; nothing visual hangs off it any more). The
+`outwardDecals` consumers in the driver-camera path already iterate
+`?? []`, so no caller changed. Verified by re-shooting all eight
+machines on the turntable — no plate anywhere; parts 30/30, machines
+and the HUD freeze green.
+
 ## r322 — THE TURNTABLE NEVER ARRIVES DARK, AND SPEC v2.3 LANDS
 
 Owner: "Make this rotating car always visible when I go over and update

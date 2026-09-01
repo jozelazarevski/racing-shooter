@@ -1,7 +1,7 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
 import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
-import { numberPlateTexture, glowTexture } from './textures.js';
+import { glowTexture } from './textures.js';
 import { DRIVING } from './driving.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
@@ -81,50 +81,6 @@ const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
 const _leafBack = new THREE.Vector3();  // scratch: -forward, for the leaf wake
 const _obPos = new THREE.Vector3();     // scratch: obstacle/puddle track projection (AI)
 const _shove = new THREE.Vector3();     // scratch: ram-contact push direction
-
-// ---------- roof sponsor decals ----------
-// Small canvas-drawn sponsor plates (white rounded rect + fictional brand word),
-// like the liveries on toy rally trucks. Cached per brand string.
-const BRANDS = ['APEX', 'SCORP', 'RAIDER', 'ECO-PWR', 'GEARHD', 'VOLT'];
-const decalCache = new Map();
-function roofDecalTexture(text) {
-  if (decalCache.has(text)) return decalCache.get(text);
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 128;
-  const ctx = c.getContext('2d');
-  // rounded white plate with dark outline (manual path for compatibility)
-  const x = 8, y = 20, w = 240, h = 88, r = 24;
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
-  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
-  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
-  ctx.closePath();
-  ctx.fillStyle = '#f4f1e8';
-  ctx.fill();
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = '#1c1a18';
-  ctx.stroke();
-  // red accent bar under the word
-  ctx.fillStyle = '#d8342a';
-  ctx.fillRect(x + 30, y + h - 24, w - 60, 9);
-  // brand word, shrunk to fit
-  ctx.fillStyle = '#1c1a18';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  let size = 54;
-  ctx.font = `900 ${size}px Arial, sans-serif`;
-  while (ctx.measureText(text).width > w - 44 && size > 18) {
-    size -= 4;
-    ctx.font = `900 ${size}px Arial, sans-serif`;
-  }
-  ctx.fillText(text, 128, y + (h - 14) / 2);
-  const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
-  decalCache.set(text, tex);
-  return tex;
-}
 
 // ---------- mesh factory: the Voxel Racers collection ----------
 // Blocky toy racers with liveries: brawler (off-road hero), crown (low-slung
@@ -907,37 +863,16 @@ export function buildVoxelRacer(spec) {
     g.add(ao);
   }
 
-  // ---- sponsor decal: sloped hood on the trucks/hatch, roof cap otherwise.
-  // (alpine skips it — its roof carries the spare and its doors the sponsors)
-  if (style !== 'alpine') {
-    const brand = spec.brand ?? BRANDS[Math.abs(number ?? 0) % BRANDS.length];
-    const decal = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.45, 0.72),
-      new THREE.MeshBasicMaterial({
-        map: roofDecalTexture(brand), transparent: true,
-        polygonOffset: true, polygonOffsetFactor: -2,
-      })
-    );
-    if (style === 'brawler' || style === 'sleek') {
-      // laid onto the hood slope, reading right-side-up from the car's front
-      decal.rotation.set(-Math.PI / 2 + hoodAng, 0, 0);
-      decal.position.set(0, topY - frontDrop / 2 + 0.055, (bodyLen - noseLen) / 2 + 0.01);
-    } else {
-      decal.rotation.set(-Math.PI / 2, 0, Math.PI);
-      decal.position.set(0, capTop + 0.045, style === 'dune' ? capZ - 0.2 : capZ);
-      if (style === 'dune') decal.scale.set(0.85, 0.85, 1);
-    }
-    // READ FROM OUTSIDE, SO IT COMES OFF FROM INSIDE. The comment above says it
-    // exactly: this reads right-side-up FROM THE CAR'S FRONT. A driver is
-    // behind it, so from the seat the brand renders in mirror writing — which
-    // is what "APEX" across the bottom of the driver's-view screenshot was.
-    // Culling does not save us here: we are looking at the decal's FRONT face.
-    // Tagged rather than hidden outright, because from every other camera it is
-    // correct and wanted.
-    decal.name = 'brand-decal';
-    (g.userData.outwardDecals ??= []).push(decal);
-    g.add(decal);
-  }
+  // THE HOOD/ROOF BRAND PLATE IS GONE (r323, owner: "Remove this ugly plate
+  // from the car hoods"). It was a white rounded rect laid on the hood slope
+  // (brawler/sleek) or roof cap, and it read as a sticker pasted over the
+  // machine rather than livery painted on it. Delete means delete: no mesh,
+  // no texture, no cache (roofDecalTexture / decalCache / BRANDS all went
+  // with it). Brand identity stays where it looks like livery — the door
+  // roundels and the painted door sponsor panels — and `spec.brand` remains
+  // data (the ZENITH quest and the badge job read it).
+  // `userData.outwardDecals` stays as a concept; its consumers in main.js
+  // already iterate `?? []`.
 
   // ---- wheels ----
   //
