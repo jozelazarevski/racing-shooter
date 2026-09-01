@@ -10427,7 +10427,19 @@ class Game {
     if (pl.alive && this.state === 'race' && gate) {
       const ahead = (gate.si - pl.trackIndex + N) % N;
       const overshot = ahead > N * 0.5;
-      this._gateMissT = overshot ? (this._gateMissT ?? 0) + dt : 0;
+      // §3.2's own word is UNCORRECTED. A player driving back toward the
+      // gate — reversing to it, or turned around and heading for it — is
+      // correcting, and yanking them mid-manoeuvre read as "I can't drive
+      // backwards" (r304 report; with §3.5's silence there was nothing on
+      // screen to say why the snap happened). While their velocity closes
+      // on the gate at better than walking pace the grace HOLDS: it does
+      // not accrue and does not reset, so stopping again resumes the clock.
+      const toGx = gate.x - pl.pos.x, toGz = gate.z - pl.pos.z;
+      const dist = Math.hypot(toGx, toGz) || 1;
+      const closing = (pl.vel.x * toGx + pl.vel.z * toGz) / dist;
+      const correcting = closing > 2;
+      if (!overshot) this._gateMissT = 0;
+      else if (!correcting) this._gateMissT = (this._gateMissT ?? 0) + dt;
       const RT = window.__DRIVING?.route ?? {};
       if (this._gateMissT > (RT.missedGateGraceS ?? 4)) {
         this._gateMissT = 0;
@@ -11557,6 +11569,11 @@ class Game {
       if (this.track.hazeBand2) this.track.hazeBand2.visible = this.track.hazeBand.visible;
     }
     this._watchCarVisible(dt);
+    // r304 ("I can't drive backwards"): auto-gas reads this flag. While the
+    // car is actually rolling backwards, releasing the brake must COAST,
+    // not slam full forward throttle — that lurch was cancelling every
+    // reverse the moment the thumb lifted to steer.
+    this.input.reverseRolling = (this.player?.speedAlong ?? 0) < -0.5;
     this.input.endFrame();
     this._autoQuality();
     this.composer.render();

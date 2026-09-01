@@ -161,8 +161,13 @@ export class Input {
   endFrame() { this.pressed.clear(); }
 
   get throttle() {
-    // auto-gas: full throttle unless you are actually on the brake
-    if (this.autoThrottle) return this.brake > 0 ? 0 : 1;
+    // auto-gas: full throttle unless you are actually on the brake — or
+    // still ROLLING BACKWARDS (r304, "I can't drive backwards"): the
+    // instant-on gas used to cancel a reverse the moment the pedal lifted
+    // to steer, so backing out of a wall was press-creep-lurch forever.
+    // main.js publishes reverseRolling each frame; once drag brings the
+    // car back past -0.5 m/s the auto-gas resumes and pulls it forward.
+    if (this.autoThrottle) return (this.brake > 0 || this.reverseRolling) ? 0 : 1;
     return Math.max(this.down('KeyW', 'ArrowUp') ? 1 : 0, this.analog.throttle);
   }
   /** TWO-THUMB: both steer buttons at once IS the brake.

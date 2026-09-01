@@ -4161,6 +4161,37 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r304 — "I CAN'T DRIVE BACKWARDS": THE GEAR WORKED, EVERYTHING AROUND IT FOUGHT
+Measure before tuning, again: the reverse LAW was fine (hard brake ≥0.6
+held 0.45 s at standstill → 5 m/s² backwards, r288, verified −8.8 m/s
+via the real pedal path AND direct step). Three things around the gear
+made it unusable in the hands, all fixed:
+
+1. AUTO-GAS CANCELLED EVERY REVERSE. Both touch schemes snap throttle
+   to 1 the instant brake is 0, so lifting the pedal to steer while
+   rolling backwards slammed the car forward — press-creep-lurch,
+   forever. main.js publishes `input.reverseRolling` (speedAlong <
+   −0.5) each frame; auto-gas returns 0 while it is set and resumes
+   once the roll dies. Keyboard players are untouched.
+2. NO ENGINE BRAKE IN REVERSE. With every pedal released a backward
+   roll coasted 5+ s (backward rolling drag is tiny), stranding the
+   auto-gas schemes in a slow drift. Reverse coast now decays 3 m/s²
+   toward zero, never past it — release, stop in ~3 s, auto-gas pulls
+   forward again.
+3. THE MISSED-GATE RETURN YANKED A CORRECTING PLAYER. §3.2's word is
+   UNCORRECTED — but `_gateMissT` accrued while the player was driving
+   BACK to the owed gate, and with §3.5's silence the 4 s snap had no
+   on-screen cause, so it read as reverse refusing. While the player's
+   velocity closes on the gate at >2 m/s the grace HOLDS (no accrual,
+   no reset); stop correcting and the clock resumes, and the return
+   still fires. test-patch13 R9's stationary probe is unaffected
+   (vel 0 is not correcting).
+
+Gates: NEW test-reverse.mjs 7/7 (pedal reverse on auto-gas, coast on
+release, resume, keyboard, correcting-grace both halves) + the driving
+battery re-run (drivingspec, patch02, rules, wedge, unstuck, shortcut,
+corridor2, patch13). Tag r304.
+
 ## r303 — THE CAMERA BUTTON COMES BACK
 User ask, one line. r296 had folded the 📷 cycle into the pause menu
 ("beside pause it was a mis-tap at speed") and its 70px top-right slot
