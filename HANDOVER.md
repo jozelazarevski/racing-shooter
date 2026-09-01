@@ -4161,6 +4161,67 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r314 — v1.5 PHASE 4: NAMES, GRASS, DUSK, THE SEAT, AND THE TOWN BUDGET
+Build "next+3". Five systems, each measured (tests/test-phase4.mjs, 10/10):
+
+NAMING (§11.10 / Q18): the protected names are OUT of stage data — display
+names AND keys. Beyond the spec's four (already renamed as display names
+in r302, their keys now follow: route monaco→principality,
+silverstone→aerodrome, spa→ardennes, suzuka→crossover; theme
+monteCarlo→principality), the sweep caught the rest of the chapter still
+shipping real circuit and brand names: RED BULL RING→ALPENRING,
+MONZA→AUTODROMO VELOCE, NORDSCHLEIFE→WALDSCHLEIFE, MARINA BAY→NEON
+MARINA, MOUNT PANORAMA→RAZORBACK MOUNTAIN, OULTON PARK→ORCHARD PARK,
+LAGUNA SECA→DRY LAGOON, TOUR DE CORSE→TOUR DES CAPS, and the Riviera
+city pair GENOVA PORTO→PORTO GRANDE / SANREMO STAGE→LIGURIA STAGE.
+Q18's scan (comment-stripped data lines) runs in the suite. TRAP FOUND
+AND DEFUSED: world layouts seed their RNG from the THEME KEY STRING —
+renaming monteCarlo silently REGENERATED Principality Streets (seven new
+guard-fence violations, measured). T.seedKey now carries the historical
+string ('monteCarlo') as a pure RNG input, so the shipped layout stands.
+Internal theme keys genova/sanremo remain (city words as code keys, not
+display; flagged for the owner if the strict reading should bind).
+
+GRASS FLOOR (§11.6 / F7): dragOffRoad 0.35 → 0.08, one value, global.
+Measured before: grass topped at 24-34% of road speed — a wall wearing a
+lawn. After: PINE 56%, GLACIER 70%, 0-30 km/h in 1.6 s — inside F7's
+[55, 75] band. FALLOUT RE-PINNED, not hidden: test-goat's climb canaries
+were calibrated to the old price (its own comments said the price is
+"μ, cos(slope) and drag") — height 34→50, pace 6→36 (the old defect band
+19-26 u/s IS legal grass pace now; the canary guards F7's 75% bound
+instead), rejoin-bank keep 35%→25% (more speed carried in, more shed).
+Shortcut protection lives in the route gates, CUT_LAT and test-shortcut —
+all green under the new price. Goat is back to its single pre-existing
+red (FURKA rejoin 21-23%, red before and after, catalogued).
+
+DUSK (§11.9 / Q17): fix 17's obstacle lift verified by a scripted pixel
+probe on EMBER PASS (dusk: true): _darkLift ran, and a rendered obstacle
+reads 139% apart from its surroundings against the 15% floor. (MAPLE
+MILE, fix 17's own motivating world, is autumn-warm, not dusk-flagged —
+the first probe run caught that.)
+
+DRIVER'S VIEW (§6.3): KEPT, not removed — the spec's removal clause is
+conditional ("until then"), and the current seat meets the re-add bar in
+substance: eye inside the glasshouse at the car's own seat height, a
+dedicated 0.12 near plane (stricter than the 0.3 bar), horizon stabilised
+against the road, cockpit + wheel rendered. The bonnet clause was traded
+for the cockpit on measured phone-frame grounds (26-33% of a portrait
+frame was hood, zero road pixels on a grade — the exact report §6.3
+exists to prevent). The suite pins the near plane and the cockpit.
+
+TOWN BUDGET (§11.8 / Q24): measured, and the measurable half holds —
+20 s driven lap of PORTO GRANDE (the most urban world) runs JS frame
+p95 at 5.1 ms against an 18 ms total phone budget; buildings are already
+instanced (five batches per district). Not mapping, recorded honestly:
+no pedestrian system exists (the ≤24 pool rule is vacuous) and the
+renderer has ONE shadow map (1024 on touch), not cascades to reduce.
+
+ATTRIBUTED, NOT OURS (identical on the deployed tree): nothing-on-road's
+six standing reds (ROCKFALL, FURKA ×2, HEDGEROW, ORCHARD PARK, PORTO
+GRANDE — plus marginal threshold flicker that swaps worlds run to run),
+roadclear's four (COTE D AZUR, MOUNTAIN TO SEA ×2, SEA CLIFF RUN),
+tyres' track card, newworlds' roster tail.
+
 ## r313 — v1.5 PHASE 3: SEVEN DRIVERS, NOT ONE ALGORITHM (AI REWORK §5)
 Build "next+2", the whole of §5. THE RUBBER BAND IS DELETED — both halves
 (the maxSpeed band and the corner band that actually bound). In its place:

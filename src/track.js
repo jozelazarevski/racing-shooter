@@ -136,31 +136,31 @@ export const LEVELS = [
   // route over an existing theme (art is the theme's; the geometry is the
   // circuit's). Appended, priced with explicit `cost` like every fresh
   // region, laddered so the collection spans a career.
-  { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
+  { id: 33, name: 'ALPENRING', theme: 'alpine', route: 'alpenring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
-  { id: 34, name: 'PRINCIPALITY STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
+  { id: 34, name: 'PRINCIPALITY STREETS', theme: 'principality', route: 'principality', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
-  { id: 35, name: 'AERODROME CIRCUIT', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
+  { id: 35, name: 'AERODROME CIRCUIT', theme: 'farmland', route: 'aerodrome', region: 'GRAND CIRCUITS',
     cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
       sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
       skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
-  { id: 36, name: 'ARDENNES SWEEP', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
+  { id: 36, name: 'ARDENNES SWEEP', theme: 'forest', route: 'ardennes', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
-  { id: 37, name: 'CROSSOVER RING', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
+  { id: 37, name: 'CROSSOVER RING', theme: 'redwood', route: 'crossover', region: 'GRAND CIRCUITS',
     cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
-  { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
+  { id: 38, name: 'WALDSCHLEIFE', theme: 'forest', route: 'waldschleife', region: 'GRAND CIRCUITS',
     cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
-  { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
+  { id: 39, name: 'AUTODROMO VELOCE', theme: 'medterrace', route: 'autodromo', region: 'GRAND CIRCUITS',
     cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
-  { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
+  { id: 40, name: 'NEON MARINA', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
     cost: 12, fresh: true, tune: { rampCount: 0 } },
-  { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
+  { id: 41, name: 'RAZORBACK MOUNTAIN', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
       dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
-  { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
+  { id: 43, name: 'ORCHARD PARK', theme: 'farmland', route: 'orchard', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
       // HALF THE WALLS, asked for directly off a screenshot: the farmland
       // hedge ran both verges nearly unbroken and this is a PARK, not a
@@ -175,11 +175,11 @@ export const LEVELS = [
       sunColor: 0xffd898, sunIntensity: 2.5, sunEl: 0.34, hemiGround: 0xa07a48,
       skyTop: '#4a7ab8', skyHorizon: '#f0d8a8', fogColor: 0xe8d8b0,
       terrainLow: '#8a7a3e', terrainHigh: '#b89a58' } },
-  { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
+  { id: 44, name: 'DRY LAGOON', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
     cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
   // hairpin over hairpin, on the Mediterranean island theme
-  { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
+  { id: 45, name: 'TOUR DES CAPS', theme: 'medterrace', route: 'caps', region: 'GRAND CIRCUITS',
     cost: 17, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
   // wine country, deep forest, and the Dolomites - the player's three asks,
   // the vineyard lap tracing their third hand-drawn loop
@@ -355,7 +355,7 @@ export const LEVELS = [
     // COAST would be sent to a world with no water.
     scenery: ['MOUNTAIN', 'FARMLAND'] },
   { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 35, fresh: true, route: 'corse',
+    cost: 35, fresh: true, route: 'caps',
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
     // elevation amplitude, and corners that arrive uphill.
     //
@@ -383,7 +383,7 @@ export const LEVELS = [
     // through terraces, not a mountain world.
     scenery: ['FARMLAND'] },
   { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 36, fresh: true, route: 'monza',
+    cost: 36, fresh: true, route: 'autodromo',
     // THE FLAT ONE. The salt flats behind the olive coast: almost no
     // elevation, no bridges, no bores — the fastest thing in the family,
     // where the corners arrive with no hill to help you slow down.
@@ -589,7 +589,7 @@ export const LEVELS = [
     } },
 
   { id: 72, name: 'BRACKEN MOOR', theme: 'mistfell', region: 'AUTUMN',
-    cost: 45, fresh: true, route: 'corse',
+    cost: 45, fresh: true, route: 'caps',
     // THE HARD ONE, AND THE BLEAK ONE. `corse` is a tight unforgiving lap and
     // `mistfell` is the least forgiving air on the roster — 780 u of fog, three
     // fog banks, and almost no canopy to give you a reference. The chapter
@@ -629,7 +629,7 @@ export const LEVELS = [
     } },
 
   { id: 74, name: 'IL BUDELLO', theme: 'riviera', region: 'RIVIERA',
-    cost: 47, fresh: true, route: 'monaco',
+    cost: 47, fresh: true, route: 'principality',
     // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
     // shopfront barely wide enough for a car, and `monaco` is the roster's
     // street shape: barriers close, corners slow, no run-off anywhere.
@@ -803,7 +803,7 @@ export const LEVELS = [
       },
     } },
 
-  { id: 77, name: 'GENOVA PORTO', theme: 'genova', region: 'RIVIERA',
+  { id: 77, name: 'PORTO GRANDE', theme: 'genova', region: 'RIVIERA',
     cost: 50, fresh: true, route: 'panorama',
     // THE CITY. `panorama` is the roster's flat-then-mountain shape, which is
     // Genova exactly: a long fast run along the docks and then straight up
@@ -814,8 +814,8 @@ export const LEVELS = [
       elev: { amp: 30, ph: [0.6, 1.9, 2.8] },
     } },
 
-  { id: 78, name: 'SANREMO STAGE', theme: 'sanremo', region: 'RIVIERA',
-    cost: 51, fresh: true, route: 'corse',
+  { id: 78, name: 'LIGURIA STAGE', theme: 'sanremo', region: 'RIVIERA',
+    cost: 51, fresh: true, route: 'caps',
     // THE RALLY. Sanremo's stages run in the mountains BEHIND the town, not
     // along the front, and `corse` is the roster's tight unforgiving mountain
     // lap. The one world in this chapter with no sea in it at all — which is
@@ -964,7 +964,7 @@ const SCENERY = {
   harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
   dalmatia: ['COAST'], azur: ['COAST'],
   mountainsea: ['COAST', 'MOUNTAIN'],
-  citadel: ['COAST', 'CITY'], monteCarlo: ['COAST', 'CITY'],
+  citadel: ['COAST', 'CITY'], principality: ['COAST', 'CITY'],
   neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
 };
 
@@ -998,7 +998,7 @@ const SURFACE_BY_THEME = {
   // sealed: tarmac passes, corniches, town streets, the Mediterranean coast
   canyon: SEALED, volcano: SEALED, alpine: SEALED, pass: SEALED,
   tremola: SEALED, dolomiti: SEALED, neon: SEALED, undercity: SEALED,
-  oldtown: SEALED, monteCarlo: SEALED,
+  oldtown: SEALED, principality: SEALED,
   harbor: SEALED, liguria: SEALED, aegean: SEALED, brava: SEALED,
   dalmatia: SEALED, azur: SEALED, mountainsea: SEALED,
   citadel: SEALED,
@@ -1860,7 +1860,7 @@ const CIRCUITS = {
   // art), so twelve tracks cost zero new art systems. Corner radii are kept
   // above the game's floors except where the real corner IS the point (the
   // Loews hairpin, the Corkscrew); parallel legs never run closer than 26 u.
-  rbring: [ // Red Bull Ring — three big straights, hilltop rights, flowing left sweeps home
+  alpenring: [ // Red Bull Ring — three big straights, hilltop rights, flowing left sweeps home
     [121.6, 99.3], [142.1, 93.3], [162.6, 87.5], [183.4, 81.4], [203.7, 74.3],
     [222.5, 64.4], [234.4, 49.3], [235.0, 29.8], [228.3, 9.6], [217.2, -8.0],
     [200.2, -18.5], [178.7, -21.4], [155.8, -21.2], [132.8, -20.5], [109.9, -19.7],
@@ -1877,7 +1877,7 @@ const CIRCUITS = {
     [-43.6, 136.7], [-24.2, 140.4], [-3.4, 136.3], [17.3, 130.0], [37.9, 123.7],
     [58.6, 117.4], [79.3, 111.4], [100.4, 105.4],
   ],
-  monaco: [ // Monaco — Ste Devote, the climb to Casino, Loews, the tunnel sweep, Rascasse
+  principality: [ // Monaco — Ste Devote, the climb to Casino, Loews, the tunnel sweep, Rascasse
     [188.3, -138.2], [199.6, -130.1], [208.6, -120.3], [223.2, -116.1], [235.0, -108.0],
     [233.1, -92.5], [223.2, -75.3], [211.9, -58.5], [199.4, -42.4], [184.4, -28.3],
     [167.3, -17.5], [148.8, -10.5], [128.9, -6.6], [108.1, -4.9], [87.0, -5.0],
@@ -1894,7 +1894,7 @@ const CIRCUITS = {
     [109.3, -52.8], [111.5, -71.6], [111.9, -90.4], [120.3, -105.9], [136.1, -117.2],
     [153.8, -126.4], [171.6, -135.1],
   ],
-  silverstone: [ // Silverstone — Copse, the Maggotts/Becketts esses, Stowe, Club
+  aerodrome: [ // Silverstone — Copse, the Maggotts/Becketts esses, Stowe, Club
     [124.1, -123.1], [142.4, -123.6], [161.3, -117.9], [178.9, -109.2], [194.1, -96.5],
     [205.0, -80.3], [212.3, -62.1], [218.4, -43.3], [224.3, -24.5], [230.1, -5.7],
     [235.0, 13.3], [234.4, 31.8], [224.5, 47.2], [208.5, 58.3], [190.7, 66.6],
@@ -1912,7 +1912,7 @@ const CIRCUITS = {
     [113.4, -11.5], [123.6, -28.5], [133.8, -45.5], [142.1, -63.3], [142.6, -80.1],
     [131.1, -90.7], [116.5, -99.1], [113.1, -112.4],
   ],
-  spa: [ // Spa — La Source, the Eau Rouge climb, Kemmel, and a long flowing east side
+  ardennes: [ // Spa — La Source, the Eau Rouge climb, Kemmel, and a long flowing east side
     [-155.4, -5.4], [-169.5, 10.0], [-184.8, 24.5], [-199.6, 39.1], [-212.6, 54.5],
     [-223.1, 71.2], [-231.9, 88.8], [-233.3, 101.2], [-226.6, 106.0], [-210.8, 99.0],
     [-193.9, 88.5], [-177.0, 77.9], [-160.1, 67.4], [-143.0, 57.7], [-126.2, 53.4],
@@ -1931,7 +1931,7 @@ const CIRCUITS = {
     [-57.3, -68.6], [-73.8, -57.3], [-90.3, -45.7], [-107.3, -35.4], [-125.2, -28.0],
     [-141.6, -19.3],
   ],
-  suzuka: [ // the TRUE figure-8 at last - the crossover rides an overpass
+  crossover: [ // the TRUE figure-8 at last - the crossover rides an overpass
     [-50.7, -4.6], [-34.0, -3.6], [-17.1, -13.2], [-3.6, -28.4], [9.7, -44.6],
     [25.2, -58.3], [42.7, -67.9], [60.7, -75.7], [78.6, -82.6], [97.4, -82.7],
     [115.5, -74.5], [131.6, -61.7], [147.0, -47.0], [162.4, -32.3], [177.8, -17.6],
@@ -1947,7 +1947,7 @@ const CIRCUITS = {
     [-204.4, -32.1], [-186.4, -23.3], [-167.4, -16.1], [-147.2, -13.1], [-126.8, -11.6],
     [-106.8, -8.7], [-86.8, -5.1], [-68.3, 0.1],
   ],
-  nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
+  waldschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
     [151.0, -122.0], [168.8, -127.0], [186.9, -139.4], [207.2, -141.0], [225.3, -127.6],
     [235.0, -106.6], [233.7, -87.8], [221.4, -71.8], [206.9, -52.8], [191.7, -32.6],
     [172.5, -15.5], [149.9, -5.5], [127.5, 0.8], [118.3, 12.4], [120.6, 29.0],
@@ -1961,7 +1961,7 @@ const CIRCUITS = {
     [-1.8, -150.7], [16.9, -137.3], [42.0, -131.6], [66.9, -125.7], [90.8, -120.2],
     [114.4, -122.9], [134.4, -125.6],
   ],
-  monza: [ // Monza — long straights broken by chicanes, the Lesmos, Parabolica home
+  autodromo: [ // Monza — long straights broken by chicanes, the Lesmos, Parabolica home
     [-58.1, 113.9], [-42.5, 111.7], [-23.6, 111.0], [-1.6, 111.3], [20.8, 111.1],
     [43.3, 111.0], [65.6, 110.7], [87.9, 110.3], [110.3, 109.9], [132.5, 109.4],
     [154.7, 108.7], [176.6, 107.3], [198.1, 104.9], [218.1, 99.2], [232.5, 86.7],
@@ -2018,7 +2018,7 @@ const CIRCUITS = {
     [-3.5, -89.3], [-54.2, -88.8], [-103.7, -85.2], [-150.0, -74.1], [-192.8, -53.5],
     [-225.9, -25.1], [-224.1, -12.9], [-215.7, -9.4], [-194.9, -26.2],
   ],
-  oulton: [ // Oulton Park — parkland kidney with Old Hall, Island, the Hislops flick
+  orchard: [ // Oulton Park — parkland kidney with Old Hall, Island, the Hislops flick
     [76.7, 83.6], [95.7, 74.6], [114.3, 65.7], [133.0, 57.5], [151.8, 49.9],
     [170.3, 41.4], [188.9, 32.3], [207.3, 22.9], [223.7, 11.0], [233.8, -5.7],
     [235.0, -25.4], [229.7, -45.2], [222.2, -64.3], [213.6, -83.0], [202.9, -100.9],
@@ -2049,7 +2049,7 @@ const CIRCUITS = {
     [-94.6, -162.3], [-65.6, -173.5], [-36.7, -184.8], [-7.8, -196.0], [21.2, -207.3],
     [50.1, -218.5], [79.4, -228.7],
   ],
-  corse: [ // Tour de Corse — 26 km of Corsican mountain tarmac, hairpin over hairpin
+  caps: [ // Tour de Corse — 26 km of Corsican mountain tarmac, hairpin over hairpin
     [82.6, 32.3], [57.4, 29.3], [36.8, 29.3], [16.2, 29.4], [10.1, 33.1],
     [8.8, 39.0], [17.8, 51.7], [26.2, 68.8], [30.0, 87.7], [30.1, 107.6],
     [29.1, 127.6], [31.7, 146.4], [42.3, 159.0], [58.1, 159.4], [69.1, 147.3],
@@ -3552,7 +3552,8 @@ const THEMES = {
   // worlds. The old olive-terrace dressing never looked like Monaco; the
   // buildings ARE the scenery now (frontage drops the cone horizon and puts
   // rooftops on the skyline instead).
-  monteCarlo: {
+  principality: {
+    seedKey: 'monteCarlo',  // §11.10 rename kept the shipped layout: RNG input, not a name
     fogColor: 0xdfe6ea, fogNear: 360, fogFar: 1650,
     hemiSky: 0xbcd8f0, hemiGround: 0xb0a89a, hemiIntensity: 0.8,
     sunColor: 0xfff2d6, sunIntensity: 2.85,
@@ -6803,10 +6804,16 @@ export class Track {
       ? T.narrows
       : T.cliffWalls ? false : (NARROW_TUNE[themeKey] ?? { count: 3, min: 0.6 });
     if (!spec || !(spec.count > 0)) return;
-    // seeded LCG from the theme name — layouts stay deterministic across loads
+    // seeded LCG from the theme name — layouts stay deterministic across
+    // loads. T.seedKey overrides the string: the §11.10 rename of the
+    // monteCarlo theme key would otherwise have silently REGENERATED
+    // PRINCIPALITY STREETS' narrows (measured: seven new guard-fence
+    // violations in the carriageway) — the seed is an RNG input, not a
+    // name, so it keeps its historical value.
+    const seedKey = T.seedKey ?? themeKey;
     let seed = 2166136261 >>> 0;
-    for (let k = 0; k < themeKey.length; k++) {
-      seed = ((seed ^ themeKey.charCodeAt(k)) * 16777619) >>> 0;
+    for (let k = 0; k < seedKey.length; k++) {
+      seed = ((seed ^ seedKey.charCodeAt(k)) * 16777619) >>> 0;
     }
     const rnd = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
