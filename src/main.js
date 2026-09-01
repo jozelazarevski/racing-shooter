@@ -443,6 +443,19 @@ const CAM_MODES = [
   // (11 against the 6 every other view gets). From a fixed eye with no boom,
   // pace has to be sold by the frame itself, and a wide lens is also what buys
   // back the peripheral road a cockpit loses by being 12 u closer to it.
+  //
+  // TUNNEL (r326, owner: "Add camera that is when I enter in the tunel as
+  // choice"). No tunnel cut ever existed in this codebase to restore — the
+  // look the owner remembers is the CHASE camera being CLAMPED under a bore's
+  // roof (`tunnelAt` pulls the eye down to apex − 0.5), which turns it into a
+  // low, road-level pursuit shot. This mode is that clamp as a standing
+  // choice: eye at ~5 u, close in, aim low down the road, so every straight
+  // feels like the inside of a tunnel. §6.4 is intact — it banned AUTOMATIC
+  // cuts, and this changes only in the pause menu / cycle button like every
+  // other mode. LAST in the list so saved camera preferences keep their
+  // indices and the `?? 3` CHASE fallback stays honest.
+  { name: 'TUNNEL', back: 14, h: 5.2, look: 7, lookH: 1.5,
+    spdBack: 4, spdH: 1.2, chase: true, steer: 0.76 },
 ];
 // ---- economy ----
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
