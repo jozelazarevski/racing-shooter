@@ -183,6 +183,13 @@ const UPGRADES = [
   // on a three-hull race, and the 30 s cooldown still applies on top, so extra
   // charges buy you SEPARATE incidents rather than a second try at one corner.
   { key: 'beacon',   name: 'RECOVERY BEACON', icon: '🆘', desc: '+1 SOS charge / lvl', max: 3 },
+  // r316 (owner): "a Copilot where it's gonna tell the driver to slow down,
+  // prepare for left or right turn, just like in a real rally. And maybe
+  // this Copilot can be purchased and upgraded as well."
+  //   L1  SLOW DOWN warnings before corners you are overdriving
+  //   L2  + direction and severity: LEFT/RIGHT, HAIRPIN/SHARP
+  //   L3  + earlier calls, distance countdown, medium corners too
+  { key: 'copilot',  name: 'RALLY COPILOT',   icon: '🎧', desc: 'pace notes: corner calls / lvl', max: 3 },
 ];
 
 // ===== [PARTS] THE BUILD BAY — hardware you CHOOSE, not levels you climb =====
@@ -489,6 +496,7 @@ const upgradeCost = (lvl) => 600 + lvl * lvl * 500;
 // `gate` filters offers that a world/difficulty can't honor; `lap: true`
 // contracts resolve at lap boundaries; `atFinish` ones resolve in finishRace.
 const _dv = new THREE.Vector3();   // scratch for debris ground lookups
+const _vUp = new THREE.Vector3();  // scratch for hit-spark directions (r316)
 /* RACE CONTRACTS — the side objectives, and the rung you are standing on.
  *
  * These used to be flat: DEMOLITION asked for twelve props on the fiftieth
@@ -10108,6 +10116,24 @@ class Game {
   }
 
   onEnemyHit(enemy, dmg, source) {
+    // r316 (owner: "when I hit a car with missile or machine gun I want
+    // debris flying out of the other car too"): the VICTIM sheds, every
+    // hit. The generic damage() path gates its debris at 15 damage — a
+    // cannon round (3.5-4.5) never crossed it, so machine-gunning a rival
+    // read as nothing landing; and a part pops only twice in a rival's
+    // whole 70 hull. A rocket now takes a visible PIECE off the car every
+    // time; sustained cannon fire chips metal per hit and strips a part
+    // every few bursts.
+    if (enemy.alive && !(enemy.invuln > 0)) {
+      if (source === 'missile') {
+        this.particles.debris(enemy.pos, 5 + ((Math.random() * 3) | 0));
+        this.popCarPart(enemy);
+      } else {
+        this.particles.sparks(enemy.pos, _vUp.set(0, 1, 0), 7);
+        this.particles.debris(enemy.pos, 1 + (Math.random() < 0.4 ? 1 : 0));
+        if (Math.random() < 0.15) this.popCarPart(enemy);
+      }
+    }
     const killed = enemy.damage(dmg, this.player);
     this.audio.hit();
     if (killed) {
@@ -10531,6 +10557,85 @@ class Game {
         this.returnToGate(pl, gate.id, 'missed');
       }
     } else this._gateMissT = 0;
+  }
+
+  /** r316 THE RALLY COPILOT (owner request): "tell the driver to slow down,
+   *  prepare for left or right turn, just like in a real rally", purchased
+   *  and upgraded in the garage like any part.
+   *
+   *  The note reads the ROAD, the same way the rival planner and the
+   *  difficulty stand-in do: heading delta over a fixed window gives the
+   *  corner's arc, radius gives its severity, and the stand-in's own corner
+   *  model (v = sqrt(18.9 r)) gives the speed it can be taken at. A call
+   *  goes out once per corner, at a lookahead that grows with the copilot's
+   *  level; SLOW! fires red whenever the driver carries too much speed for
+   *  the corner that is nearly on them, whatever was already called.
+   *    L1  SLOW DOWN only — the cheap co-driver just yells
+   *    L2  + direction and severity (LEFT/RIGHT, HAIRPIN/SHARP)
+   *    L3  + earlier calls, a distance figure, and medium corners
+   *  Haptics carry the call on the phone (audio is a no-op stub by design):
+   *  hairpin/slow buzz hard, sharp medium, medium light. */
+  _copilotTick(dt) {
+    const el = document.getElementById('copilot-note');
+    if (!el) return;
+    const lvl = this.carUpgrades?.().copilot | 0;
+    const c = this.player;
+    const t = this.track;
+    const show = (txt, cls) => {
+      el.textContent = txt;
+      el.className = cls;
+      el.style.display = '';
+      this._cpHideT = 1.6;
+    };
+    this._cpHideT = Math.max(0, (this._cpHideT ?? 0) - dt);
+    if (this._cpHideT <= 0 && el.style.display !== 'none') el.style.display = 'none';
+    if (!lvl || this.freeRoam || this.state !== 'race' || !c?.alive || !t?.center?.length) return;
+    this._cpScanT = (this._cpScanT ?? 0) - dt;
+    if (this._cpScanT > 0) return;
+    this._cpScanT = 0.2;                                   // 5 Hz is plenty for a voice
+    const N = t.center.length;
+    const segL = Math.max(0.5, Math.hypot(t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
+    const v = Math.abs(c.speedAlong);
+    if (v < 8) return;                                     // nobody calls notes at walking pace
+    const K = Math.max(4, Math.round(24 / segL));          // the planners' heading window
+    const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+    const horizon = Math.round((v * (lvl >= 3 ? 4.5 : 3.2)) / segL);
+    let corner = null;
+    for (let s = Math.round(K / 2); s <= horizon; s += 3) {
+      const j = (c.trackIndex + s) % N;
+      const tn = wrap(t.headingAt((j + K) % N) - t.headingAt(j));
+      if (Math.abs(tn) > 0.18) {
+        corner = { at: j, dM: s * segL, tn, r: (K * segL) / Math.abs(tn) };
+        break;
+      }
+    }
+    if (!corner) { this._cpArmed = true; return; }
+    const vCorner = Math.sqrt(18.9 * corner.r);
+    const urgent = v > vCorner * 1.25 && corner.dM < v * 2.2;
+    // one call per corner: re-arm once the last called corner is behind us
+    const behind = (i) => ((c.trackIndex - i + N) % N) < N / 2;
+    if (this._cpLast !== undefined && behind(this._cpLast)) this._cpLast = undefined;
+    if (urgent && this._cpSlowCd === undefined) this._cpSlowCd = 0;
+    this._cpSlowCd = Math.max(0, (this._cpSlowCd ?? 0) - 0.2);
+    if (urgent && this._cpSlowCd <= 0) {
+      show('⚠ SLOW DOWN', 'cp-slow');
+      this.buzz([40, 30, 40]);
+      this._cpSlowCd = 2.0;
+      return;
+    }
+    if (lvl < 2) return;                                   // L1 only yells
+    if (this._cpLast === corner.at) return;                // already called
+    const grade = corner.r < 18 ? 'HAIRPIN' : corner.r < 30 ? 'SHARP'
+      : corner.r < 55 ? 'MEDIUM' : null;
+    if (!grade || (grade === 'MEDIUM' && lvl < 3)) return; // L3 buys the mediums
+    const left = corner.tn > 0;                            // steer>0 turns the heading up = LEFT
+    // the figure only helps when there is road to use it on — a corner
+    // under 20 m out is NOW, not a number
+    const dTxt = lvl >= 3 && corner.dM >= 20 ? `  ${Math.round(corner.dM / 10) * 10}m` : '';
+    show(`${left ? '◀ LEFT' : 'RIGHT ▶'} — ${grade}${dTxt}`,
+      grade === 'HAIRPIN' ? 'cp-slow' : grade === 'SHARP' ? 'cp-sharp' : 'cp-med');
+    this.buzz(grade === 'HAIRPIN' ? [35, 25, 35] : grade === 'SHARP' ? 28 : 14);
+    this._cpLast = corner.at;
   }
 
   /** CORRIDOR §10 — ONE return function. Free, instant, never a resource:
@@ -11672,6 +11777,7 @@ class Game {
         this._updateLivestock(dt, time);
         this._updateMission(dt); // [MISSIONS]
         this._stepRoute();       // CORRIDOR step 1: shadow observation only
+        this._copilotTick(dt);   // r316: the purchased co-driver's pacenotes
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();

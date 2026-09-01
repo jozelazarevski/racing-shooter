@@ -68,6 +68,17 @@
   .panel{background:var(--panel);border:2px solid var(--edge);border-radius:12px;
     backdrop-filter:blur(6px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
 
+  /* r316 COPILOT pacenote — top-centre lane (race-info left, score right,
+     hull under race-info: the centre is free on every pinned layout).
+     12pt+ floor per the surviving HUD_REVIEW typography rule. */
+  #copilot-note{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));
+    left:50%;transform:translateX(-50%);padding:6px 16px;border-radius:14px;
+    background:rgba(16,14,12,.72);font-family:'Luckiest Guy',sans-serif;
+    font-size:20px;letter-spacing:1px;color:#fff;white-space:nowrap;
+    pointer-events:none;z-index:40;text-shadow:0 2px 0 rgba(0,0,0,.45)}
+  #copilot-note.cp-slow{color:#ff5a48}
+  #copilot-note.cp-sharp{color:#ffb03a}
+  #copilot-note.cp-med{color:#ffe9a8}
   #race-info{position:absolute;top:12px;left:12px;padding:8px 14px;min-width:150px}
   #race-info .pos{font-family:'Luckiest Guy';font-size:30px;color:var(--yellow);
     text-shadow:2px 2px 0 var(--ink);line-height:1}
@@ -2187,7 +2198,11 @@ body.touch #feed{right:184px}
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r314</div>
+<!-- r316 COPILOT: the co-driver's pacenote. A NEW element beside the frozen
+     r309 layout (owner-requested feature; §6.11 freezes what shipped — this
+     occupies the empty top-centre lane and touches nothing pinned). -->
+<div id="copilot-note" style="display:none"></div>
+<div id="build-tag">r315</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2522,10 +2537,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r314"></script>
+<script type="module" src="./src/main.js?v=r315"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r314"></script>
+<script src="./src/offline.js?v=r315"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r314"></script>
+<script type="module" src="./src/traffic.js?v=r315"></script>
 </body>
 </html>
