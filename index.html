@@ -274,16 +274,25 @@
      the car. Now: FIRE holds the right edge and the four secondaries sit in
      a tight 2x2 quad beside it, everything inside the controls band (70%+),
      identical in both schemes. ---- */
-  #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:80px;height:80px;font-size:16px;background:rgba(140,90,20,.65)}
+  /* ---- ONE LINE (r305, user: "fire bombs rocket and all at one line at
+     the bottom, increase the buttons a bit"). The 2x2 quad becomes a
+     single row, right-anchored, shared X-ADDRESSES in both schemes:
+     mine 302 / missile 238 / shock 174 / nitro 110 / FIRE 14. Heights
+     differ per scheme because each scheme's floor differs — one-thumb
+     rides the bottom edge (b12, the ring rest moved up 40px to clear
+     it), two-thumb sits at b132 above its pedal row. ---- */
+  #t-fire{right:calc(14px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:88px;height:88px;font-size:17px;background:rgba(140,90,20,.65)}
   #t-fire.hot{background:rgba(200,50,30,.7)}
   /* an empty magazine reads as dead, not as a number you might still spend */
   #t-fire.dry{background:rgba(60,48,36,.6);opacity:.45}
-  #t-missile{right:calc(110px + env(safe-area-inset-right));bottom:calc(186px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
-  #t-mine {right:calc(164px + env(safe-area-inset-right));bottom:calc(186px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
-  #t-shock{right:calc(164px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
+  #t-missile{right:calc(238px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:22px}
+  #t-mine {right:calc(302px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:22px}
+  #t-shock{right:calc(174px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:22px}
   /* drift is a steering-side control, so it MAY sit per-scheme: one-thumb
      gives it the prime corner the fire button vacated */
-  #t-drift{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));
+  /* one-thumb DRIFT stacks ABOVE the fire row now (r305): the thumb rolls
+     up from FIRE to DRIFT on the same edge */
+  #t-drift{right:calc(18px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));
     width:80px;height:80px;font-size:13px;letter-spacing:1px;background:rgba(30,70,130,.55)}
   /* UNSTUCK. Left of the pack and clear of everything you press while
      racing — a rescue you fire by accident mid-corner is a punishment, and
@@ -291,11 +300,16 @@
      and unpressable while it recharges, with the wait on its face. */
   /* H5: UNSTUCK holds the left edge in BOTH layouts, tucked between the
      one-thumb ring (top ≈ 674 at 844) and the two-thumb pedal (720) */
-  #t-unstuck{left:calc(16px + env(safe-area-inset-left));bottom:calc(170px + env(safe-area-inset-bottom));
+  /* r305: up the left edge, clear of the raised ring (top ~632) and the
+     bottom weapon row's mine button (x32-88) in both schemes */
+  #t-unstuck{left:calc(16px + env(safe-area-inset-left));bottom:calc(250px + env(safe-area-inset-bottom));
     width:56px;height:56px;font-size:22px;background:rgba(150,60,30,.6)}
   #t-unstuck.cooling{opacity:.42;background:rgba(60,48,36,.6)}
-  #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px;
+  #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:22px;
     background:conic-gradient(rgba(127,212,255,.8) 0%, rgba(38,26,12,.6) 0)}
+  /* the two-thumb floor: pedals own b8-96, the row rides above them */
+  body.two-thumb #t-fire,body.two-thumb #t-missile,body.two-thumb #t-mine,
+  body.two-thumb #t-shock,body.two-thumb #t-nitro{bottom:calc(132px + env(safe-area-inset-bottom))}
 
   /* ---------- TWO-THUMB scheme ----------
      Both thumbs steer: a LEFT button under one and a RIGHT button under the
@@ -333,12 +347,17 @@
        landscape's spare room is horizontal. Worked at 844x390: FIRE (66)
        y206-272, the four 44s y228-272 = 58-70%, everything inside the
        band, same in both schemes (H5). */
-    #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:66px;height:66px}
-    #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
-    #t-shock{right:calc(160px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
-    #t-missile{right:calc(210px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
-    #t-mine{right:calc(260px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
+    /* landscape keeps the row at b118 in BOTH schemes (the two-thumb
+       corner pedals own the bottom edge here) — r305 sizes it up */
+    #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:68px;height:68px}
+    #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
+    #t-shock{right:calc(164px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
+    #t-missile{right:calc(218px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
+    #t-mine{right:calc(272px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
     #t-unstuck{left:calc(16px + env(safe-area-inset-left));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
+    #t-drift{right:calc(18px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:64px;height:64px}
+    /* (gauge landscape homes live AFTER the base rules — see the media
+       block by the two-thumb gauge rule; placed here they lost the cascade) */
     body.two-thumb #t-brake{bottom:calc(8px + env(safe-area-inset-bottom));width:62px;height:62px}
     body.two-thumb #t-drift{bottom:calc(8px + env(safe-area-inset-bottom));width:62px;height:62px}
   }
@@ -366,7 +385,10 @@
      with a thumb parked on it. Smaller, and biased into the actual gap. */
   /* -16px, not -26px: the other half of clearing the joystick ring (see
      input.js rest()). Still biased left of the 🚀 button by 8px measured. */
-  body.touch #speed-box{bottom:14px;left:calc(50% - 16px)}
+  /* r305: the weapon row owns the bottom edge in one-thumb, so the dial
+     rides the free lane between the raised ring (x<=134) and the DRIFT
+     column (x>=292), above the row */
+  body.touch #speed-box{bottom:110px;left:calc(50% + 17px)}
   body.touch #speedo{width:86px;height:86px}
   /* two-thumb parks BRAKE/DRIFT dead centre at the bottom edge (62px at b8),
      which is exactly the gauge's one-thumb slot — measured on the r302
@@ -376,8 +398,15 @@
      starts at x=180/y=658, so the dial rides at y 660-746, x 92-178 —
      2px clear of both. The -60px is the CENTRE bias (base rule carries
      translateX(-50%)). */
-  body.two-thumb #speed-box{bottom:calc(98px + env(safe-area-inset-bottom));
-    left:calc(50% - 60px)}
+  body.two-thumb #speed-box{bottom:calc(200px + env(safe-area-inset-bottom));
+    left:calc(50% - 60px)}  /* above the b132 row, clear of UNSTUCK's column */
+  /* landscape gauge homes — AFTER the base rules on purpose: a media query
+     adds no specificity, so put earlier these lose the cascade (they did) */
+  @media (max-height:560px){
+    body.touch #speed-box{bottom:16px;left:calc(50% - 16px)}
+    body.two-thumb #speed-box{bottom:calc(96px + env(safe-area-inset-bottom));
+      left:calc(50% - 90px)}  /* feed lane reaches x386 on an 844 landscape */
+  }
   body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
   body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */
   /* Stacked off the MEASURED height of the panel above (see hud.js
@@ -406,11 +435,16 @@
   /* very narrow phones: nudge the inner weapon column out of the speedo's way */
   @media (max-width:380px){
     /* very narrow phones: the quad tightens as a unit (r300 layout) */
-    #t-fire{width:70px;height:70px}
-    #t-missile{right:calc(98px + env(safe-area-inset-right));width:42px;height:42px}
-    #t-nitro{right:calc(98px + env(safe-area-inset-right));width:42px;height:42px}
-    #t-mine{right:calc(146px + env(safe-area-inset-right));width:42px;height:42px}
-    #t-shock{right:calc(146px + env(safe-area-inset-right));width:42px;height:42px}
+    /* the row compresses as a unit on very narrow phones (r305): 48px
+       buttons, leftmost lands at x=14 on a 320-wide portrait */
+    #t-fire{width:76px;height:76px;right:calc(12px + env(safe-area-inset-right))}
+    #t-nitro{right:calc(96px + env(safe-area-inset-right));width:48px;height:48px}
+    #t-shock{right:calc(150px + env(safe-area-inset-right));width:48px;height:48px}
+    #t-missile{right:calc(204px + env(safe-area-inset-right));width:48px;height:48px}
+    #t-mine{right:calc(258px + env(safe-area-inset-right));width:48px;height:48px}
+    /* on a 568-tall phone the feed's five rows reach y289 and the ring top
+       sits at 381 — UNSTUCK threads the gap (y312-368 measured) */
+    #t-unstuck{bottom:calc(200px + env(safe-area-inset-bottom))}
     #joy-base{width:100px;height:100px;margin:-50px 0 0 -50px}
   }
   /* landscape phones: everything anchors to corners, panels stay top */
@@ -2148,7 +2182,7 @@ body.touch #feed{right:184px}
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r303</div>
+<div id="build-tag">r305</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2483,10 +2517,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r303"></script>
+<script type="module" src="./src/main.js?v=r305"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r303"></script>
+<script src="./src/offline.js?v=r305"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r303"></script>
+<script type="module" src="./src/traffic.js?v=r305"></script>
 </body>
 </html>

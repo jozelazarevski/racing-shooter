@@ -2242,6 +2242,12 @@ export class Car {
         }
       } else {
         this.reverseTimer = 0;
+        // r304: reverse gear engine-brakes. Rolling backwards with every
+        // pedal released used to coast for five-plus seconds (backward
+        // rolling drag is tiny), which left the auto-gas schemes stranded
+        // in a long slow drift after a reverse. 3 m/s² toward zero stops
+        // a full-speed reverse in ~3 s and never pushes past 0.
+        if (vf < 0) vf = Math.min(0, vf + 3 * dt);
       }
     }
     // ---- grade force: uphill saps speed, downhill feeds it (elevated roads).

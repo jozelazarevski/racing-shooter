@@ -78,7 +78,10 @@ export class Input {
       // the HULL INTEGRITY panel, which is where it was photographed. Changing
       // the ZONE's height does not move it: the first attempt at this fix
       // shrank the zone and the overlap came back identical to the pixel.
-      base.style.top = (r.height - Math.min(110, innerHeight * 0.22)) + 'px';
+      // 150 on tall portraits (r305): the weapon row owns the bottom 80px
+      // now, so the ring rests 40px higher there. The 0.22 term still
+      // governs landscape (390 tall -> 86), unchanged.
+      base.style.top = (r.height - Math.min(150, innerHeight * 0.22)) + 'px';
       base.classList.remove('live');
       setKnob(0, 0);
     };
@@ -161,8 +164,13 @@ export class Input {
   endFrame() { this.pressed.clear(); }
 
   get throttle() {
-    // auto-gas: full throttle unless you are actually on the brake
-    if (this.autoThrottle) return this.brake > 0 ? 0 : 1;
+    // auto-gas: full throttle unless you are actually on the brake — or
+    // still ROLLING BACKWARDS (r304, "I can't drive backwards"): the
+    // instant-on gas used to cancel a reverse the moment the pedal lifted
+    // to steer, so backing out of a wall was press-creep-lurch forever.
+    // main.js publishes reverseRolling each frame; once drag brings the
+    // car back past -0.5 m/s the auto-gas resumes and pulls it forward.
+    if (this.autoThrottle) return (this.brake > 0 || this.reverseRolling) ? 0 : 1;
     return Math.max(this.down('KeyW', 'ArrowUp') ? 1 : 0, this.analog.throttle);
   }
   /** TWO-THUMB: both steer buttons at once IS the brake.

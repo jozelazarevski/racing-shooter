@@ -4161,6 +4161,60 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r305 — THE WEAPONS BECOME ONE LINE, AND THE BOTTOM EDGE IS RENEGOTIATED
+User (with a live one-thumb screenshot): "Make the fire bombs rocket and
+all at one line at the bottom, increase the buttons a bit." The r300
+2x2 quad becomes a single right-anchored row — mine/missile/shock/
+nitro at 56px (was 46), FIRE 88 (was 80) — with SHARED X-ADDRESSES in
+both schemes (right 302/238/174/110/14). Heights differ per scheme
+because the floors differ, and that is now LAW: one-thumb rides the
+bottom edge at b12 (the ring rest moved 110→150px up on tall portraits
+— input.js rest(); landscape's 0.22·h term unchanged), two-thumb sits
+at b132 above its pedals. H5 is AMENDED to match: x-addresses must
+hold across schemes, y follows the floor, UNSTUCK still holds both
+axes. Furniture that had to move: one-thumb DRIFT stacks ABOVE FIRE
+(b112 — thumb rolls up the same edge), UNSTUCK up to b250 (clear of
+the raised ring top ~632 and the mine button), the gauge into the free
+lane (one-thumb 50%+17/b110 between ring and DRIFT column; two-thumb
+50%−60/b200). CASCADE LESSON, PAID TWICE NOW: landscape gauge homes
+put BEFORE the base rules lost the cascade silently (a media query
+adds no specificity) — they live in their own media block AFTER the
+base rules, with a comment saying why. Small-portrait UNSTUCK threads
+the feed-to-ring gap at b200 (y312-368 measured on 320x568).
+Gates: test-mobile-hud 24/24 (six combos), test-hudreview 15/15 with
+the amended H5. Tag r305.
+
+## r304 — "I CAN'T DRIVE BACKWARDS": THE GEAR WORKED, EVERYTHING AROUND IT FOUGHT
+Measure before tuning, again: the reverse LAW was fine (hard brake ≥0.6
+held 0.45 s at standstill → 5 m/s² backwards, r288, verified −8.8 m/s
+via the real pedal path AND direct step). Three things around the gear
+made it unusable in the hands, all fixed:
+
+1. AUTO-GAS CANCELLED EVERY REVERSE. Both touch schemes snap throttle
+   to 1 the instant brake is 0, so lifting the pedal to steer while
+   rolling backwards slammed the car forward — press-creep-lurch,
+   forever. main.js publishes `input.reverseRolling` (speedAlong <
+   −0.5) each frame; auto-gas returns 0 while it is set and resumes
+   once the roll dies. Keyboard players are untouched.
+2. NO ENGINE BRAKE IN REVERSE. With every pedal released a backward
+   roll coasted 5+ s (backward rolling drag is tiny), stranding the
+   auto-gas schemes in a slow drift. Reverse coast now decays 3 m/s²
+   toward zero, never past it — release, stop in ~3 s, auto-gas pulls
+   forward again.
+3. THE MISSED-GATE RETURN YANKED A CORRECTING PLAYER. §3.2's word is
+   UNCORRECTED — but `_gateMissT` accrued while the player was driving
+   BACK to the owed gate, and with §3.5's silence the 4 s snap had no
+   on-screen cause, so it read as reverse refusing. While the player's
+   velocity closes on the gate at >2 m/s the grace HOLDS (no accrual,
+   no reset); stop correcting and the clock resumes, and the return
+   still fires. test-patch13 R9's stationary probe is unaffected
+   (vel 0 is not correcting).
+
+Gates: NEW test-reverse.mjs 7/7 (pedal reverse on auto-gas, coast on
+release, resume, keyboard, correcting-grace both halves) + the driving
+battery re-run (drivingspec, patch02, rules, wedge, unstuck, shortcut,
+corridor2, patch13). Tag r304.
+
 ## r303 — THE CAMERA BUTTON COMES BACK
 User ask, one line. r296 had folded the 📷 cycle into the pause menu
 ("beside pause it was a mis-tap at speed") and its 70px top-right slot
@@ -4180,7 +4234,10 @@ outlive the 3.3 s toast lifetime between fill and measure; 24/24
 twice. ATTRIBUTED, NOT OURS: test-tyres "the track card carries
 the demand and the fix" reproduces identically on an r301 worktree
 with r301's own suite — pre-existing, filed with the economy/feats
-reds. Tag r303.
+reds. Likewise test-newworlds "appended at the END of the array"
+(tail 73-78): the r294 base clone fails it with the SAME message
+under its OWN r294 suite — the suite's NEW table simply predates the
+RIVIERA batch; roster-order redesign is its own small round. Tag r303.
 
 ## r302 — CLAUDE.md v1.2 §3.5 + THE PORSCHE GAUGE: ERASE THE GUIDANCE, KEEP THE DIAL
 The user posted CLAUDE.md v1.2 (supersedes PATCH_02 v1.4 and CORRIDOR
