@@ -4161,6 +4161,70 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r317 — THE PURSE AND THE RECAP (C4/C5), AND PHASE 5 CLOSES THE BOOKS
+
+Two halves: the career pays out, and the v1.5 Phase 5 regression — the
+full 99-suite battery — is run, triaged and attributed. The plan's five
+phases are done.
+
+THE PURSE (C4). `_recordSeasonRound` now returns what the round is worth
+and finishRace folds it into `earned` + the credit breakdown:
+- POINTS pay `SEASON_CR_PER_PT 20` per point of IMPROVEMENT only — the
+  delta of your best round. A P2 first visit pays 18×20=360; the same P2
+  again pays zero. A season is earned once and cannot be farmed, which is
+  the same law the record itself obeys (best-not-latest).
+- THE RIVAL DUEL pays live: `RIVAL_BONUS_CR 150` when you finish ahead of
+  the driver §5.2 picked to hunt you (progress compare at the flag). This
+  one intentionally pays every race — it is the "beat MARIC" carrot, not
+  a savings account.
+- THE SEASON PRIZE `[3000, 2000, 1200]` pays once per chapter when the
+  final round lands (`ss._prizePaid`), at your championship position.
+THE RECAP (C5): the same completion moment speaks — "CHAMPION!" /
+"SEASON OVER — P2" centre card, the championship-complete feed line, and
+"SEASON PODIUM — THE NEXT CHAPTER IS OPEN" when the second door swings.
+
+test-career grows to 12 checks (K7 improvement-pays-once, K8 rival
+beaten/behind, K9 prize once-never-twice) — all green. TRAP for the next
+test author: `Car.progress` is a GETTER (`_wraps + trackIndex/N`).
+Assigning it is a silent no-op; stage `_wraps`/`trackIndex` instead. K8
+was green by stable-sort luck until this was fixed.
+
+PHASE 5 — THE FULL BATTERY, AND WHERE EVERY RED LIVES. All 99 suites run
+against this tree (plus the Q23 HUD-freeze suite pinning the r309 layout
+at ±1.5 px, landed mid-phase). 68 suites fully green, including every
+suite this v1.5 cycle wrote or reworked (career, machines, airace,
+difficulty, phase4, copilot, hudfreeze, drivingspec, goat). The 31
+non-green were attributed the honest way — against a pristine pre-career
+r315 checkout on its own server (port 8903), NOT by stashing while the
+battery ran (that contaminated a run once; rule stands in the r315 notes):
+- REPRODUCE IDENTICALLY ON r315 → pre-existing, not this cycle's:
+  round-fixes 2 (its top-3 gate law died at the r310 chapter model —
+  levels 1+2 are chapter-0 siblings, always open; its economy figures
+  pin pre-rework rates, expects first-clear 1500 vs today's 1200),
+  economy 1 (maxing = 100 races), arsenal 4 (obsolete sos-ration law vs
+  r301 free recovery), nature 6, dampers 6, roadclear 4, feats 2,
+  funpack 2, r143fix 2, editor family, affinity 1, drown 1, tyres 1,
+  newworlds 1, goat 1 (FURKA rejoin 23%), nothing-on-road 6.
+  Also identical on r315, verified this round: surface 5 (snow-slide
+  ratio + four particle headDelta counts), river 1 (HEDGEROW reach
+  radius 10.6 vs 11.4 u), sinking 1 (FURKA 3.94 u at sample 349),
+  sculpt-road 1 (1/89 buried peak), water 2 (PINE/FLUME ford vs deck),
+  and the transitions/pick/menu-noreset trio, which crash the same way
+  on both trees (`.click` of an undefined menu element — a menu-DOM
+  drift older than this cycle; those suites need re-anchoring, not the
+  menu).
+- FLAKES AND TIMEOUTS (not failures): patch13 traffic-spawn placement
+  went 16/16 twice on re-run (both trees); the
+  equivalence/floating/nothing-*/walls exit-124s are the battery's
+  900 s cap.
+The career purse was explicitly run against the economy laws: 10/11
+green with the purse in, the one red the exact pre-existing "100 races"
+count. The purse changes no economy verdict.
+
+NEXT: C5 remainder per the published design — sponsors on the quest
+machinery, the calendar strip, season history. Then the debt ledger
+(RECOVERY BEACON shop line, JS loop +30% vs r294, km/h display split).
+
 ## r316 — CAREER MODE, THE CHAMPIONSHIP SEASONS (C1-C3)
 Owner: "Think about creating a career mode." Design first, then the core.
 The full proposal is published (championship seasons over chapters, named

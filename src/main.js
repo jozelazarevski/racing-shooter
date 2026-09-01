@@ -3273,10 +3273,18 @@ class Game {
    *  farming it. `career.seasons[chapter][levelId] = { you, place, drivers }`. */
   static SEASON_PTS = [25, 18, 15, 12, 10, 8, 6, 4];
 
+  /** r317 C4: the purse constants. Points pay credits ONLY on improvement
+   *  (the delta of your best round), so a season is earned once and can't be
+   *  farmed; the rival duel pays live each race; the season prize pays once
+   *  per chapter when the final round lands. */
+  static SEASON_CR_PER_PT = 20;
+  static RIVAL_BONUS_CR = 150;
+  static SEASON_PRIZE_CR = [3000, 2000, 1200];
+
   _recordSeasonRound(rank) {
-    if (this.freeRoam || this.missionMode) return;
+    if (this.freeRoam || this.missionMode) return null;
     const k = this.chapterOf(this.level.id);
-    if (k < 0) return;
+    if (k < 0) return null;
     const P = Game.SEASON_PTS;
     const pts = (pos) => P[Math.min(pos, P.length) - 1] ?? P[P.length - 1];
     // the field's order at the flag: rivals by progress, the player at `rank`
@@ -3291,13 +3299,37 @@ class Game {
     const rec = { you: pts(rank), place: rank, drivers };
     const ss = ((this.career.seasons ??= {})[k] ??= {});
     const old = ss[this.level.id];
+    const gain = Math.max(0, rec.you - (old?.you ?? 0));   // C4: improvement pays
     if (!old || rec.you > old.you) ss[this.level.id] = rec;
-    // the table after this round, spoken like a championship
+    // C4: the rival duel pays live — did you finish ahead of the driver who
+    // was hunting you? (progress at the flag; you finished, so yours is the
+    // lap count you closed with)
+    const rv = this._pressureRival;
+    const rivalBeaten = !!(rv && rv.alive !== undefined
+      && (this.player.progress ?? 99) >= (rv.progress ?? 0));
+    const purse = { pointsCr: gain * Game.SEASON_CR_PER_PT,
+      rivalCr: rivalBeaten ? Game.RIVAL_BONUS_CR : 0,
+      rivalName: rv ? (rv.driverName ?? rv.name) : null,
+      prizeCr: 0, prizePos: 0 };
+    // C5: the season completes when every round of the chapter is on the
+    // table — the recap speaks, and the prize pays ONCE
+    const ch = this.chapters()[k];
     const table = this.seasonTable(k);
     const meAt = table.findIndex(([n]) => n === 'YOU') + 1;
+    if (ch && ch.levels.every((l) => ss[l.id]) && !ss._prizePaid) {
+      ss._prizePaid = true;
+      purse.prizePos = meAt;
+      purse.prizeCr = Game.SEASON_PRIZE_CR[meAt - 1] ?? 0;
+      this.hud.centerMsg(meAt === 1 ? 'CHAMPION!' : `SEASON OVER — P${meAt}`);
+      this.hud.feed(`${ch.name} CHAMPIONSHIP COMPLETE — YOU FINISH P${meAt}`,
+        meAt <= 3 ? 'good' : 'info');
+      if (meAt <= 3) this.hud.feed('SEASON PODIUM — THE NEXT CHAPTER IS OPEN', 'good');
+    }
     this.hud.feed(`CHAMPIONSHIP: P${meAt} — ${table[meAt - 1]?.[1] ?? 0} PTS (+${rec.you})`,
       meAt <= 3 ? 'good' : 'info');
+    if (purse.rivalCr) this.hud.feed(`${purse.rivalName} BEATEN  +${purse.rivalCr} CR`, 'good');
     this._renderSeasonBoard(k, meAt);
+    return purse;
   }
 
   /** The season standings for a chapter: [[name, pts], ...] best first.
@@ -10389,7 +10421,12 @@ class Game {
     const slate = (this.contracts ?? []).filter((c) => !c.job);
     const sweepCr = slate.length > 0 && slate.every((c) => c.done) ? SWEEP_CR : 0;
     const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
-    const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr;
+    // r317 C4: the championship purse joins the pot (points pay only their
+    // improvement; the rival duel pays live; the season prize pays once)
+    const purse = this._recordSeasonRound(rank)
+      ?? { pointsCr: 0, rivalCr: 0, prizeCr: 0, prizePos: 0, rivalName: null };
+    const purseCr = purse.pointsCr + purse.rivalCr + purse.prizeCr;
+    const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr + purseCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
     if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
@@ -10409,6 +10446,10 @@ class Game {
         }
         if (cleanCr) html += `<div class="cb-row"><span>CLEAN RUN — NO WRECKS</span><b>+${cleanCr}</b></div>`;
         if (sweepCr) html += `<div class="cb-row"><span>CLEAN SWEEP — ALL CONTRACTS</span><b>+${sweepCr}</b></div>`;
+        // r317 C4: the championship purse, itemized like everything else
+        if (purse.pointsCr) html += `<div class="cb-row"><span>🏁 CHAMPIONSHIP POINTS</span><b>+${purse.pointsCr}</b></div>`;
+        if (purse.rivalCr) html += `<div class="cb-row"><span>🏁 ${purse.rivalName} BEATEN</span><b>+${purse.rivalCr}</b></div>`;
+        if (purse.prizeCr) html += `<div class="cb-row"><span>🏆 SEASON P${purse.prizePos} PRIZE</span><b>+${purse.prizeCr}</b></div>`;
         for (const c of this.contracts ?? []) {
           // A MISSED JOB IS NOT A LOST JOB. A bare "✗ JOB · CLEAN SWEEP —"
           // reads as forfeited, when in fact it is still in hand and RACE
@@ -10453,9 +10494,8 @@ class Game {
       bestLap: Number.isFinite(lapRec) ? Math.round(lapRec * 10) / 10 : 0,
       stars: bestStars,
     };
-    // r317 CAREER: the round scores the championship (before the save, so
-    // the season rides the same write the stars do)
-    this._recordSeasonRound(rank);
+    // (r317: the season round was recorded up at the credits block — its
+    // write rides this same save)
     saveJSON(this._pkey('career'), this.career);
     this._showStars(bestStars, hadStars, starsBefore, rank, chapBefore);
     this.renderGarage();

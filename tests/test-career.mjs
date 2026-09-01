@@ -39,7 +39,8 @@ const r = await p.evaluate(() => {
   // progress, which is exactly what the real flag sees
   const stage = (rank, order) => {
     g.state = 'race';
-    g.enemies.forEach((e, i) => { e.alive = true; e.progress = 10 - order[i]; });
+    // progress is a GETTER (_wraps + trackIndex/N) — stage the real fields
+    g.enemies.forEach((e, i) => { e.alive = true; e._wraps = 10 - order[i]; e.trackIndex = 0; });
     g.playerRank = rank;
     g.player.finished = false;
     g.raceOver = false;
@@ -69,8 +70,34 @@ const r = await p.evaluate(() => {
   g.career.finished = {};
   const doorOpen = g.isChapterOpen(k + 1);
   g.career.finished = finishedStash;
+  // ---- C4 the purse, at the unit level (the method returns it) ----
+  // clean slate for the purse checks
+  g.career.seasons[k] = {};
+  g.playerRank = 2;
+  g.player._wraps = 4; g.player.trackIndex = 0;
+  g.enemies.forEach((e, i) => { e.alive = true; e._wraps = 3; e.trackIndex = 100 - i * 10; });
+  g._pressureRival = g.enemies[0];             // behind you: the duel pays
+  const p1 = g._recordSeasonRound(2);
+  const p2 = g._recordSeasonRound(2);          // same result again: no farm
+  g._pressureRival = g.enemies[1];
+  g.enemies[1]._wraps = 5;                     // ahead of you: no bonus
+  const p3 = g._recordSeasonRound(2);
+  // season completion pays the prize once
+  for (const lv of ch.levels) {
+    g.career.seasons[k][lv.id] ??= { you: 18, place: 2,
+      drivers: { 'R. VOSS': 25, 'K. MARIC': 15, 'T. OKADA': 12, 'A. LINDQVIST': 10,
+        'S. FERRO': 8, 'J. DUARTE': 6, 'E. KOVACS': 4 } };
+  }
+  delete g.career.seasons[k]._prizePaid;
+  g._pressureRival = null;
+  const p4 = g._recordSeasonRound(2);
+  const p5 = g._recordSeasonRound(2);
   const board = document.getElementById('season-board');
   return {
+    p1: { pointsCr: p1.pointsCr, rivalCr: p1.rivalCr },
+    p2: { pointsCr: p2.pointsCr, rivalCr: p2.rivalCr },
+    p3rival: p3.rivalCr,
+    p4prize: p4.prizeCr, p4pos: p4.prizePos, p5prize: p5.prizeCr,
     rec1, rec2, rec3,
     table1: table1.slice(0, 8),
     names: g.enemies.map((e) => e.driverName),
@@ -99,6 +126,15 @@ check('K5  no real-world racing names on the grid',
   r.names.join(', '));
 check('K6  the results card carries the standings board',
   (r.boardText ?? '').includes('CHAMPIONSHIP'), r.boardText ?? 'no board');
+check('K7  points pay their improvement once; the same result again pays zero',
+  r.p1.pointsCr === 18 * 20 && r.p2.pointsCr === 0,
+  `first ${r.p1.pointsCr}, repeat ${r.p2.pointsCr}`);
+check('K8  beating your named rival pays; finishing behind them does not',
+  r.p1.rivalCr === 150 && r.p3rival === 0,
+  `beaten ${r.p1.rivalCr}, behind ${r.p3rival}`);
+check('K9  the season prize pays once at completion, never twice',
+  r.p4prize > 0 && r.p5prize === 0,
+  `completion P${r.p4pos} paid ${r.p4prize}, repeat ${r.p5prize}`);
 check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();
