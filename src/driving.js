@@ -42,6 +42,12 @@ export const DRIVING = {
   csAssistGain: 0.55,        // adds yaw toward killing lateral velocity
   csAssistSlipMin: 0.22,     // engages above this slip
   spinSlipAngle: 1.13,       // rad (~65°): past this, assist off — the spin is earned
+  // r307 ("when I drift it does not seem it helping me turn, just sliding"):
+  // the held-drift laws. Measured before: a 2 s handbrake drift at 70 km/h
+  // yawed the nose 52° while scrubbing 70 -> 2 km/h — all slide, no turn.
+  driftScrubCap: 2.1,        // × budget kinetic ceiling WITH the handbrake (unloaded tyres); 4.4 otherwise
+  driftReward: 0.5,          // slice of scrubbed slide returned as forward speed while held (0.35 free)
+  driftYawAssist: 0.85,      // rad/s of rotation help toward the steer, 15°-65° slip, handbrake held
 
   // §5-equivalent — the yaw caps (this engine steers in yaw-rate space).
   // 1.45 mid-range (r294, "impossible to steer in this curve at this

@@ -4161,6 +4161,34 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r307 — THE DRIFT FINALLY TURNS THE CAR
+User: "When I drift it does not seem it helping me turn. But just
+sliding." Measured to the number before touching anything: a 2 s
+handbrake drift at 70 km/h, full steer, yawed the nose 52° while
+scrubbing 70 → 2 km/h. The slide existed; the turn did not. Cause,
+three-part:
+- the KINETIC SCRUB CEILING (4.4 × budget, r-era anti-oscillation cap)
+  applied unchanged during a handbrake drift — ~2.3 g burning the slide
+  and, through the lag spill, all the car's speed;
+- the drift reward returned only 35% of the scrubbed slide as forward
+  speed — the drift bled momentum it should carry;
+- §8.2's ENTRY KICK started the tail but nothing sustained rotation
+  after its 0.3 s decay, and the counter-steer assist is (rightly)
+  drift-gated OFF — so a held drift had no yaw help at all.
+Laws (keys in driving.js + driving.json):
+- driftScrubCap 2.1: the ceiling drops while the handbrake is held —
+  locked tyres are unloaded, not an anchor;
+- driftReward 0.5 (0.35 free): held drifts carry momentum;
+- driftYawAssist 0.85 rad/s (CLAUDE.md §4.4, at last): 15°-65° slip
+  with the handbrake held adds rotation TOWARD the steer, fading in
+  from walking pace; past the spin angle it stops — same shape as the
+  counter-steer assist, opposite sign. Self-limiting: maxSlip measured
+  80°, no spiral.
+After: 168° of turn and a 45 km/h exit at 70 (139°/81 at 110); FT3
+slip 72° at 0.5 s; PLAIN steering byte-identical (34°/25°, untouched
+paths). NEW test-drift.mjs 6/6 pins all of it; drivingspec/rules/
+patch02 regression. Tag r307.
+
 ## r306 — "CLEAN THIS UP": THE GORGE WAS THREE BUGS WEARING ONE SCREENSHOT
 The user's CANYON RUN photo (giant wall faces filling the frame, road
 patches bleeding through rock, a shard through the carriageway) was
