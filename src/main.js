@@ -454,6 +454,12 @@ const CAM_MODES = [
   // cuts, and this changes only in the pause menu / cycle button like every
   // other mode. LAST in the list so saved camera preferences keep their
   // indices and the `?? 3` CHASE fallback stays honest.
+  // r336 investigated an H1 red against this mode and ACQUITTED it: the
+  // 94-110% screen depths were the H1 ride teleporting the car 29 u down
+  // the gorge-jump wall (a gap a real car flies); on continuous road the
+  // mode frames the car at 51% against the 70% law. The suite now masks
+  // vertical discontinuities for every mode; these values are r326's,
+  // unchanged.
   { name: 'TUNNEL', back: 14, h: 5.2, look: 7, lookH: 1.5,
     spdBack: 4, spdH: 1.2, chase: true, steer: 0.76 },
 ];

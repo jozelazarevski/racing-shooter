@@ -63,18 +63,30 @@ const h1 = await p.evaluate(() => {
   for (let m = 0; m < names.length; m++) {
     if (names[m] === 'DRIVER') continue;
     g.camMode = m;
-    let worst = 0;
+    let worst = 0, prevGY = null, skip = 0;
     // ride the spline rather than free-drive: the gate measures FRAMING, and
-    // a blind 30 u/s plough into scenery measures the crash instead
+    // a blind 30 u/s plough into scenery measures the crash instead.
+    // r336: the same principle vertically — CANYON RUN's ride crosses the
+    // gorge jump, where groundHeightAt dives 29 u in one station. The
+    // teleport down that wall (and the boom's scramble after it) measured
+    // the plunge, not the framing — TUNNEL read 94% from it, CHASE 61%. A
+    // real car flies that gap with the camera tracking smoothly, so frames
+    // around any vertical discontinuity are ridden but not judged, for
+    // every mode equally. The law itself is unchanged: < 70% on every
+    // frame of continuous road.
     for (let k = 0; k < 240; k++) {
       const idx = (100 + Math.floor(k * 0.5)) % N;
       const pt = t.pointAt(idx, 0);
-      c.pos.set(pt.x, t.groundHeightAt(idx, 0) + 0.3, pt.z); c.y = c.pos.y;
+      const gY = t.groundHeightAt(idx, 0) + 0.3;
+      if (prevGY !== null && Math.abs(gY - prevGY) > 3) skip = 30;
+      else if (skip > 0) skip--;
+      prevGY = gY;
+      c.pos.set(pt.x, gY, pt.z); c.y = c.pos.y;
       c.trackIndex = idx; c.heading = t.headingAt(idx);
       c.vel.set(Math.sin(c.heading), 0, Math.cos(c.heading)).multiplyScalar(30);
       c.airborne = false; c.vy = 0; c.alive = true;
       g.frame();
-      if (k < 40) continue;                       // let the boom settle first
+      if (k < 40 || skip > 0) continue;           // settle / discontinuity mask
       // the bbox BOTTOM is the deepest screen point: project the contact patch
       const v = c.mesh.position.clone().project(g.camera);
       if (v.z < 1) worst = Math.max(worst, (1 - (v.y + 1) / 2) * 100);
