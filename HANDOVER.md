@@ -4161,6 +4161,37 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r336 — X1: THE FULL BATTERY, AND ONE ACQUITTAL (v2.3 B7 closes)
+
+The closing regression pass over the seven-build v2.3 session
+(r329-r335). 113 suites, 4-way parallel: 73 green outright. Every
+non-green attributed:
+
+- 13 parallel-load flakes, green solo: airace, cars, carriageway,
+  destruction, mobile-hud, obstacles, roam, river, slowfield, phase4,
+  floating, walls, camera (the rc=124 timeout family among them).
+- reload-storm: harness cwd artifact — copies src/offline.js relative
+  to cwd; green from the repo root.
+- Pre-existing, verified against the r315-era logs byte-for-byte:
+  surface (same 15/20, same five fails), final-integration (same
+  test-code crash), patch13 (same 15/1 intermittent), plus the
+  catalogued obsolete-law and menu-DOM groups (arsenal, editor2-5,
+  transitions/pick/menu-noreset, dampers, feats, economy, funpack,
+  r143fix, tyres, newworlds, drown, roadclear, round-fixes).
+- hudreview H1 TUNNEL, the one candidate regression — ACQUITTED. The
+  94-110% screen depths were the H1 ride teleporting the car 29 u down
+  CANYON RUN's gorge-jump wall (a gap a real car flies); the close
+  TUNNEL boom amplified the same artifact that already cost CHASE 61%.
+  The suite now rides through vertical discontinuities without judging
+  them (30-frame mask, all modes equally; the < 70% law itself is
+  unchanged and now reads 45-51% across all six modes). TUNNEL's
+  shipped r326 values are untouched — a parameter hunt that "fixed"
+  the number before the root cause was found is reverted on purpose.
+
+VERDICT: zero regressions from r329-r335. The v2.3 open-fault table
+is closed end to end — every row repaired, verified by measurement,
+or recorded as an owner override (3.4a, 3.6b, driver's view).
+
 ## r335 — THE LIP WEARS ROCK (v2.3 §7.9 daylight half / P12)
 
 Recording F 0:01 and 0:30: "the grass shelf runs to the lip with no
