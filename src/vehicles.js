@@ -1999,6 +1999,58 @@ export class Car {
     // …and the tyre itself loses the slope's cosine (§5.1 μ·cos): modest
     // below the ceiling (cos 35° = 0.82), honest on a real face
     this._slopeCos = offRoad ? 1 / Math.sqrt(1 + terrGrade * terrGrade) : 1;
+    // v2.3 §3.3 (r330): THE FACE SHEDS THE CAR. Drive authority above 35°
+    // has been zero since r298, yet a car still PARKED on a grade-1.9 face
+    // for six seconds (slopehang.mjs, world 12 — recording F's "hangs on
+    // 60 to 70° walls"): the GRADE pull only argues with vf, and the drag
+    // arithmetic finds an equilibrium a fraction of a u/s from rest. Past
+    // the ceiling gravity now acts on the BODY — a raw downhill velocity
+    // push no drag term can bargain with, so the car slides down instead
+    // of hanging. Half a second of onset (the spec's own lateral-decay
+    // window) so a grazed crest is not an instant rejection. Fenced the
+    // way every mountain law is fenced: outside the r328 rejoin band
+    // (banks are moments, not faces) and on the goat-aware grade, so the
+    // carved spiral and the scramble zone never shed a climber.
+    // Trigger on the TRUE gradient magnitude, not the heading-projected
+    // grade: a car parked sideways across a 60° face reads ~0 along its
+    // heading yet is exactly the hang the law exists for. Fenced the
+    // _wilds way (the tracked-projection lateral under-reads near
+    // switchback stacks, so the fence is the larger of projection and
+    // true distance to the tracked sample), and the goat spiral in roam
+    // is exempt outright — the carved route is the designed line.
+    let farOffRoad = false;
+    if (offRoad && !this.airborne && !nearGoatRoam) {
+      const band = DRIVING.rejoinBandU ?? 34;
+      farOffRoad = Math.abs(this.lateral ?? 0) > band;
+      if (!farOffRoad) {
+        const ciS = this.game.track?.center?.[this.trackIndex];
+        farOffRoad = !!ciS && Math.hypot(this.pos.x - ciS.x, this.pos.z - ciS.z) > band;
+      }
+    }
+    let onSteepFace = false;
+    if (farOffRoad && this.game.track?.terrainHeight) {
+      const tkS = this.game.track, ES = 4;
+      const gxS = (tkS.terrainHeight(this.pos.x + ES, this.pos.z)
+        - tkS.terrainHeight(this.pos.x - ES, this.pos.z)) / (2 * ES);
+      const gzS = (tkS.terrainHeight(this.pos.x, this.pos.z + ES)
+        - tkS.terrainHeight(this.pos.x, this.pos.z - ES)) / (2 * ES);
+      const gmS = Math.hypot(gxS, gzS);
+      if (gmS > maxClimbTan) {
+        onSteepFace = true;
+        this._steepT = (this._steepT ?? 0) + dt;
+        if (this._steepT > (RT.slopeLatDecayS ?? 0.5)) {
+          const sinS = gmS / Math.sqrt(1 + gmS * gmS);
+          const dhx = -gxS / gmS, dhz = -gzS / gmS;          // downhill unit
+          const vDown = this.vel.x * dhx + this.vel.z * dhz;
+          if (vDown < (RT.steepSlideCapU ?? 22)) {
+            const push = 9.8 * sinS * dt;
+            this.vel.x += dhx * push;
+            this.vel.z += dhz * push;
+          }
+        }
+      }
+    }
+    if (!onSteepFace) this._steepT = 0;
     // §15 slope telemetry: any contact above 30°, throttled to 1/s —
     // `progress: true` above 35° is the tuning loop's definition of a
     // physics bug, so the flight recorder must be able to convict us

@@ -4161,6 +4161,37 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r330 — THE FACE SHEDS THE CAR (v2.3 §3.3, and B1's paperwork closed)
+
+Recording F's fault 1 tail: "hangs on 60 to 70° walls". Measured first
+(tools-scratch/slopehang.mjs): drive authority above 35° has been zero
+since r298 and real steep faces DO shed a driven car — but a car
+resting on a face held anyway, because the GRADE pull only argues with
+forward speed and the drag arithmetic equilibrates a fraction of a u/s
+from rest, and a car parked SIDEWAYS reads grade ~0 along its heading
+and never even enters the law.
+
+§3.3's answer: past `maxClimbDeg`, gravity acts on the BODY. When the
+TRUE gradient magnitude (central differences, not the heading
+projection) exceeds tan 35°, after `slopeLatDecayS` (0.5 s — the
+spec's lateral-decay window) a raw downhill velocity push
+(9.8·sin·dt, capped at `steepSlideCapU` 22 u/s of downhill speed) is
+added that no drag term can bargain with. Fenced like every mountain
+law: outside the r328 rejoin band (larger of tracked-projection
+lateral and true distance to the sample — the _wilds under-read
+lesson), goat spiral exempt in roam, airborne exempt.
+
+tests/test-slopegrip.mjs: driven at a grade-2.9 face the car peaks at
+0.9 s and is shed; PARKED mid-face it slides 18 u down without input;
+on flat off-road the law never engages (_steepT pinned 0 over 3 s).
+Gates goat (26/26 — banks and spiral untouched), containment, cliff,
+drivingspec (FT floor), sinking green.
+
+Paperwork: CLAUDE.md gains §3.4a recording the r320 owner override
+("should be wrecked at this kind of falls") over §3.4's no-damage
+apex return — B1's physics row is now implemented or explicitly
+owner-overridden end to end.
+
 ## r329 — THE SAFETY NET AND THE CAMERA'S SIX METRES (v2.3 §3.2 + §3.9)
 
 B1 continues with the pair recording F filmed on the waterfall: a car
