@@ -79,9 +79,19 @@ export const LEVELS = [
     // relentless short hairpins, and jumps would be absurd on a tarmac col
     // the real col runs through galleries; two of them here
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
-  { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
-    // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+  // r327: OUNINPOHJA is GONE (it was also a real stage name, §7.10). The
+  // owner drew its replacement at 1:100 and labelled the brief on the sheet;
+  // the `serpentPass` route IS that drawing. Sea on the north-west (the
+  // "Sea views" corner), tall elevation for "Steep inclinations", the
+  // mountainsea theme's cliffs for the "Cliff" loop, and two bores for
+  // "Mountains and tunels inside mountains". GRANITE NARROWS is now the
+  // sole owner of the old `ouninpohja` oval.
+  { id: 23, name: 'SERPENT PASS', theme: 'mountainsea', route: 'serpentPass', region: 'WORLD RALLY',
+    tune: {
+      tunnels: { count: 2 },
+      coast: { a: [-235, -320], b: [-205, 330], level: -3.0, floor: -13, beach: 18 },
+      elev: { amp: 9, ph: [0.8, 2.4, 4.1] },
+    } },
   { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
@@ -91,7 +101,7 @@ export const LEVELS = [
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
-  { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
+  { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', routeReverse: true, region: 'WORLD RALLY',
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
@@ -154,7 +164,7 @@ export const LEVELS = [
     cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 40, name: 'NEON MARINA', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
     cost: 12, fresh: true, tune: { rampCount: 0 } },
-  { id: 41, name: 'RAZORBACK MOUNTAIN', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
+  { id: 41, name: 'RAZORBACK MOUNTAIN', theme: 'outback', route: 'panorama', routeFlipX: true, region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
       dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
@@ -222,7 +232,7 @@ export const LEVELS = [
   // hugs its coast for most of its length, which is what puts the citadel in
   // frame from the road.
   { id: 58, name: 'CITADEL BAY', theme: 'citadel', region: 'MEDITERRANEAN',
-    cost: 30, fresh: true, route: 'aegeanRun' },
+    cost: 30, fresh: true, route: 'aegeanRun', routeFlipX: true },
   // SKETCH D, drawn and handed over with its own labels on it: tunnels where
   // the north-south strand crosses the two straights, a bridge where the
   // right-hand strand crosses the lower one, and sea cliffs on the water side.
@@ -258,7 +268,7 @@ export const LEVELS = [
   // the start gate or (since r190) sitting on a crest, so asking for three is
   // asking for AT MOST three — the planner places what the mountain allows.
   { id: 61, name: 'OLIVE PASS', theme: 'olivecountry', region: 'MEDITERRANEAN',
-    cost: 33, fresh: true, route: 'turini', tune: { tunnels: { count: 3 } } },
+    cost: 33, fresh: true, route: 'turini', routeFlipX: true, tune: { tunnels: { count: 3 } } },
   { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
     cost: 32, fresh: true, route: 'seaCliffRun',
     tune: {
@@ -290,7 +300,7 @@ export const LEVELS = [
   // Career order is this array and `starCost` prices by INDEX, so they are
   // APPENDED, never inserted, with ascending ids.
   { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 34, fresh: true, route: 'liguriaRun',
+    cost: 34, fresh: true, route: 'liguriaRun', routeFlipX: true,
     // THE MOUNTAIN ONE. Asked for directly: "change cape oliveto to run inside
     // mountains." It was the headland world — a coast road boring through the
     // capes — and the sea is gone, because you cannot be inside a mountain
@@ -355,7 +365,7 @@ export const LEVELS = [
     // COAST would be sent to a world with no water.
     scenery: ['MOUNTAIN', 'FARMLAND'] },
   { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 35, fresh: true, route: 'caps',
+    cost: 35, fresh: true, route: 'caps', routeFlipX: true,
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
     // elevation amplitude, and corners that arrive uphill.
     //
@@ -383,7 +393,7 @@ export const LEVELS = [
     // through terraces, not a mountain world.
     scenery: ['FARMLAND'] },
   { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 36, fresh: true, route: 'autodromo',
+    cost: 36, fresh: true, route: 'autodromo', routeFlipX: true,
     // THE FLAT ONE. The salt flats behind the olive coast: almost no
     // elevation, no bridges, no bores — the fastest thing in the family,
     // where the corners arrive with no hill to help you slow down.
@@ -452,6 +462,10 @@ export const LEVELS = [
     } },
   { id: 66, name: 'GLACIER COL', theme: 'furka', region: 'ALPINE PASSES',
     cost: 38, fresh: true, route: 'panorama',
+    // r327: GLACIER COL keeps the shape UNMODIFIED — it is recording B's
+    // evidence world and the F7 grass-bound fixture, and the anchor copy of
+    // a shared shape is chosen for being an anchor, not for id order.
+    // RAZORBACK MOUNTAIN carries this group's mirror instead.
     // THE HIGH ONE, and the biggest thing in the family. `panorama` climbs a
     // mountain and comes back down the far side — the one route on the roster
     // whose SHAPE is already a col — and the walls are pushed out to 360 u and
@@ -486,7 +500,7 @@ export const LEVELS = [
       valleyWalls: { h: 135, run: 360 },
     } },
   { id: 67, name: 'TIMBER GORGE', theme: 'deepwood', region: 'ALPINE PASSES',
-    cost: 39, fresh: true, route: 'estonia',
+    cost: 39, fresh: true, route: 'estonia', routeFlipX: true,
     // THE WOODED ONE, and the one that still lets you off the ground.
     // `estonia` is the crest route, and the flanks here are forest rather than
     // rock — far enough out (250 u) and shallow enough (30%) that you can see
@@ -551,6 +565,8 @@ export const LEVELS = [
 
   { id: 69, name: 'MAPLE MILE', theme: 'autumnwood', region: 'AUTUMN',
     cost: 42, fresh: true, route: 'estonia',
+    // r327: MAPLE MILE keeps the shape UNMODIFIED — recording C's world and
+    // the patch13 fixture; ESTONIA CRESTS carries this group's reverse.
     // AND THE ONE THAT GETS YOU OFF THE GROUND. `estonia` is the crest route,
     // and a blind crest through a wood at peak colour is the single best thing
     // this palette can be pointed at — you land looking at it.
@@ -589,7 +605,7 @@ export const LEVELS = [
     } },
 
   { id: 72, name: 'BRACKEN MOOR', theme: 'mistfell', region: 'AUTUMN',
-    cost: 45, fresh: true, route: 'caps',
+    cost: 45, fresh: true, route: 'caps', routeReverse: true,
     // THE HARD ONE, AND THE BLEAK ONE. `corse` is a tight unforgiving lap and
     // `mistfell` is the least forgiving air on the roster — 780 u of fog, three
     // fog banks, and almost no canopy to give you a reference. The chapter
@@ -617,7 +633,7 @@ export const LEVELS = [
    * ---------------------------------------------------------------------- */
 
   { id: 73, name: 'ALASSIO SEAFRONT', theme: 'riviera', region: 'RIVIERA',
-    cost: 46, fresh: true, route: 'corniche',
+    cost: 46, fresh: true, route: 'corniche', routeFlipX: true,
     // THE POSTCARD, and the introduction. `corniche` is the coast-road shape:
     // long open sweeps with the water on one side, which is exactly the
     // four-kilometre arc of sand the town is built along. Nothing technical —
@@ -629,7 +645,7 @@ export const LEVELS = [
     } },
 
   { id: 74, name: 'IL BUDELLO', theme: 'riviera', region: 'RIVIERA',
-    cost: 47, fresh: true, route: 'principality',
+    cost: 47, fresh: true, route: 'principality', routeFlipX: true,
     // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
     // shopfront barely wide enough for a car, and `monaco` is the roster's
     // street shape: barriers close, corners slow, no run-off anywhere.
@@ -764,7 +780,7 @@ export const LEVELS = [
     } },
 
   { id: 75, name: 'PORTO MOLO', theme: 'riviera', region: 'RIVIERA',
-    cost: 48, fresh: true, route: 'marina',
+    cost: 48, fresh: true, route: 'marina', routeFlipX: true,
     // THE HARBOUR. `marina` runs the quays, which is stop-start by nature —
     // and the one lap on the coast where the sea is on BOTH sides of you.
     tune: {
@@ -774,7 +790,7 @@ export const LEVELS = [
     } },
 
   { id: 76, name: 'CAPO MELE', theme: 'riviera', region: 'RIVIERA',
-    cost: 49, fresh: true, route: 'turini',
+    cost: 49, fresh: true, route: 'turini', routeReverse: true,
     // THE HEADLAND, and the hard one. Capo Mele is the cape at the east end of
     // the bay and the road over it stacks hairpins the whole way up; `turini`
     // is the roster's hairpin ladder. The render sent with the report is this
@@ -804,7 +820,7 @@ export const LEVELS = [
     } },
 
   { id: 77, name: 'PORTO GRANDE', theme: 'genova', region: 'RIVIERA',
-    cost: 50, fresh: true, route: 'panorama',
+    cost: 50, fresh: true, route: 'panorama', routeReverse: true,
     // THE CITY. `panorama` is the roster's flat-then-mountain shape, which is
     // Genova exactly: a long fast run along the docks and then straight up
     // into the hills the city is stacked on. The most built-up world on the
@@ -815,7 +831,7 @@ export const LEVELS = [
     } },
 
   { id: 78, name: 'LIGURIA STAGE', theme: 'sanremo', region: 'RIVIERA',
-    cost: 51, fresh: true, route: 'caps',
+    cost: 51, fresh: true, route: 'caps', routeFlipX: true, routeReverse: true,
     // THE RALLY. Sanremo's stages run in the mountains BEHIND the town, not
     // along the front, and `corse` is the roster's tight unforgiving mountain
     // lap. The one world in this chapter with no sea in it at all — which is
@@ -865,7 +881,7 @@ export const CHAPTERS = [
   { n: 3, from: 16, name: 'NIGHT AND STONE',
     blurb: 'Neon city runs and the first of the Alpine passes.' },
   { n: 4, from: 22, name: 'THE WORLD RALLY',
-    blurb: 'The famous stages: Turini, Ouninpohja, Fafe, Pikes Peak.' },
+    blurb: 'The legend stages: four passes every driver knows by heart.' },
   { n: 5, from: 29, name: 'HOME GROUND',
     blurb: 'Olive terraces, lantern-lit old town, hedgerows and red dirt.' },
   { n: 6, from: 33, name: 'GRAND CIRCUITS',
@@ -1601,6 +1617,25 @@ const CIRCUITS = {
     [136, -66], [206, -52], [246, -18],
     [250, 20], [212, 56], [140, 70], [58, 76], [-24, 74],
     [-106, 68], [-184, 56], [-238, 22],
+  ],
+
+  // SERPENT PASS (r327) — the owner's 1:100 hand-drawn commission, traced
+  // from the drawing itself (skeletonized, segment-stitched through its
+  // touch points, RDP-simplified; tools in the session scratchpad). The
+  // labels on the sheet are the world's brief: sea views along the
+  // north-west rim, steep inclinations mid-lap, a cliff loop in the
+  // south-west, and mountains with bores through them on the east side.
+  // The kink relaxation below tidies the pen's corners the same way it
+  // does for every other sketch route.
+  serpentPass: [
+    [31, 230], [121, 223], [169, 184], [169, 140], [154, 92], [95, 47],
+    [166, -24], [173, -87], [133, -191], [84, -239], [59, -249],
+    [-56, -250], [-84, -236], [-104, -212], [-86, -148], [-64, -141],
+    [-27, -153], [10, -151], [55, -131], [53, -98], [4, -70], [-75, -75],
+    [-145, -15], [-172, 46], [-173, 76], [-136, 125], [-97, 126],
+    [-85, 117], [-97, 31], [-77, -5], [-16, -5], [36, 17], [43, 37],
+    [32, 59], [-31, 62], [-53, 73], [-33, 102], [34, 127], [59, 148],
+    [44, 166], [-47, 185], [-44, 205], [-26, 218],
   ],
 
   // FAFE — Portugal. A tight, technical village loop that exists to set up ONE
@@ -6364,7 +6399,20 @@ export class Track {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    const pts = CIRCUITS[(level && (level.route || level.theme))] || CIRCUITS.forest;
+    let rawPts = CIRCUITS[(level && (level.route || level.theme))] || CIRCUITS.forest;
+    // r327 DUPLICATE SHAPES DIFFER. Eleven route keys served 26 worlds, so
+    // fifteen of them drove another world's exact centreline — "same corners
+    // in the same order is the same track wearing a different hat" (the
+    // OLIVE COAST note above already states the law). A shared key's later
+    // users now declare a transform: `routeFlipX` mirrors the plan (every
+    // left becomes a right), `routeReverse` runs it the other way round
+    // (different corner sequence AND handedness), and both together are a
+    // fourth distinct lap. Everything downstream — elevation, ramps,
+    // tunnels, props, gates — generates from the transformed centreline, so
+    // no placement can survive from the sibling world.
+    if (level && level.routeFlipX) rawPts = rawPts.map(([x, z]) => [-x, z]);
+    if (level && level.routeReverse) rawPts = [...rawPts].reverse();
+    const pts = rawPts;
     this.curve = new THREE.CatmullRomCurve3(
       pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'

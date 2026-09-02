@@ -4161,6 +4161,53 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r327 — SERPENT PASS: THE OWNER'S DRAWING BECOMES A WORLD, AND NO
+## TWO WORLDS SHARE A CENTRELINE ANY MORE
+
+Owner, with a 1:100 hand-drawn map: "Replace ouninpoja with this map.
+Identify duplicative shapes and change their tracks."
+
+THE DRAWING IS THE ROUTE. The sheet was digitized, not approximated:
+ribbon masked, largest component kept (drops the labels and stray pen
+marks), skimage skeleton, segments split at the stroke's touch points
+and re-stitched by direction continuity, RDP-simplified to 43 control
+points, scaled into route space (trace tools in the session
+scratchpad; overlay verified against the drawing). The kink relaxation
+already built for sketch routes tidies the pen corners — max
+per-station turn came out 13.9°, inside the 15° healthy band.
+
+OUNINPOHJA (also a real stage name, §7.10) is gone; id 23 is SERPENT
+PASS on the sheet's own brief: mountainsea theme with the coast along
+the north-west rim ("Sea views"), elev amp 9 ("Steep inclinations" —
+13.3 u of profile), the theme's cliff construction ("Cliff"), and two
+bores ("Mountains and tunels inside mountains"). Verified racing: all
+seven rivals at 1.34-1.43 laps in 30 s, zero stuck, zero errors;
+test-tunnels drives its bores among the roster's 34-in-34. GRANITE
+NARROWS is now the sole owner of the old oval. The WORLD RALLY blurb
+also stops naming real stages.
+
+THE DUPLICATES. Eleven route keys served 26 worlds — fifteen of them
+drove another world's exact centreline. Each shared key's later users
+now declare a transform applied at track build (`routeFlipX` mirrors
+the plan: every left becomes a right; `routeReverse` runs it the other
+way; both = a fourth distinct lap), and everything downstream —
+elevation, ramps, tunnels, props, gates — regenerates from the
+transformed centreline. Fifteen worlds changed: CITADEL BAY, OLIVE
+PASS, CAPE OLIVETO, TERRAZZA ALTA, SALINE SPRINT, RAZORBACK MOUNTAIN,
+TIMBER GORGE, ESTONIA CRESTS, BRACKEN MOOR, ALASSIO SEAFRONT, IL
+BUDELLO, PORTO MOLO, CAPO MELE, PORTO GRANDE, LIGURIA STAGE.
+
+THE ANCHOR RULE, learned mid-build: the UNMODIFIED copy of a shared
+shape is chosen for being an anchor, not for id order. The first
+assignment flipped GLACIER COL (recording B's evidence world, the F7
+grass fixture) and reversed MAPLE MILE (recording C, the patch13
+fixture) — F7 promptly read 80% on ground the fixture no longer stood
+on, and a relocated grid failed the grid-clear law. Both anchors are
+pristine again; RAZORBACK MOUNTAIN and ESTONIA CRESTS carry those
+groups' variants instead, and both suites went back to green (phase4
+holds, patch13 16/16). Representative pairs measured non-identical;
+filters 35/35; newworlds holds its exact pre-existing roster-tail red.
+
 ## r326 — THE TUNNEL CAMERA, AS A CHOICE
 
 Owner: "Add camera that is when I enter in the tunel as choice." There
