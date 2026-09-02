@@ -81,6 +81,11 @@
     "upsideDownS": 2.0,
     "playerResetDelayS": 1.5,
     "killRespawnHoldS": 4.0,
+    "belowTerrainM": 1.0,
+    "voidDeepM": 4.0,
+    "voidConfirmS": 0.5,
+    "camMinDistU": 6,
+    "camCloseRiseU": 16,
     "camClearanceM": 1.5
   },
   "ai": {

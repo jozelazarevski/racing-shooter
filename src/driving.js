@@ -200,6 +200,17 @@ export const DRIVING = {
     upsideDownS: 2.0,
     playerResetDelayS: 1.5,
     killRespawnHoldS: 4.0,   // §6.10: a destroyed rival holds this long, then its last gate
+    // v2.3 §3.2 (r329): the below-terrain watchdog. Datum is
+    // min(terrainHeight, physics ground); healthy driving measured 0.83 u
+    // worst-case (voiddepth.mjs), so 1.0 held voidConfirmS is a lost car.
+    belowTerrainM: 1.0,
+    voidDeepM: 4.0,          // this deep is unambiguous: return at once
+    voidConfirmS: 0.5,
+    // v2.3 §3.9 (r329): a camera clamped inside camMinDistU of the car
+    // rises toward top-down (car + ~15 u of surroundings) instead of
+    // pulling in — the recording-F waterfall frames
+    camMinDistU: 6,
+    camCloseRiseU: 16,
     camClearanceM: 1.5,
     // ribbonNearM is GONE (r302): the ribbon and the gate arrow it fed are
     // erased under CLAUDE.md v1.2 §3.5 — a key nothing reads is a config

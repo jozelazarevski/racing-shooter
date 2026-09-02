@@ -10809,6 +10809,39 @@ class Game {
             lateralM: ev.lateral, section: ev.kind });
         }
       }
+      // v2.3 §3.2 (r329): THE BELOW-TERRAIN WATCHDOG. A car under the world
+      // is a containment failure whatever put it there, and the old net
+      // (terrain − 6 for 2.5 s, player only) let recording F's fall-through
+      // run for seconds of black screen. The datum is min(terrainHeight,
+      // the ground physics is standing the car on): a tunnel bore never
+      // trips it (there gY IS the bore floor), a shelf rejoin never trips
+      // it (the car climbs from ON the terrain, so it is never below BOTH),
+      // and the off-road ease lag measured 0.83 u worst-case over four
+      // worlds of rival laps and bank scrambles (voiddepth.mjs) — so 1.0 u
+      // held half a second is a car the physics has lost, not a transient.
+      // Four units down is unambiguous and returns at once. Every car,
+      // rivals included; a firing in a healthy build is a §3.1 bug.
+      if (this.state === 'race') {
+        const terr = this.track.terrainHeight(car.pos.x, car.pos.z);
+        const depth = Math.min(terr, car._physGY ?? terr) - car.y;
+        const PH = window.__DRIVING?.route ?? {};
+        if (depth > (PH.belowTerrainM ?? 1.0)) {
+          car._voidT = (car._voidT ?? 0) + 1 / 60;
+          // an AIRBORNE car under the datum is the fall-through class itself
+          // (the fall-edge branch goes ballistic first), but it only fires
+          // on the sustained path: a flight past a cliff face grazes the
+          // depth test for a frame or two, a flight INSIDE the mountain
+          // holds it for the full half second.
+          if ((!car.airborne && depth > (PH.voidDeepM ?? 4.0))
+              || car._voidT > (PH.voidConfirmS ?? 0.5)) {
+            car._voidT = 0;
+            this.telemetry?.log('void', {
+              car: car === this.player ? 'player' : car.persona ?? car.name ?? 'rival',
+              depthM: +depth.toFixed(1) });
+            this.returnToGate(car, car._nextGate ?? 0, 'void');
+          }
+        } else car._voidT = 0;
+      }
     }
     // §5.2 (r313): THE PRESSURE RIVAL — the honest rubber band. At GO+15,
     // the ONE rival nearest the player in progress holds the lease (nearest
@@ -11421,6 +11454,26 @@ class Game {
             cp.z -= pz * side * push;
           }
         }
+      }
+    }
+    // v2.3 §3.9 (r329): A CAMERA INSIDE SIX UNITS OF THE CAR HAS STOPPED
+    // BEING A CAMERA. Recording F's waterfall frames show what every guard
+    // above can conspire to produce: the ground lift raises the eye, the
+    // height cap answers by hauling the boom in, and the pull-in loop is
+    // allowed to stop at 4 u from the bodywork — a lens a few metres away,
+    // nearly edge-on, showing neither the car's situation nor the road.
+    // When the guards have left the eye that close, pulling in was the
+    // wrong move: RISE toward top-down instead. The horizontal foot stays
+    // where the clamps put it (they had their reasons); the height becomes
+    // whatever frames the car plus ~15 u of its surroundings. Runs after
+    // every other guard so it covers the deck, tunnel and terrain branches
+    // alike; the driver's seat never comes through this path.
+    {
+      const RT9 = window.__DRIVING?.route ?? {};
+      const minD = RT9.camMinDistU ?? 6;
+      if (this.camPos.distanceTo(p.pos) < minD) {
+        this.camPos.y = Math.max(this.camPos.y, p.pos.y + (RT9.camCloseRiseU ?? 16));
+        this.camLook.lerp(p.pos, 0.6);
       }
     }
     // THE BOOM HAS A LENGTH, AND IT IS NOT NEGOTIABLE.

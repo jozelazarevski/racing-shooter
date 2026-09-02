@@ -4161,6 +4161,50 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r329 — THE SAFETY NET AND THE CAMERA'S SIX METRES (v2.3 §3.2 + §3.9)
+
+B1 continues with the pair recording F filmed on the waterfall: a car
+that falls through the world runs on with the HUD ticking, and the
+chase camera ends up "a few metres away, nearly edge-on" showing
+neither the car nor the road.
+
+§3.2 THE BELOW-TERRAIN WATCHDOG (`main._stepRoute`, every car, race
+only). Datum = min(terrainHeight, the ground physics is standing the
+car on) — that one `min` makes every legitimate below-terrain state
+vanish: a tunnel bore (gY IS the bore floor), a shelf rejoin (the car
+climbs from ON the terrain), a carved gorge road (gY is the deck).
+What remains is measured headroom: rival laps plus bank scrambles
+across four worlds put the worst healthy excursion at 0.83 u
+(tools-scratch/voiddepth.mjs), so the spec's 1.0 u (`belowTerrainM`)
+held `voidConfirmS` 0.5 s is a car the physics has lost. Grounded past
+`voidDeepM` 4 u fires at once; airborne cars go through the confirmed
+path only, so a flight past a cliff face never trips it while a flight
+INSIDE the mountain does. Fires -> `returnToGate(reason 'void')` +
+telemetry `void {car, depthM}`. Per the spec's own words this is the
+net, not the fix: a `void` in a healthy log is a §3.1 bug. `Car.step`
+now publishes `_physGY` for it.
+
+§3.9 THE CLOSE-CLAMP (after every camera guard, before the leash).
+The ground lift raises the eye, the height cap pulls the boom in, and
+the pull-in loop stops 4 u from the bodywork. Now: inside `camMinDistU`
+(6 u) of the car the camera RISES instead — the horizontal foot stays
+where the guards put it, the height becomes car + `camCloseRiseU`
+(16 u, framing ~15 u of surroundings), the look eases onto the car.
+P10's word: no frame closer than 6.
+
+Suite: tests/test-containment.mjs (8 checks). Buried player returns on
+frame 0 with the event logged; a rival forged 2 u under fires the same
+loop at 0.5 s (rivals road-lock their own ground, so through g.frame()
+they are contained by construction — that is T5: 60 s of racing, zero
+voids); a bore park is not a void; camera seeded 1.4 u off the bumper
+ends the frame at 16 u; a 75 s agent-driven tunnel-world lap never dips
+under 5.9 u (min measured 46). Gates: cliff, restart-stopped, goat,
+tunnelcam, sinking, unstuck, hudfreeze all green. Learned along the
+way and written into the tests: rival `lateral` is HELD state (a pos
+teleport reads as on-road and re-pins), and `_blendHeight` flattens
+terrainHeight to the roadline even inside a bore, so the bore exemption
+is belt-and-braces on this engine.
+
 ## r328 — THE REJOIN BAND (v2.3 B1 opens: §3.8/P9, and the last goat red)
 
 First build of the v2.3 queue. Recording F's fault: "the car stuck at 1
