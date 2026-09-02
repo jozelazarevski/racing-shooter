@@ -322,11 +322,17 @@ export class Hud {
     if (!g.freeRoam && !g.missionMode && this.el.strip && this._standingsTimer <= 0) {
       this._standingsTimer = 0.25;
       const cars = [g.player, ...g.enemies];
-      let lo = Infinity, hi = -Infinity;
-      for (const c of cars) { lo = Math.min(lo, c.progress); hi = Math.max(hi, c.progress); }
-      const span = Math.max(0.05, hi - lo);
+      // v2.3 §6.1 (r331): dots read each car's OWN lap position, not the
+      // field span. The old mapping normalized lo..hi across the field, so
+      // a car running last sat pinned at the left edge however far it
+      // drove — recording F's "player progress frozen at 0% for 34 s"
+      // was 8th place rendering as a parked dot while the whole field
+      // moved together. trackIndex/N is the spec's "fraction along the
+      // current segment" at strip resolution: every dot sweeps 0→100%
+      // each lap (S1b), and the field's gaps read as real road gaps.
+      const N = Math.max(1, g.track?.center?.length ?? 1);
       const html = cars.map((c) => {
-        const f = Math.round(((c.progress - lo) / span) * 92 + 2);
+        const f = Math.round(((c.trackIndex ?? 0) / N) * 96 + 2);
         return `<i class="${c === g.player ? 'me' : ''}${c.alive ? '' : ' dead'}" style="left:${f}%"></i>`;
       }).join('');
       if (html !== this._stripKey) { this._stripKey = html; this.el.strip.innerHTML = html; }
