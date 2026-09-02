@@ -64,18 +64,18 @@ export const LEVELS = [
   // It is now the technical exam immediately before the alpine finale.
   { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON',
     tune: { gorgeJump: { count: 1 } } },
-  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES',
+  { id: 19, name: 'KARVEN CLIMB', theme: 'pass', region: 'ALPINE PASSES',
     tune: { tunnels: { count: 2 } } },
-  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
+  { id: 20, name: 'SERPENTINA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
     tune: { tunnels: { count: 1 } } },
-  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES', laps: 1,
+  { id: 21, name: 'FALKEN RIDGE', theme: 'furka', region: 'ALPINE PASSES', laps: 1,
     tune: { tunnels: { count: 1 } } },
 
   // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
   // own `tune`. `tune` is layered over the theme object, so anything a theme
   // sets can be overridden per level — elevation, jump count, cliff walls, the
   // hero bridge. Career order is this array; ids are stable and never reused.
-  { id: 22, name: 'COL DE TURINI', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
+  { id: 22, name: 'COL DE VERNAY', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
     // relentless short hairpins, and jumps would be absurd on a tarmac col
     // the real col runs through galleries; two of them here
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
@@ -92,16 +92,16 @@ export const LEVELS = [
       coast: { a: [-235, -320], b: [-205, 330], level: -3.0, floor: -13, beach: 18 },
       elev: { amp: 9, ph: [0.8, 2.4, 4.1] },
     } },
-  { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
+  { id: 24, name: 'PENEDO LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
-  { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
+  { id: 25, name: 'HIGHCROWN PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
     tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0, tunnels: { count: 1 } } },
   { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
-  { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', routeReverse: true, region: 'WORLD RALLY',
+  { id: 28, name: 'BIRCHLAND CRESTS', theme: 'forest', route: 'estonia', routeReverse: true, region: 'WORLD RALLY',
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
@@ -195,14 +195,14 @@ export const LEVELS = [
   // the vineyard lap tracing their third hand-drawn loop
   { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
-  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true,
+  { id: 48, name: 'TORRI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true,
     // the Dolomites are more tunnel than road; this is the world that most
     // obviously should have had them and did not
     tune: { tunnels: { count: 2 } } },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
   // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
   // crosses itself and tunnels where a headland gets in the way.
-  { id: 50, name: 'CINQUE TERRE', theme: 'liguria', region: 'MEDITERRANEAN', cost: 22, fresh: true,
+  { id: 50, name: 'CINQUE BORGHI', theme: 'liguria', region: 'MEDITERRANEAN', cost: 22, fresh: true,
     route: 'liguriaRun', tune: { tunnels: { count: 1 } } },
   { id: 51, name: 'AEGEAN BLUE', theme: 'aegean', region: 'MEDITERRANEAN', cost: 23, fresh: true,
     route: 'aegeanRun' },
@@ -632,7 +632,7 @@ export const LEVELS = [
    * shape that already exists rather than inventing a fifth.
    * ---------------------------------------------------------------------- */
 
-  { id: 73, name: 'ALASSIO SEAFRONT', theme: 'riviera', region: 'RIVIERA',
+  { id: 73, name: 'ALBAROSA SEAFRONT', theme: 'riviera', region: 'RIVIERA',
     cost: 46, fresh: true, route: 'corniche', routeFlipX: true,
     // THE POSTCARD, and the introduction. `corniche` is the coast-road shape:
     // long open sweeps with the water on one side, which is exactly the
@@ -644,7 +644,7 @@ export const LEVELS = [
       elev: { amp: 7, ph: [0.4, 1.2, 2.0] },
     } },
 
-  { id: 74, name: 'IL BUDELLO', theme: 'riviera', region: 'RIVIERA',
+  { id: 74, name: 'IL VICOLO', theme: 'riviera', region: 'RIVIERA',
     cost: 47, fresh: true, route: 'principality', routeFlipX: true,
     // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
     // shopfront barely wide enough for a car, and `monaco` is the roster's
@@ -789,7 +789,7 @@ export const LEVELS = [
       elev: { amp: 4, ph: [2.2, 0.5, 1.7] },
     } },
 
-  { id: 76, name: 'CAPO MELE', theme: 'riviera', region: 'RIVIERA',
+  { id: 76, name: 'CAPO VELA', theme: 'riviera', region: 'RIVIERA',
     cost: 49, fresh: true, route: 'turini', routeReverse: true,
     // THE HEADLAND, and the hard one. Capo Mele is the cape at the east end of
     // the bay and the road over it stacks hairpins the whole way up; `turini`
@@ -899,7 +899,7 @@ export const CHAPTERS = [
   { n: 12, from: 68, name: 'AUTUMN',
     blurb: 'The season turns: gold woodland, harvest country, russet moor.' },
   { n: 13, from: 73, name: 'THE ITALIAN RIVIERA',
-    blurb: 'Alassio: the seafront, the budello, the harbour and the cape.' },
+    blurb: 'Albarosa: the seafront, the vicolo, the harbour and the cape.' },
 ];
 
 /** Career-order index ranges per chapter, derived once from `from`.
