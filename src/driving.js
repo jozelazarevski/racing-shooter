@@ -43,6 +43,12 @@ export const DRIVING = {
   offRoadClimbDiv: 0.14,
   offRoadClimbBleed: 14,     // u/s² toward the climb cap: banks cross, charges die
   offRoadClimbFreeGrade: 0.15, // rolling grass under this grade climbs free (F7)
+  rejoinBandU: 34,           // r328: within this of the road, banks are a
+                             // scramble, not a wall (v2.3 §3.8/P9); real
+                             // mountain faces live past the 60 u wilds fence
+  offRoadClimbDivNear: 0.5,  // inside the band a climb prices like a ROAD climb
+                             // (0.30 still walled FURKA grade-1.1 banks at 24%)
+  offRoadClimbBleedNear: 6,  // u/s² graze inside the band (14 outside)
   fallEdgeDrop: 3,           // ground this far below the car is a FALL, not a slope:
                              // the car goes ballistic and onLand prices the impact
                              // (the r320 cliff report — the ease was rappelling

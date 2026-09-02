@@ -2275,8 +2275,23 @@ export class Car {
       // notices 0.15 of forgiveness.
       const free = offRoad ? (DRIVING.offRoadClimbFreeGrade ?? 0.15) : 0;
       const s2 = Math.max(0, slope - free);
-      const div = offRoad ? (DRIVING.offRoadClimbDiv ?? 0.14) : 0.55;
+      // r328 (v2.3 §3.8/P9, and the standing FURKA rejoin red): A REJOIN
+      // BANK IS A SCRAMBLE, NOT A WALL. Within `rejoinBandU` of the
+      // carriageway the climb law softens — the wall divisor was sized for
+      // MOUNTAINS ("I can still enter a mountain"), and applied to the
+      // 0.6-1.1 banks between stacked switchback legs it collapsed the cap
+      // to the 8 u/s floor and the bleed shed the rest: measured 23% of
+      // speed kept, which is recording F's car parked at 1-3 km/h under
+      // the road it can see. Real faces live 60+ u out (the wilds fence),
+      // so the band cannot re-open the mountains.
+      const nearRoad = offRoad
+        && Math.abs(this.lateral) < (DRIVING.rejoinBandU ?? 34);
+      const div = offRoad
+        ? (nearRoad ? (DRIVING.offRoadClimbDivNear ?? 0.30)
+          : (DRIVING.offRoadClimbDiv ?? 0.14))
+        : 0.55;
       vCap = Math.max(topSpeed * (offRoad ? 0.14 : 0.55), topSpeed - (GRADE * s2) / div);
+      this._rejoinBand = nearRoad;        // read by the bleed below
     }
     else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
     // v1.5 §11.5/§6.6 (r310): while BOOSTING the stage ceiling binds the
@@ -2301,7 +2316,12 @@ export class Car {
     // crossing carries through on what the car brought, while a HELD
     // mountain charge still converges to the crawl cap in ~2.5 s.
     if (offRoad && slope > 0 && vf > vCap) {
-      vf = Math.max(Math.max(vCap, vf - (DRIVING.offRoadClimbBleed ?? 14) * dt),
+      // r328: inside the rejoin band the bleed is a graze, not a tax
+      // collector — the crossing carries through on what the car brought.
+      const bleed = this._rejoinBand
+        ? (DRIVING.offRoadClimbBleedNear ?? 6)
+        : (DRIVING.offRoadClimbBleed ?? 14);
+      vf = Math.max(Math.max(vCap, vf - bleed * dt),
         -this.maxSpeed * 0.35);
     } else {
       vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);

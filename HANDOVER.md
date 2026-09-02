@@ -4161,6 +4161,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r328 — THE REJOIN BAND (v2.3 B1 opens: §3.8/P9, and the last goat red)
+
+First build of the v2.3 queue. Recording F's fault: "the car stuck at 1
+to 3 km/h on the grass trying to climb that face back onto the road" —
+which is also the roster's oldest standing suite red, FURKA's rejoin
+banks keeping 21-24% of speed against the 25% floor across three
+tunings.
+
+MEASURED CAUSE: the r315 mountain wall, applied to the wrong ground.
+The off-road climb divisor (0.14) was sized to stop a 29 u/s mountain
+charge; on the 0.6-1.1 banks between stacked switchback legs the same
+arithmetic collapses the speed cap to its 8 u/s floor
+(9.8·0.65/0.14 = 45 off the top) and the 14 u/s² momentum bleed sheds
+the rest — a player scrambling back to a road they can SEE crawls at
+walking pace under it.
+
+THE LAW: ground beside the road prices like road. Within `rejoinBandU`
+(34 u — banks live 12-40 out; the mountain kill fence is 60) the climb
+divisor is the ON-ROAD 0.5 and the bleed drops to a 6 u/s² graze; past
+the band the 0.14 wall and 14 u/s² bleed stand untouched, so "I can
+still enter a mountain" stays closed. Three driving.json knobs:
+rejoinBandU, offRoadClimbDivNear (0.5 — 0.30 was tried and still
+walled the grade-1.1 banks at 24%), offRoadClimbBleedNear.
+
+test-goat 26/26 — FURKA's median bank keep is 25% on the floor, SUMMIT
+28%, and the mountain-law controls (charge ceiling, too-steep scolds)
+all hold. F7 unmoved: PINE 56%, GLACIER 70%, both inside 55-75;
+drivingspec and the r320 cliff law green.
+
 ## r327 — SERPENT PASS: THE OWNER'S DRAWING BECOMES A WORLD, AND NO
 ## TWO WORLDS SHARE A CENTRELINE ANY MORE
 

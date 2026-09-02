@@ -266,8 +266,11 @@ if (await load(6)) {
 // 25, from 35 (r314): F7's off-road price carries more speed INTO the bank,
 // and the crossing sheds proportionally more of it (SUMMIT measured 29%
 // under F7 against 35+ before). The law's intent — a rejoin bank is a
-// scramble, not a wall — holds at 25. FURKA remains this law's standing
-// red (21-23% both before and after F7; pre-existing, catalogued).
+// scramble, not a wall — holds at 25. r328 CLEARED the long-standing FURKA
+// red (21-24% across three tunings) with the rejoin band: within
+// rejoinBandU of the road the climb divisor is the on-road 0.5 and the
+// bleed is a graze, so the band prices like a road climb while the 0.14
+// mountain wall stands past the wilds fence.
 const BANK_KEEP = 25;                 // % of 40 u/s still there 1.5 s later
 for (const id of [6, 21]) {
   if (!await load(id)) { ok(false, `world ${id} did not build`); continue; }
