@@ -79,7 +79,7 @@ const pixels = await page.evaluate(async () => {
   const g = window.__game;
   const { LEVELS } = await import('./src/track.js');
   g.state = 'title';
-  g.swapLevel(LEVELS.find((l) => l.name === 'TREMOLA DESCENT') || LEVELS[0], true, null);
+  g.swapLevel(LEVELS.find((l) => l.name === 'SERPENTINA DESCENT') || LEVELS[0], true, null);
   for (let f = 0; f < 6; f++) await new Promise((r) => requestAnimationFrame(r));
   const cam = g.camera;
   const shot = () => {

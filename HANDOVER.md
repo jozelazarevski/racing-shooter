@@ -4161,6 +4161,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r334 — EVERY STAGE WEARS ITS OWN NAME (v2.3 §7.10 / R9)
+
+Fault 14's tail. Twelve real places still sat in the roster's display
+names; each keeps its cadence and flavour under an invented name:
+
+    GOTTHARD CLIMB  -> KARVEN CLIMB      TREMOLA DESCENT -> SERPENTINA DESCENT
+    FURKA RIDGE     -> FALKEN RIDGE      COL DE TURINI   -> COL DE VERNAY
+    FAFE LEAP       -> PENEDO LEAP       PIKES PEAK      -> HIGHCROWN PEAK
+    ESTONIA CRESTS  -> BIRCHLAND CRESTS  DOLOMITI CORSA  -> TORRI CORSA
+    CINQUE TERRE    -> CINQUE BORGHI     ALASSIO SEAFRONT-> ALBAROSA SEAFRONT
+    IL BUDELLO      -> IL VICOLO         CAPO MELE       -> CAPO VELA
+
+Plus the one displayed blurb naming the town. Scope is the spec's
+letter (§7.10: circuit, city, mountain, brand, driver): sea- and
+region-scale descriptors (RIVIERA, MEDITERRANEAN, AEGEAN, AMAZON,
+ARDENNES, COSTA BRAVA, LIGURIA) stand — they name a coastline's
+character, not a place you can lap. Theme keys and code comments are
+identifiers, not stage data, and are untouched; levels are addressed
+by id everywhere but one test (test-floating, updated).
+
+tests/test-naming.mjs runs R9 at runtime: name, region, blurb of all
+78 entries scanned against the spec's five protected names plus the
+renamed places plus the usual circuit suspects — zero hits. floating
+6/6 green on the renamed lookup.
+
 ## r333 — TRAFFIC DISCIPLINE, MEASURED (v2.3 §5.7 / S10 — no code)
 
 Recording F 0:20.5: "a rival sits behind a tractor on the upper road,
