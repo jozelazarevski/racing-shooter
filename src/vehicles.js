@@ -3511,6 +3511,12 @@ export class Car {
     } else {
       gY = roadY;
     }
+    // v2.3 §3.2 (r329): the ground the physics is actually standing this car
+    // on, published for the below-terrain watchdog (main._stepRoute). The
+    // watchdog's datum is min(terrainHeight, this) so a bore — where y is the
+    // bore floor and terrainHeight is the mountain over it — never reads as
+    // being under the world.
+    this._physGY = gY;
 
     // TOO STEEP TO CLIMB.
     //
