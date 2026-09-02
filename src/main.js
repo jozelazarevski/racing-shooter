@@ -6771,7 +6771,22 @@ class Game {
       halo.rotation.x = -Math.PI / 2;
       halo.position.y = 0.1;
       group.add(halo);
-      const p = t.pointAt(d.index, d.lateral);
+      // v2.3 §7.12 (r332): A PICKUP LIVES ON THE SURFACE IT IS COLLECTED
+      // FROM. pointAt seats it at road height at (index, lateral) — where
+      // the route hugs a wall, that point can be INSIDE the hillside
+      // (recording F 0:08: the wet-tyre beacon glowing inside the
+      // mountain). If terrain stands more than 0.5 u over the spot, walk
+      // the pickup toward the centreline and then down the road until it
+      // is in the open; then never let it sit below terrain either.
+      let p = t.pointAt(d.index, d.lateral);
+      for (let tries = 0; tries < 30; tries++) {
+        const terr = t.terrainHeight(p.x, p.z);
+        if (terr <= p.y + 0.5) break;
+        if (Math.abs(d.lateral) > 0.5) d.lateral *= 0.5;
+        else d.index = (d.index + 3) % t.N;
+        p = t.pointAt(d.index, d.lateral);
+      }
+      p.y = Math.max(p.y, t.terrainHeight(p.x, p.z));
       group.position.copy(p);
       this.worldLayer.add(group);
       this.pickups.push({

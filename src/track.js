@@ -16789,6 +16789,7 @@ export class Track {
       if (key === 'roof' && roofC !== null) return roofC;
       return K[key];
     };
+    let elemLow = y;   // lowest masonry this structure reaches (r332, §7.13)
     // ---- A BUILDING GETS A FOUNDATION THAT REACHES THE GROUND -------------
     //
     // "Kill all floaters in the design." A structure is seated by ONE number —
@@ -16818,6 +16819,7 @@ export class Track {
         const g2 = this._seatY(x + Math.cos(th) * fr, z + Math.sin(th) * fr);
         if (Number.isFinite(g2) && g2 - 0.25 < low) low = g2 - 0.25;
       }
+      elemLow = low;
       const drop = y - low;
       if (drop > 0.25) {
         // 0.4 u of overlap into the body above so there is never a seam, and
@@ -16843,8 +16845,11 @@ export class Track {
     const r = T.r * scale * Math.max(wS, dS), mat = T.mat ?? 'hut';
     const solid = { x, z, r, y: y + 0.6, mat };
     this.solids.push(solid);
-    // the editor's handle on this structure — see `placedElements`
-    this.placedElements.push({ type, x, z, rot, scale, r, authored });
+    // the editor's handle on this structure — see `placedElements`.
+    // baseY (r332): the lowest masonry this structure reaches — the plinth
+    // bottom on a slope, the seated base on the flat — so the §7.13
+    // validator can re-check the plinth promise without re-deriving it.
+    this.placedElements.push({ type, x, z, rot, scale, r, authored, baseY: elemLow });
     this._addShadow(x, z, r * 1.35);
     return { r, solid, y };
   }
