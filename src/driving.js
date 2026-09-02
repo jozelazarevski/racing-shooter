@@ -186,6 +186,11 @@ export const DRIVING = {
                         // STANDS — under touch auto-gas, 40 km/h at respawn
                         // read as an instant nitro launch
     maxClimbDeg: 35,
+    // v2.3 §3.3 (r330): past maxClimbDeg the face sheds the car — onset
+    // after slopeLatDecayS (the spec's lateral-decay window), downhill
+    // slide speed capped at steepSlideCapU
+    slopeLatDecayS: 0.5,
+    steepSlideCapU: 22,
     fatalDropM: 12,
     waterDepthM: 1.2,
     smashMaxKg: 80,

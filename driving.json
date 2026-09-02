@@ -67,6 +67,8 @@
     "returnAheadM": 6,
     "returnSpeedKmh": 0,
     "maxClimbDeg": 35,
+    "slopeLatDecayS": 0.5,
+    "steepSlideCapU": 22,
     "fatalDropM": 12,
     "waterDepthM": 1.2,
     "smashMaxKg": 80,
