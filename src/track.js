@@ -8737,8 +8737,17 @@ export class Track {
         let mc = 0;
         for (let w = -16; w <= 16; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
         // a jump needs a genuine straight: launching mid-corner throws the car
-        // off the far rim sideways, which is a trap rather than a stunt
-        if (mc > 0.009) continue;
+        // off the far rim sideways, which is a trap rather than a stunt.
+        // r337 (#20): ...but "genuine straight" is judged by the WORLD. On
+        // ROCKFALL RAVINE — the roster's twistiest circuit, and one that
+        // ASKS for a jump in its tune — the straightest ±16 window measures
+        // 0.0115, so the flat 0.009 gate shipped the world with no jump at
+        // all, silently. A world that requests a gorgeJump gets its
+        // straightest station up to a hard ceiling of 0.014 (radius ≈ 71 m
+        // — still a near-straight at launch speed); the trench-clearance
+        // rule below still holds the veto, and worlds with true straights
+        // sort to their sub-0.009 stations exactly as before.
+        if (mc > 0.014) continue;
         stations.push({ i, mc });
       }
       stations.sort((a, b) => a.mc - b.mc);

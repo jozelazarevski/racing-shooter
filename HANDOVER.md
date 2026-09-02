@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r337 — ROCKFALL GETS ITS JUMP BACK (backlog #20)
+
+The item read "brow unreachable at launch speed under honest tyres";
+the measurement said something starker: ROCKFALL RAVINE has had NO
+jump at all. Its tune asks for `gorgeJump: {count: 1}`, but
+_planJumpGorges' straightness gate (max curvature 0.009 over a ±16
+window) found nothing on the roster's twistiest circuit — the
+straightest window measures 0.0115 — so the world shipped jumpless,
+silently, and the brow probe was measuring ordinary road bumps.
+
+The law now judges "straight" by the world: a circuit that asks for a
+jump gets its straightest station up to a hard ceiling of 0.014
+(radius ≈ 71 m — still a near-straight at launch speed). The
+trench-clearance veto is untouched, and worlds with genuine straights
+sort to their sub-0.009 stations exactly as before — CANYON RUN
+(704, 212) and RED CENTRE RUN (172) build byte-identically pre/post.
+
+Proof: ROCKFALL builds its gorge at station 142; an honest pure-pursuit
+run-up crosses it at 140 km/h with 0.65 s of air and a clean landing
+from both 400- and 250-sample approaches; 120 s of rival racing logs
+ZERO rival frames in the gorge and all seven rivals lapping at pace.
+Gates containment, cliff, hudreview, nature green.
+
 ## r336 — X1: THE FULL BATTERY, AND ONE ACQUITTAL (v2.3 B7 closes)
 
 The closing regression pass over the seven-build v2.3 session
