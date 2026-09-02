@@ -4161,6 +4161,28 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r333 — TRAFFIC DISCIPLINE, MEASURED (v2.3 §5.7 / S10 — no code)
+
+Recording F 0:20.5: "a rival sits behind a tractor on the upper road,
+stationary." Measured on the current engine before touching anything
+(tools-scratch/trafficjam.mjs + tests/test-traffic.mjs): the fault has
+no mechanism left. Shuttles are KINEMATIC — nothing can physically
+block one; the only stop is the deliberate ~1 s hit-lurch — and rivals
+read traffic as avoidance proxies with a tangential skirt bias. Worst
+rival-behind-traffic streak over 90 game-seconds with a tractor pinned
+motionless mid-shoulder (worst case, forced by the probe): ZERO frames
+under 10 km/h within 14 u. The spec's 2 s blocked-despawn guard would
+be dead code on a kinematic fleet and is deliberately not added.
+
+Two probe lessons written into the suite: traffic.js runs on its own
+WALL-CLOCK RAF, so a synchronous g.frame() pump starves it (measure
+traffic in real time, composer stubbed — both loops speed up together);
+and a crossing rig waiting at its spur mouth between scripted passes is
+off the carriageway by design, so S10a only counts stationary time ON
+the road. tests/test-traffic.mjs: worst on-road stationary 0.7 s,
+worst rival queue 0.0 s, all seven rivals lapping. Suite-only build —
+no tag bump, nothing shipped changed.
+
 ## r332 — ON THE GROUND IT CAME FROM (v2.3 §7.12 + §7.13)
 
 Recording F's two floaters. 0:08: a wet-tyre pickup beacon glowing
