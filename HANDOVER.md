@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r332 — ON THE GROUND IT CAME FROM (v2.3 §7.12 + §7.13)
+
+Recording F's two floaters. 0:08: a wet-tyre pickup beacon glowing
+INSIDE the mountain — pointAt seats a pickup at road height at
+(index, lateral), and where the route hugs a wall that point can be
+inside the hillside. 0:31: "the chalet floats on a white slab".
+
+§7.12, generator side: at placement, if terrain stands more than
+0.5 u over the pickup, it walks toward the centreline and then down
+the road until it is in the open, and never sits below terrain.
+Validator rule `pickup-buried` re-checks every world at load.
+
+§7.13: the _element plinth (the "kill all floaters" law) already
+carries every structure's masonry to the lowest ground under its own
+footprint — the recording predates it. What was missing was the
+spec's re-check: _element now records `baseY` (the lowest masonry) on
+placedElements, and validator rule `structure-hover` fails any base
+more than the plinth's own sink over its 12-point footprint ring.
+
+tests/test-pickupsurface.mjs: five worlds (both recording fixtures
+included), zero buried pickups, zero hovering structures, validator
+silent. Gates nature, patch13, phase4, containment green.
+
 ## r331 — THE STRIP TELLS THE TRUTH (v2.3 §6.1 / S1b, and 6.5 verified closed)
 
 Recording F's headline: "the player's dot on the field strip pinned at

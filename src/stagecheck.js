@@ -175,6 +175,37 @@ export function runStageValidator(game) {
     }
   }
 
+  // ---- v2.3 §7.12 (r332): no pickup inside the world's mass -------------
+  // (a pickup on a shelf road sits far ABOVE the valley floor and is fine;
+  // the violation is terrain standing over the beacon — recording F 0:08)
+  for (const p of game.pickups ?? []) {
+    const terr = t.terrainHeight?.(p.pos.x, p.pos.z);
+    if (Number.isFinite(terr) && terr > p.pos.y + 0.5) {
+      log('pickup-buried', { index: p.index, type: p.type,
+        overM: +(terr - p.pos.y).toFixed(1), fix: 'generator' });
+    }
+  }
+
+  // ---- v2.3 §7.13 (r332): no structure base hovering over terrain -------
+  // (the _element plinth carries every footprint to its lowest ground; this
+  // re-checks that promise the spec's way: base within 0.1 u of terrain at
+  // every footprint corner, with the plinth's own 0.25 sink as slack)
+  {
+    let hovers = 0, worst = 0;
+    for (const el of t.placedElements ?? []) {
+      if (!Number.isFinite(el.baseY)) continue;
+      let lowG = Infinity;
+      for (let a = 0; a < 12; a++) {
+        const th = a * Math.PI / 6;
+        const g = t.terrainHeight?.(el.x + Math.cos(th) * el.r, el.z + Math.sin(th) * el.r);
+        if (Number.isFinite(g) && g < lowG) lowG = g;
+      }
+      const hover = el.baseY - lowG;
+      if (hover > 0.35) { hovers++; if (hover > worst) worst = hover; }
+    }
+    if (hovers) log('structure-hover', { count: hovers, worstM: +worst.toFixed(1), fix: 'generator' });
+  }
+
   game._stageReport = V;
   return V;
 }
