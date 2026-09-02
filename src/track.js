@@ -18237,6 +18237,35 @@ export class Track {
         colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
       }
     }
+    // v2.3 §7.9 (r335): THE LIP WEARS ROCK. The pass above paints the WALL
+    // of a drop — the near-vertical vertices — but the flat shelf vertex at
+    // the top keeps its grass, and that shelf is what a driver sees:
+    // recording F (0:01, 0:30) shows the grass running to the edge with no
+    // visual change and the car driving straight over. So any vertex whose
+    // neighbour one cell out falls away past ~42° gets the template's own
+    // scree tone, scaled with the size of the fall — a rock band along
+    // every drop lip, on every palette, daylight included. Material change
+    // only; the geometry and the physics never move.
+    {
+      const scree = new THREE.Color(
+        this.T.terrainScree !== undefined ? this.T.terrainScree : this.T.terrainDirt);
+      for (let iz = 0; iz < W; iz++) {
+        for (let ix = 0; ix < W; ix++) {
+          const i = iz * W + ix;
+          const y0 = pos.getY(i);
+          let fall = 0;
+          if (ix + 1 < W) fall = Math.max(fall, y0 - pos.getY(i + 1));
+          if (ix > 0) fall = Math.max(fall, y0 - pos.getY(i - 1));
+          if (iz + 1 < W) fall = Math.max(fall, y0 - pos.getY(i + W));
+          if (iz > 0) fall = Math.max(fall, y0 - pos.getY(i - W));
+          if (fall < cell * 0.9) continue;
+          const k = Math.min(1, (fall - cell * 0.9) / (cell * 0.9)) * 0.8;
+          tmp.setRGB(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]);
+          tmp.lerp(scree, Math.max(0.35, k));
+          colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+        }
+      }
+    }
   }
 
   /** Shared top-lit rock geometry: a dodecahedron with a baked vertex-color
