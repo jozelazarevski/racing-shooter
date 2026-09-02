@@ -4161,6 +4161,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r331 — THE STRIP TELLS THE TRUTH (v2.3 §6.1 / S1b, and 6.5 verified closed)
+
+Recording F's headline: "the player's dot on the field strip pinned at
+0% for the whole 34 s, including a gate crossing." Root cause was not a
+frozen metric — `progress` ticks fine — but the strip's MAPPING: dots
+were normalized to the field's lo..hi span, so a car running last sat
+pinned at the left edge however far it drove. Eighth place rendered as
+a parked dot while the whole field moved together.
+
+Dots now read each car's OWN lap position (trackIndex/N — the spec's
+"fraction along the current segment" at strip resolution). Same DOM,
+same dot elements, appearance frozen; only the data is honest now.
+S1b: a scripted lap sweeps the player dot 2 -> 96 monotonically; all
+seven rival dots advance on their own progress.
+
+6.5 (wet state / toast spam) VERIFIED CLOSED, no code: the engine's
+wet state is already stage-wide (theme surface + ford timer) and both
+wet toasts are one-shot at GO+3.2 s. 30 s of scripted road-grass-road
+oscillation on a dry world emits zero wet/tyre status toasts
+(test-strip T3) — the recording-F per-sample WET TIRES spam has no
+emitter in this codebase.
+
+tests/test-strip.mjs (4 checks) green; hudfreeze (S9) and phase4
+fixtures green.
+
 ## r330 — THE FACE SHEDS THE CAR (v2.3 §3.3, and B1's paperwork closed)
 
 Recording F's fault 1 tail: "hangs on 60 to 70° walls". Measured first
