@@ -4161,6 +4161,27 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r335 — THE LIP WEARS ROCK (v2.3 §7.9 daylight half / P12)
+
+Recording F 0:01 and 0:30: "the grass shelf runs to the lip with no
+visual change and the car drives straight over." _slopeRock painted
+the WALL of a drop (steep vertices) but the flat shelf vertex at the
+top kept its grass — and the shelf is what a driver sees.
+
+New lip pass in _slopeRock: any near-terrain vertex whose neighbour
+one cell out falls away past ~42° is tinted toward the template's own
+`terrainScree`, scaled with the size of the fall (35-80%). Runs on the
+near and far patches alike; material change only, geometry and
+physics untouched, every palette, daylight included.
+
+Debug lesson worth its own line: THREE converts hex vertex colours to
+LINEAR space, so a probe comparing built colours against raw sRGB hex
+reads a working tint as absent — an hour of "the pass doesn't run"
+was the colour space. tests/test-droplip.mjs compares in linear:
+lips sit 3x closer to scree than flat ground on both fixture worlds
+(0.074 vs 0.240 and 0.052 vs 0.173). Screenshot check clean; gates
+nature, phase4, containment green.
+
 ## r334 — EVERY STAGE WEARS ITS OWN NAME (v2.3 §7.10 / R9)
 
 Fault 14's tail. Twelve real places still sat in the roster's display
