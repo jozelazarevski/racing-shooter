@@ -4161,6 +4161,28 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r338 — THE COMBO CHIP GOES DARK ON A FRESH GRID (phone report)
+
+Owner screenshot: SERPENT PASS grid, countdown "2", timer 0:00.0,
+score 0 — and "×1.5 COMBO" lit with a charged bar. Investigated the
+frame end to end first: grid orientation, tangents through the
+hand-drawn route's wrap (smooth, 3° to the gate) and the chase framing
+all measured correct — the anomaly is the chip.
+
+Root cause: the combo chip is DOM state as well as numbers.
+`_updateCombo` runs only on race frames, so the LAST race's lit chip —
+its 'on' class, its ×1.5 text, its bar width — rode through the
+results screen, the menu and the whole next countdown untouched.
+resetRace zeroed comboN/comboT but never the element. It now also
+strips the chip's classes, so a fresh grid starts dark and the first
+scoring event of the new race lights it honestly.
+
+test-strip gains T4 (lit chip -> resetRace -> dark), and its scripted
+lap learned to pay the missed-gate debt per hop (teleporting forward
+past the owed gate accrued the 4 s grace across hops until
+returnToGate yanked the dot backward mid-suite — a harness lesson,
+not a game bug). Gates hudfreeze, restart-stopped, containment green.
+
 ## r337 — ROCKFALL GETS ITS JUMP BACK (backlog #20)
 
 The item read "brow unreachable at launch speed under honest tyres";

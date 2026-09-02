@@ -44,6 +44,19 @@ const r = await p.evaluate(async () => {
   for (let s = 0; s < 40; s++) {
     const idx = Math.round((s / 40) * (N - 1));
     pl.placeAt(idx, 0, true);
+    pl.invuln = 9; pl.health = pl.maxHealth;   // rivals shoot; a kill-respawn would regress the dot
+    // hopping forward past the owed gate accrues the missed-gate grace
+    // across hops until returnToGate yanks the dot backward — pay the debt:
+    // owe the nearest gate ahead of each hop
+    if (g.route?.gates?.length) {
+      let best = g.route.gates[0], bd = 1e9;
+      for (const gt of g.route.gates) {
+        const d = (gt.si - idx + N) % N;
+        if (d < bd) { bd = d; best = gt; }
+      }
+      pl._nextGate = best.id;
+      g._gateMissT = 0;
+    }
     for (let k = 0; k < 20; k++) g.frame();
     seen.push(meLeft());
   }
@@ -78,7 +91,16 @@ const r = await p.evaluate(async () => {
   }
   g.hud.feed = hudFeed;
   const wetish = feeds.filter((x) => /WET|TYRE|TIRE|GRIP|SLICK/i.test(x));
-  return { t1, t2, t3: { toasts: feeds.length, wetish } };
+  // T4 (r338, phone report): a lit combo chip must not survive into the
+  // next race's grid — _updateCombo only runs on race frames, so the DOM
+  // has to be cleared by resetRace itself
+  g.styleBump?.(); g.styleBump?.();
+  for (let k = 0; k < 5; k++) g.frame();
+  const comboEl = document.getElementById('combo');
+  const litBefore = comboEl?.classList.contains('on') ?? null;
+  g.resetRace();
+  const litAfter = comboEl?.classList.contains('on') ?? null;
+  return { t1, t2, t3: { toasts: feeds.length, wetish }, t4: { litBefore, litAfter } };
 });
 
 check('T1  S1b: a scripted lap sweeps the player dot 0 -> 100%',
@@ -87,6 +109,8 @@ check('T2  rival dots advance on their own progress',
   r.t2.moved >= Math.min(5, r.t2.rivals), JSON.stringify(r.t2));
 check('T3  dry road-grass oscillation: zero wet/tyre toasts (6.5)',
   r.t3.wetish.length === 0, JSON.stringify(r.t3));
+check('T4  a lit combo chip goes dark on the next grid (r338)',
+  r.t4.litBefore === true && r.t4.litAfter === false, JSON.stringify(r.t4));
 check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();

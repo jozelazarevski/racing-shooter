@@ -10185,6 +10185,11 @@ class Game {
     this.fovKick = 0;
     this.enemySlowUntil = 0;
     this.comboN = 0; this.comboT = 0; this._lastRank = undefined; this._tauntT = -9;
+    // r338 (phone report, SERPENT PASS grid): the combo CHIP is DOM state as
+    // well as numbers. _updateCombo only runs on race frames, so the last
+    // race's lit chip — ×1.5, charged bar — rode through results, the menu
+    // and the whole next countdown as a leftover. A fresh grid starts dark.
+    document.getElementById('combo')?.classList.remove('on', 'hot');
     // race contracts: fresh slate + counters every race (picked in startRace)
     this.contracts = [];
     this.contractCredits = 0;
