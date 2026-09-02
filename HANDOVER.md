@@ -4161,6 +4161,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r339 — THE POD STAYS IN THE SEA (owner: "P the whale tho")
+
+SERPENT PASS's three whales were breaching out of the HILLSIDE, 27-63 u
+from the racing line, on ground at -1.8 to +0.1 against a -3 sea.
+Cause: _buildWhales places the pod off the coast line's seaward
+NORMAL, and the normal's sign is the a→b winding — the hand-tuned
+SERPENT PASS coast winds opposite to the roster's east-coast worlds,
+so "seaward" pointed inland.
+
+Whales are WATER-SEEKING now: a candidate spot must have terrain
+genuinely sunk below the waterline (margin scaled to the coast's own
+depth, so shallow-shelf worlds keep their pods) and stand 60+ u clear
+of the road; the placer tries the normal side, its mirror, then
+further out, and a spot that is never wet builds no whale — a missing
+whale is scenery, a beached one is a phone report.
+
+Found along the way and recorded, not changed: world 57's coast
+declares its waterline BELOW its own seabed (level -11, ground
+bottoming at -7) — its old pod surfaced from dry ground too; it now
+correctly fields none until that coast config is looked at.
+
+tests/test-whales.mjs green (SERPENT PASS pod at floor depth -13,
+63-120 u off the road; SEA CLIFF RUN's honest coast unchanged, five
+whales far out). Gates nature, water green. Staged screenshot shows
+the breach in open water with a sailboat for scale.
+
 ## r338 — THE COMBO CHIP GOES DARK ON A FRESH GRID (phone report)
 
 Owner screenshot: SERPENT PASS grid, countdown "2", timer 0:00.0,

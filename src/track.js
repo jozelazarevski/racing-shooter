@@ -24471,12 +24471,43 @@ export class Track {
     // `Math.random` is the SEEDED generator during a build (`withSeed` wraps
     // the whole construction), so a pod is in the same place every time you
     // open the world — same as every other scatter in this file.
+    // r339 (owner: "P the whale tho"): the pod is placed off the coast
+    // NORMAL, and the normal's sign is the a→b winding — SERPENT PASS's
+    // hand-tuned coast winds the other way round, so its three whales
+    // breached out of the hillside 27-63 u from the racing line. A whale
+    // is WATER-SEEKING now: a candidate spot must have terrain genuinely
+    // sunk below the sea (level − 2.5) and stand clear of the road; try
+    // the normal side, then its mirror, then further out on each. A spot
+    // that is never wet builds no whale — a missing whale is scenery, a
+    // beached one is a phone report.
+    // "genuinely sunk" is judged by the coast's OWN depth: a shallow shelf
+    // world (CLIFF KNOT's floor sits 2 under its level) must not lose its
+    // pod to a margin sized for deep water
+    const seaDepth = level - (C.floor ?? level - 10);
+    const wetBar = level - Math.min(2.5, Math.max(0.8, seaDepth * 0.5));
+    const wet = (x, z) => this.terrainHeight(x, z) < wetBar;
+    const clearOfRoad = (x, z) => {
+      for (let i = 0; i < N; i += 4) {
+        const c = this.center[i];
+        if ((c.x - x) * (c.x - x) + (c.z - z) * (c.z - z) < 60 * 60) return false;
+      }
+      return true;
+    };
     for (let k = 0; k < count; k++) {
       const t = (k + 0.7) / (count + 0.4);
       const along = t * L + (Math.random() - 0.5) * L * 0.18;
-      const out = 150 + Math.random() * 260;               // well past the beach
-      const x = C.a[0] + (abx / L) * along + nx * out;
-      const z = C.a[1] + (abz / L) * along + nz * out;
+      const out0 = 150 + Math.random() * 260;              // well past the beach
+      const bx = C.a[0] + (abx / L) * along;
+      const bz = C.a[1] + (abz / L) * along;
+      let x = null, z = null;
+      for (const side of [1, -1]) {
+        for (const out of [out0, out0 + 140, out0 + 280]) {
+          const cx = bx + nx * side * out, cz = bz + nz * side * out;
+          if (wet(cx, cz) && clearOfRoad(cx, cz)) { x = cx; z = cz; break; }
+        }
+        if (x !== null) break;
+      }
+      if (x === null) continue;
       const s = 5.5 + Math.random() * 3.5;
       // one merged body: nose, barrel, tail stock, dorsal, two fluke lobes
       const body = mergeBoxes([

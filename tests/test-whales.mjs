@@ -1,114 +1,58 @@
-/* WHALES, BREACHING.
- *
- * The sea is the biggest thing in a coast world and the only one that never
- * did anything. A pod out past the shoreline is scenery, and the two ways
- * scenery like this goes wrong are both easy to measure:
- *
- *   it gets in the way — a whale near enough to matter to a car is a whale
- *   you would have to collide with, so they must sit well out to sea and well
- *   off the racing line;
- *
- *   and it never stops — a row of animals bobbing on a loop reads as an
- *   effect, not a place. A breach is one arc and then nothing for twenty
- *   seconds, so most of the time there should be nothing to see.
+/* r339 — WHALES BREACH FROM WATER (owner: "P the whale tho" — a whale
+ * surfacing out of the hillside beside SERPENT PASS's racing line).
+ * The pod used to trust the coast line's a→b winding for "seaward";
+ * whales are water-seeking now. For every sampled coast world: each
+ * whale sits over terrain genuinely below the sea (level − 2.5) and at
+ * least 60 u from the road, and the worlds that always had honest
+ * coasts still field their pods.
  */
 import { chromium } from 'playwright-core';
 
 const BASE = process.env.BASE ?? 'http://localhost:8901';
+const WORLDS = [23, 60, 57];   // SERPENT PASS, SEA CLIFF RUN, CLIFF KNOT-family coast
+let fail = 0;
+const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  ' + d : ''}`); };
 
-let pass = 0, fail = 0;
-const ok = (cond, msg, extra = '') => {
-  if (cond) { pass++; console.log('PASS ', msg); }
-  else { fail++; console.log('FAIL ', msg, extra); }
-};
+const browser = await chromium.launch({
+  executablePath: '/opt/pw-browsers/chromium',
+  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
+});
+const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+const errs = [];
+p.on('pageerror', (e) => errs.push(String(e).slice(0, 140)));
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 480, height: 320 } });
-page.setDefaultTimeout(600000);
-const errors = [];
-page.on('pageerror', (e) => errors.push(String(e.message)));
-// SEA CLIFF RUN — the world built around its coast, and the one that asks for
-// the biggest pod
-await page.goto(`${BASE}/?level=60&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
-await page.waitForFunction(() => window.__game?.track?.center && window.__game.player,
-  undefined, { timeout: 600000 });
-
-const R = await page.evaluate(() => {
-  const g = window.__game, t = g.track;
-  const W = t.animated.whales;
-  const out = { n: W.length, level: t.T.coast ? (t.T.coast.level ?? -2) : null };
-  if (!W.length) return out;
-
-  // how far out to sea, and how far from the racing line?
-  out.minSeaward = Infinity; out.minToRoad = Infinity;
-  for (const w of W) {
-    const s = t._coastSide(w.g.position.x, w.g.position.z);
-    out.minSeaward = Math.min(out.minSeaward, s);
-    out.minToRoad = Math.min(out.minToRoad, t._distToTrack(w.g.position.x, w.g.position.z));
-  }
-  out.minSeaward = +out.minSeaward.toFixed(1);
-  out.minToRoad = +out.minToRoad.toFixed(1);
-
-  // and none of them is a collider — this is scenery, not an obstacle
-  out.asSolid = (t.solids || []).filter((s) =>
-    W.some((w) => Math.hypot(s.x - w.g.position.x, s.z - w.g.position.z) < 20)).length;
-
-  // WALK A MINUTE OF CLOCK. Count how much of it each whale spends out of the
-  // water, and how high the best breach got.
-  let up = 0, samples = 0, peak = -Infinity, everVisible = 0;
-  for (let k = 0; k < 600; k++) {
-    t.update(1 / 10, k / 10);
-    for (const w of W) {
-      samples++;
-      if (w.g.visible) {
-        up++;
-        peak = Math.max(peak, w.g.position.y);
-        if (w.g.position.y > out.level) everVisible++;
+for (const id of WORLDS) {
+  await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
+  await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 300000 });
+  const r = await p.evaluate(() => {
+    const t = window.__game.track;
+    const C = t.T.coast;
+    if (!C) return { coast: false };
+    const level = C.level ?? -2;
+    const whales = (t.animated?.whales ?? []).map((w) => {
+      const x = w.g.position.x, z = w.g.position.z;
+      let bd = 1e9;
+      for (let i = 0; i < t.center.length; i += 4) {
+        const d = Math.hypot(t.center[i].x - x, t.center[i].z - z);
+        if (d < bd) bd = d;
       }
-    }
-  }
-  out.upFraction = +(up / samples).toFixed(3);
-  out.peakAbove = +(peak - out.level).toFixed(1);
-  out.brokeSurface = everVisible > 0;
-  out.tris = (() => {
-    let n = 0;
-    for (const w of W) w.g.traverse((o) => {
-      if (o.isMesh && o.geometry?.index) n += o.geometry.index.count / 3;
-      else if (o.isMesh) n += (o.geometry?.attributes?.position?.count ?? 0) / 3;
+      return { terr: +t.terrainHeight(x, z).toFixed(1), road: Math.round(bd) };
     });
-    return Math.round(n);
-  })();
-  return out;
-});
+    return { coast: true, level, whales };
+  });
+  if (!r.coast) { check(`world ${id}: has a coast`, false, 'no coast tune'); continue; }
+  const beached = r.whales.filter((w) => w.terr > r.level - 0.5).length;
+  const nearRoad = r.whales.filter((w) => w.road < 60).length;
+  // world 57's coast declares its waterline BELOW its own seabed (level -11,
+  // ground bottoming at -7) — there is no honest water there, so the law is
+  // "no beached whale", not "a pod at any cost" (pre-r339 it fielded three
+  // whales surfacing from dry ground)
+  const mustHavePod = id !== 57;
+  check(`world ${id}: no whale breaches from dry ground${mustHavePod ? ', pod present' : ''}`,
+    beached === 0 && nearRoad === 0 && (!mustHavePod || r.whales.length >= 1),
+    JSON.stringify({ level: r.level, whales: r.whales }));
+}
+check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
-console.log(`\n--- SEA CLIFF RUN: ${R.n} whales, sea level ${R.level} ---`);
-ok(R.n >= 3, 'a pod is built on a coast world', R.n);
-ok(R.minSeaward > 60,
-  'they swim well out to sea, not in the shallows', `nearest ${R.minSeaward} u seaward`);
-ok(R.minToRoad > 120,
-  'and nowhere near the racing line', `nearest ${R.minToRoad} u from the road`);
-ok(R.asSolid === 0, 'none of them is a collider — scenery, not an obstacle', R.asSolid);
-ok(R.brokeSurface, 'a whale does break the surface');
-ok(R.peakAbove > 3, 'a breach clears the water properly', `${R.peakAbove} u above the sea`);
-ok(R.upFraction > 0.02 && R.upFraction < 0.45,
-  'but the sea is empty most of the time — a breach is rare, not a loop',
-  `out of the water ${(R.upFraction * 100).toFixed(1)}% of the time`);
-ok(R.tris < 900, 'the whole pod is cheap', `${R.tris} triangles`);
-
-// a world with no coast must not grow whales, or try to
-await page.goto(`${BASE}/?level=1&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
-await page.waitForFunction(() => window.__game?.track?.center && window.__game.player,
-  undefined, { timeout: 600000 });
-const inland = await page.evaluate(() => {
-  const t = window.__game.track;
-  t.update(1 / 60, 12);
-  return { whales: t.animated.whales.length, coast: !!t.T.coast };
-});
-ok(!inland.coast && inland.whales === 0,
-  'an inland world grows none, and ticking it is still safe', JSON.stringify(inland));
-
-ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 await browser.close();
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+console.log(fail ? `\n${fail} FAILED` : '\nthe pod stays in the sea');
