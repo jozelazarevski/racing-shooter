@@ -19583,8 +19583,24 @@ export class Track {
       // even though crests are excluded from pinches themselves (AEGEAN
       // BLUE: both piers at gi 112 in crest 65's fan). Prefer fan-clear
       // pinches for the gateways; a later pinch takes the slot.
+      // r354 (#65): ...and a GROUNDED pinch. On MOUNTAIN TO SEA the slot
+      // fell on an embankment — road ~20 u over the terrain — and the
+      // gatehouse stood on stilts (18 voussoir blocks 20.68 u over drawn
+      // ground on the pristine base too). A town gate stands on town
+      // ground: refuse a pinch whose pier feet would hang more than 3 u.
+      const gateGrounded = (s) => {
+        const c2 = this.center[s.mid], n2 = this.nrm[s.mid];
+        const lat2 = this.widthAt(s.mid) + 1.5 + 1.8 + 0.3;   // pier centre
+        for (const side of [1, -1]) {
+          const px2 = c2.x + n2.x * lat2 * side, pz2 = c2.z + n2.z * lat2 * side;
+          const gy2 = this._seatY ? this._seatY(px2, pz2) : this.terrainHeight(px2, pz2);
+          if (!Number.isFinite(gy2) || c2.y - gy2 > 3) return false;
+        }
+        return true;
+      };
       const gateSecs = (this._narrowSecs || []).filter((s) =>
-        !this._inCrestFanLat(s.mid, this.center[s.mid].x, this.center[s.mid].z));
+        !this._inCrestFanLat(s.mid, this.center[s.mid].x, this.center[s.mid].z)
+        && gateGrounded(s));
       for (const sec of gateSecs.slice(0, 2)) this._buildArchGateway(sec.mid, F);
     }
 
@@ -19643,11 +19659,16 @@ export class Track {
     const c = this.center[mid];
     const pierW = 2.6, pierD = 5.0;
     for (const side of [1, -1]) {
-      const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, clear, pierD), stone);
-      pier.position.set(side * lat, clear / 2, 0);
+      // r354 (#65): the pier reaches DOWN to its own ground — the site
+      // filter refuses drops over 3 u, and this closes the honest remainder
+      // (the §7.13 conform rule: no base edge or gap visible).
+      const p = this.pointAt(mid, lat * side);
+      const gy = this._seatY ? this._seatY(p.x, p.z) : this.terrainHeight(p.x, p.z);
+      const drop = Number.isFinite(gy) ? Math.max(0, Math.min(3.5, p.y - gy)) + 0.3 : 0.3;
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, clear + drop, pierD), stone);
+      pier.position.set(side * lat, clear / 2 - drop / 2, 0);
       pier.castShadow = pier.receiveShadow = true;
       g.add(pier);
-      const p = this.pointAt(mid, lat * side);
       this.solids.push({ x: p.x, z: p.z, r: 1.55, y: p.y, mat: 'stone' });
       this._addShadow(p.x, p.z, 2.4, p.y);
     }
@@ -19655,13 +19676,20 @@ export class Track {
     // Spacing matters — at nine blocks over a 35 u arc it read as loose rubble
     // rather than an arch, so they are laid nearly edge to edge.
     const span = lat - pierW * 0.5;
-    const RISE = 0.5;
+    // r354 (#65): A WIDE GATE GETS A SHALLOW ARCH. `span·RISE` scaled the
+    // ring's rise with the opening, and on the 2x-widened pinches that made
+    // a ~13 u semicircle whose crown blocks stood 20.7 u over the ground —
+    // the "floating arch" on MOUNTAIN TO SEA (the pre-2x apex, ~4.6 u of
+    // rise, is exactly where the float suite's budgets sit). Real wide
+    // gateways are segmental: the rise is CAPPED and the ring flattens.
+    const RISEH = Math.min(span * 0.5, 4.6);
     const VN = 16;
     for (let s = 0; s <= VN; s++) {
       const a = (s / VN) * Math.PI;
       const blk = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.5, pierD), stone);
-      blk.position.set(-Math.cos(a) * span, clear + Math.sin(a) * span * RISE, 0);
-      blk.rotation.z = a - Math.PI / 2;
+      blk.position.set(-Math.cos(a) * span, clear + Math.sin(a) * RISEH, 0);
+      // the wedge leans with the SEGMENTAL curve, not the semicircle's
+      blk.rotation.z = (a - Math.PI / 2) * Math.min(1, RISEH / (span * 0.5));
       blk.castShadow = true;
       g.add(blk);
     }
@@ -19671,7 +19699,7 @@ export class Track {
     const total = lat * 2 + pierW;
     const bays = Math.max(3, Math.round(total / F.unit));
     const bw = total / bays;
-    const yOver = clear + span * RISE + 2.8;
+    const yOver = clear + RISEH + 2.8;
     for (let s = 0; s < bays; s++) {
       const x = -total / 2 + bw * (s + 0.5);
       const over = new THREE.Mesh(new THREE.BoxGeometry(bw * 1.01, 5.4, pierD * 1.3), faceMat);
@@ -19691,7 +19719,7 @@ export class Track {
     // a lantern hung under the keystone
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6),
       new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }));
-    lamp.position.set(0, clear + span * RISE - 1.4, 0);
+    lamp.position.set(0, clear + RISEH - 1.4, 0);
     g.add(lamp);
     g.position.set(c.x, c.y, c.z);
     g.rotation.y = this.headingAt(mid);                 // local +x = road normal
