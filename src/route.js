@@ -12,7 +12,7 @@
  * the old checkpoint mask until step 4 hands the job over. R1/R2 gate this
  * step in tests/test-route.mjs.
  */
-import { ROAD_HALF } from './track.js';
+import { ROAD_HALF, ROUTE_SCALE } from './track.js';
 import { DRIVING } from './driving.js';
 
 /* §13 stage layouts — section-kind SEQUENCES per lap, in lap order starting
@@ -62,7 +62,25 @@ export class Route {
   constructor(track, levelId) {
     this.track = track;
     const R = DRIVING.route ?? {};
-    const kinds = LAYOUTS[levelId] ?? DEFAULT_LAYOUT;
+    let kinds = LAYOUTS[levelId] ?? DEFAULT_LAYOUT;
+    // r340: the lap is ROUTE_SCALE times longer, so the layout repeats to
+    // keep §7's gate spacing in its metre caps (mountain 150, general 300).
+    // The seam can join two street runs into one long one (IL BUDELLO ends
+    // street,street,street and begins the same) — §7.1's pacing rule says
+    // <= 3 consecutive street, so a seam that would run past 3 turns its
+    // first repeated gate into a trail gate.
+    if (ROUTE_SCALE >= 2) {
+      const doubled = [];
+      for (let r2 = 0; r2 < ROUTE_SCALE; r2++) {
+        for (let i = 0; i < kinds.length; i++) {
+          let k = kinds[i];
+          if (k === 'street' && i === 0 && doubled.length >= 3
+              && doubled.slice(-3).every((q) => q === 'street')) k = 'trail';
+          doubled.push(k);
+        }
+      }
+      kinds = doubled;
+    }
     const N = track.center.length;
     this.gates = kinds.map((kind, i) => {
       let si = Math.round((i * N) / kinds.length) % N;

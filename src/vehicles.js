@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
+import { ROAD_HALF, RIM_RADIUS, ROUTE_SCALE, mergeBoxes } from './track.js';
 import { glowTexture } from './textures.js';
 import { DRIVING } from './driving.js';
 
@@ -4800,14 +4800,23 @@ export class EnemyCar extends Car {
     // longer own the error rate — the DRIVER does. Two kinds, per spec:
     // run 1-3 m wide, or brake 10% late; recover on line either way.
     if (g.raceTime > 5) {
+      // r340: a corner CLASS is a radius, and every radius doubled with the
+      // 2x lap — the fixed curvature gates saw no corners at all (zero
+      // mistakes across a full airace batch) and the scan window, in
+      // samples, covered twice the road. Thresholds scale by ROUTE_SCALE;
+      // the window is metres.
+      const segL2 = t.segLen ?? 3;
+      const mk0 = Math.max(4, Math.round(25 / segL2));
+      const mk1 = Math.round(105 / segL2);
+      const mks = Math.max(2, Math.round(16 / segL2));
       let curvNear = 0;
-      for (let k = 10; k <= 40; k += 6) curvNear = Math.max(curvNear, t.curvature[(this.trackIndex + k) % N]);
+      for (let k = mk0; k <= mk1; k += mks) curvNear = Math.max(curvNear, t.curvature[(this.trackIndex + k) % N]);
       // At PACE is an absolute, not a fraction of maxSpeed: rivals are
       // corner-limited (~25 u/s here) while maxSpeed rides the kit lean to
       // ~69, so the old 0.5×maxSpeed gate was true 2 frames in 360 and no
       // driver ever made a mistake (measured, r313 probe).
-      const approaching = t.curvature[this.trackIndex] < 0.012 && curvNear > 0.022
-        && Math.abs(v) > 16;
+      const approaching = t.curvature[this.trackIndex] < 0.012 / ROUTE_SCALE
+        && curvNear > 0.022 / ROUTE_SCALE && Math.abs(v) > 16;
       if (approaching && this._errArmed) {
         this._errArmed = false;
         // §5.1 cutChance: this corner, this driver may hug the inside a
@@ -4822,12 +4831,12 @@ export class EnemyCar extends Car {
           this._mistakeCd = 6 + Math.random() * 3;
           this._mistakes++;
           let dirSum = 0; // "wide" = outside of the corner being flubbed
-          for (let k = 10; k <= 40; k += 6) dirSum += t._raceLine[(this.trackIndex + k) % N];
+          for (let k = mk0; k <= mk1; k += mks) dirSum += t._raceLine[(this.trackIndex + k) % N];
           this._errWideDir = dirSum > 0 ? -1 : 1;
           g.telemetry?.log('mistake', { rival: this.persona, corner: this.trackIndex,
             kind: this._errKind });
         }
-      } else if (!approaching && curvNear < 0.02) {
+      } else if (!approaching && curvNear < 0.02 / ROUTE_SCALE) {
         this._errArmed = true; // clean straight: armed for the next corner
       }
     }

@@ -40,9 +40,17 @@ const runStage = async (levelId, name) => {
   if (process.env.EXP) {   // sweep override for the paceCornerExp calibration
     await p.evaluate((x) => { window.__DRIVING.ai.paceCornerExp = x; }, Number(process.env.EXP));
   }
+  // r340: the lap is ROUTE_SCALE times longer. Every budget in this suite
+  // that is denominated "per lap" (overtakes, collisions) or anchored at a
+  // wall-clock epoch calibrated on the old lap (GO+45 = "the field has
+  // sorted") measures behaviour per metre of racing — at 2x the same conduct
+  // mechanically doubles the per-lap count and 45 s is mid-launch-sort. The
+  // suite's frame of reference scales; the instantaneous rules (>3 within
+  // 20 m, SETUP before COMMIT, the GO+20 token law) stay absolute.
+  const RS = await p.evaluate(async () => (await import('./src/track.js')).ROUTE_SCALE ?? 1);
   const races = [];
   for (let raceN = 0; raceN < RACES; raceN++) {
-    const r = await p.evaluate(() => {
+    const r = await p.evaluate((RS) => {
       const g = window.__game, t = g.track, N = t.center.length;
       g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
       g.resetRace(); g.startRace?.();
@@ -55,11 +63,14 @@ const runStage = async (levelId, name) => {
       // rival-player COLLISIONS: a rival's BULLET also arrives as
       // player.damage(4.5, shooter) — §5.6 counts contact, so only damage
       // with the rival physically alongside (< 5 u) is a collision
-      let rpHits = 0;
+      let rpHits = 0, rpHitsLate = 0;
       const origDmg = g.player.damage.bind(g.player);
       g.player.damage = (amt, src) => {
         if (src && g.enemies.includes(src) && amt >= 2
-            && src.pos.distanceToSquared(g.player.pos) < 25) rpHits++;
+            && src.pos.distanceToSquared(g.player.pos) < 25) {
+          rpHits++;
+          if (g.raceTime > 45 * RS) rpHitsLate++;
+        }
         return origDmg(amt, src);
       };
       let packTicks = 0, rivalPackTicks = 0, latePackTicks = 0,
@@ -68,7 +79,7 @@ const runStage = async (levelId, name) => {
       const gate0 = g.route?.gates?.[0];
       const playerLapTimes = [];
       let frames = 0;
-      const CAP = 150 * 60;
+      const CAP = 150 * 60 * RS;
       while (frames < CAP) {
         // ---- expert stand-in (test-difficulty's driver, on the analog stick)
         const car = g.player;
@@ -133,8 +144,9 @@ const runStage = async (levelId, name) => {
         }
         // sampled metrics at 4 Hz. Q12's own words except "lap 1 turn 1":
         // at race pace turn 1 arrives ~10-14 s in and its sort-out runs a
-        // few seconds past GO+15, so the audit window opens at 20.
-        if (frames % 15 === 0 && now > 20) {
+        // few seconds past GO+15, so the audit window opens at 20 — turn 1
+        // sits at a lap FRACTION, so the epoch scales with ROUTE_SCALE.
+        if (frames % 15 === 0 && now > 20 * RS) {
           // Q12 pack: any car with 3+ OTHERS within 20 m. Split by whether
           // the PLAYER is in the cluster: a slow reference player being
           // filed past collects the whole field around itself (measured on
@@ -152,7 +164,7 @@ const runStage = async (levelId, name) => {
             }
             if (close >= 3) {
               if (hasYou) packTicks++;
-              else { rivalPackTicks++; if (now > 45) latePackTicks++; }
+              else { rivalPackTicks++; if (now > 45 * RS) latePackTicks++; }
               break;
             }
           }
@@ -217,23 +229,24 @@ const runStage = async (levelId, name) => {
         overtaken: overtakenOnPlayer,
         overtakenPerLap: laps > 0 ? +(overtakenOnPlayer / laps).toFixed(1) : overtakenOnPlayer,
         rpHitsPerLap: laps > 0 ? +(rpHits / laps).toFixed(1) : rpHits,
+        rpHitsLate,
         commits: commits.length, commitNoSetup, earlyAcq, mistakes, pressGap: press,
       };
-    });
+    }, RS);
     races.push(r);
     console.log(`  ${name} race ${raceN + 1}: spread ${r.spread}s (${r.done}/8 lap1, P${r.playerRank}), `
       + `rivalPack ${r.rivalPackTicks} (+${r.packTicks} w/player), gantry ${r.gantryTicks}, `
-      + `overtaken/lap ${r.overtakenPerLap}, hits/lap ${r.rpHitsPerLap}, `
+      + `overtaken/lap ${r.overtakenPerLap}, hits/lap ${r.rpHitsPerLap} (${r.rpHitsLate} late), `
       + `commits ${r.commits} (${r.commitNoSetup} orphan), earlyAcq ${r.earlyAcq}, mistakes ${r.mistakes}`);
   }
   await p.close();
-  return { races, errs };
+  return { races, errs, RS };
 };
 
 const stages = [[1, 'PINE VALLEY'], [4, 'CANYON RUN']];
 const all = [];
 for (const [id, name] of stages) {
-  const { races, errs } = await runStage(id, name);
+  const { races, errs, RS } = await runStage(id, name);
   all.push(...races);
   const okSpread = races.filter((r) => r.spread >= 8 && r.spread <= 25).length;
   check(`Q11 ${name}: lap-1 P1-P8 spread in [8,25] s in most races`,
@@ -248,12 +261,12 @@ for (const [id, name] of stages) {
   // loosely so a real breakdown still fails).
   // fraction-gated like the spec's own Q11 ("in >= 16 of 20"): single races
   // roll dice on mistakes and battles; the batch carries the verdict
-  check(`Q12 ${name}: no >3-rival 20 m pack once the field has sorted (GO+45 on)`,
-    races.filter((r) => r.latePackTicks <= 8).length >= Math.ceil(races.length * 0.66),
+  check(`Q12 ${name}: no >3-rival 20 m pack once the field has sorted (GO+${45 * RS} on)`,
+    races.filter((r) => r.latePackTicks <= 8 * RS).length >= Math.ceil(races.length * 0.66),
     `late rival ticks: ${races.map((r) => r.latePackTicks).join(', ')} `
     + `(early sorting: ${races.map((r) => r.rivalPackTicks - r.latePackTicks).join(', ')})`);
-  check(`Q12 ${name}: a swarm around a slow player still disperses (< 45 s total)`,
-    races.every((r) => r.packTicks <= 180),
+  check(`Q12 ${name}: a swarm around a slow player still disperses (< ${45 * RS} s total)`,
+    races.every((r) => r.packTicks <= 180 * RS),
     `player-inclusive ticks: ${races.map((r) => r.packTicks).join(', ')}`);
   check(`Q13 ${name}: every COMMIT has its SETUP >= 0.3 s prior`,
     races.every((r) => r.commitNoSetup === 0),
@@ -261,8 +274,8 @@ for (const [id, name] of stages) {
   // A front-running player (lap-1 rank <= 2) must see 0-3 passes per lap; a
   // mid-pack or slow one is passed by each faster rival plus limited churn
   // (<= 10 total — beyond that is the yo-yo the state machine prevents)
-  check(`Q13 ${name}: player overtaken <= 3/lap up front (<= 10 total in the pack)`,
-    races.every((r) => (r.playerRank <= 2 ? r.overtakenPerLap <= 3 : r.overtaken <= 10)),
+  check(`Q13 ${name}: player overtaken <= ${3 * RS}/lap up front (<= ${10 * RS} total in the pack)`,
+    races.every((r) => (r.playerRank <= 2 ? r.overtakenPerLap <= 3 * RS : r.overtaken <= 10 * RS)),
     races.map((r) => `P${r.playerRank}:${r.overtaken}tot/${r.overtakenPerLap}perlap`).join(', '));
   check(`Q14 ${name}: <= 1 distinct rival acquires the player before GO+20`,
     races.every((r) => r.earlyAcq <= 1),
@@ -273,8 +286,8 @@ for (const [id, name] of stages) {
   // the spec's <= 1 binds the pace-matched case (PINE, rank 1: measured 0);
   // embedded mid-pack every contact is ram-capped at 8 hull and bounded.
   // Fraction-gated: a single filing-past race rolls hot dice.
-  check(`§5.6 ${name}: <= 1 rival-player collision per lap (<= 5 in mid-pack traffic)`,
-    races.filter((r) => r.rpHitsPerLap <= (r.playerRank <= 2 ? 1 : 5)).length
+  check(`§5.6 ${name}: <= ${1 * RS} rival-player collision per lap (<= ${5 * RS} in mid-pack traffic)`,
+    races.filter((r) => r.rpHitsPerLap <= (r.playerRank <= 2 ? 1 : 5) * RS).length
       >= Math.ceil(races.length * 0.66),
     races.map((r) => `P${r.playerRank}:${r.rpHitsPerLap}`).join(', '));
   check(`${name}: no page errors`, errs.length === 0, errs.slice(0, 2).join(' | '));
