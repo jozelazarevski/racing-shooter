@@ -2685,7 +2685,12 @@ export class Car {
       // and the angle parks under the 65° spin line. Yaw away from the
       // slide (counter-steer) is never touched, and without the handbrake
       // nothing here runs — the earned spin stays earnable.
-      if (inputs.drift && Math.abs(vl) > 0.01) {
+      // PLAYER ONLY, same precedent as the over-budget law below: the AI
+      // plans within the budget and its errSlide handbrake is a recovery
+      // look, not a drift ask — the ceiling's carry math priced against
+      // the rival's near-zero lag over-rotated their slides (airace Q12
+      // measured the field re-packing on CANYON after r341).
+      if (inputs.drift && this === this.game.player && Math.abs(vl) > 0.01) {
         const intoDir = -Math.sign(vl);
         const into = dTheta * intoDir;
         const maxInto = Math.max(0, (DRIVING.driftBetaMax ?? 1.0) - beta)
