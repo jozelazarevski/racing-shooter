@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r346 — THE WET TIRES "REGRESSION" WAS THE GAME BEING RIGHT (suite-only, no tag)
+
+Filed as a 6.5 toast regression; the bisect (green r339, red r340) and
+three instrumented passes say otherwise. test-strip's T3 teleports the
+player through 30 blind hops on REDWOOD RAMPAGE — r340's river re-plan
+put a FORD dead on hop 17's spot (distance 0 u) and ran the river's
+valley under two more stretches the hops DRIVE into (car at terr −11,
+road along the valley floor, wet timer live). Every toast was honest
+water, once per state change, cooldown respected — the wet system's own
+"ask the WATER, not a list of crossings" doctrine working as written.
+
+The real defects were the SUITE's, both fixed:
+- test-strip had NO process.exit — it printed "1 FAILED" and exited 0
+  since it was written (r331). Every batch's "strip rc=0" since proved
+  nothing. It gates now.
+- The T3 fixture asks the game's own water question (t.waterAt) along
+  each hop's whole one-second path, both verges and the carriageway —
+  the first two proxies (ford list, verge elevation) each measured wrong
+  in a different way before the honest one landed.
+
+Lesson for the ledger: a suite that cannot fail is worse than no suite —
+audit the other suites' exit wiring when convenient.
+
 ## r345 — OFF THE ROUTE IS A CHOICE, NOT A CRIME (owner: "Don't reset the car when I go off route")
 
 §3.6c OWNER OVERRIDE, recorded in CLAUDE.md beside 3.4a/3.6b: the

@@ -225,3 +225,6 @@ check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe world holds the car, and the camera keeps its distance');
+
+// r346: the verdict must reach the exit code (the test-strip lesson).
+process.exit(fail ? 1 : 0);
