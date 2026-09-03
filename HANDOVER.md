@@ -4193,6 +4193,13 @@ the one that matters is CLIFF KNOT's r1.6 at lat 2.1, IN the
 carriageway; GLACIER COL's is a logpile element square in a fan). src
 tags on bore walls / culvert furniture are the new census handles.
 
+RIDE-ALONG (the re-site's own fallout, caught by the gate): FALKEN
+RIDGE's bore moved 92-108 -> 112-128 and the raised ridge's steep foot
+ran under a farm spur's fence line — five posts seated on the ANALYTIC
+curve floated 0.8-1.3 u over the drawn mesh chord. The spur builder
+seats on _seatY now (the r286 "the picture is the mesh" convention);
+nature and river fully green after.
+
 ## r342 — THE ROSTER ASKS FOR THE GARAGE (owner: "I need to be forced to buy upgrades. Now I am not. And that is a gap.")
 
 THE GAP, measured: rival machines are catalogue stats at a flat 0.96

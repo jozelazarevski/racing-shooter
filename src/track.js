@@ -18168,7 +18168,12 @@ export class Track {
       /** p0 = spur mouth, (ux,uz) = along the spur, (px,pz) = across it. */
       place: (p0, ux, uz, px, pz, len, roadY, tan) => {
         const rot = Math.atan2(ux, uz);
-        const gy = (x, z) => this.terrainHeight(x, z);
+        // r343: SEAT ON THE GROUND THE PLAYER SEES (_seatY, the r286
+        // convention), not the analytic curve. Surfaced when the FALKEN
+        // RIDGE bore re-sited and its ridge's steep foot ran under this
+        // spur's fence line: five posts seated on the analytic curve
+        // floated 0.8-1.3 u over the drawn mesh chord.
+        const gy = (x, z) => (this._seatY ? this._seatY(x, z) : this.terrainHeight(x, z));
         // --- cattle grid: five bars laid across the mouth ---
         for (let k = 0; k < 5; k++) {
           const f = 2.0 + k * 0.85;
