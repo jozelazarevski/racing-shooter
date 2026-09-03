@@ -4161,6 +4161,47 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r349 — THE LAST FOUR EMITTERS (kicker-fan residue closed, #55)
+
+The r343 sweep left ~10 unculled kicker-landing records on 4-6 worlds
+with their emitters unidentified. The break in the case: "unculled" in
+the report means cullSolid found NO im/inst handle — these are BARE
+records ({x, z, r, y, mat} and nothing else), so dumping every field
+each record carries (tools-scratch/dbg-kickerid3.mjs) narrowed the
+search to bare-push sites, and each record's exact r value named its
+line:
+
+- CLIFF KNOT ×6 (r 1.50, one straight line, spacing 3.594): the
+  PIAZZA's raised-plate retaining-face row — RS = 1.5, spacing
+  RS·2.4 = 3.6, the arithmetic signature. Fix: piazza SITE SELECTION
+  skips fan stations (the face cannot be left unregistered without a
+  penetrable drawn plate, so the square moves instead — the hunt
+  already walks ±140 samples).
+- AEGEAN BLUE ×2 (r 1.55, both sides of one gi): _buildArchGateway
+  piers. A pinch can sit inside an UPSTREAM crest's fan even though
+  crests are excluded from pinches. Fix: gateway slots prefer
+  fan-clear pinches (filter before slice(0, 2)).
+- HARBOR QUAY ×1 (r exactly 1.5, irregular spot): the seafront quay
+  CANNON. Fix: the gun's nudge loop rejects fan spots like it already
+  rejects road spots; a gun with nowhere clear is not built.
+- OLIVE COAST ×1 (r 2.769 — a computed value): NOT the sea rocks
+  (first guess; guard added anyway for shallow solid-grade stacks) but
+  the HERO BOULDER — _stoneFit shrank 3.915 to 2.769 to clear the
+  carriageway, at _seatY 27.65 (dy −1.4 from the road). Fix: hero
+  candidates re-roll until fan-clear; none clear → no hero.
+
+All guards use r343's _inCrestFanLat (crests build at 6636, before
+every dressing builder, so the guards are live). After: dbg-kickerid3
+reads 0 residue on all six flagged worlds; features survive (AEGEAN
+BLUE keeps 2 piers at a later pinch, CLIFF KNOT keeps 2 piazzas,
+HARBOR QUAY keeps its guns, OLIVE COAST keeps a hero).
+
+ALSO: test-final-integration is still broken AFTER the r348 BASE fix —
+its waitForFunction calls pass {timeout} as Playwright's ARG slot and
+its 78-world boot loop needs 2x budgets; test-menu-noreset needs to
+enter a chapter room before clicking a world card (task #63, both
+broken on pristine r344 too).
+
 ## r348 — THE FINALE (CP2: chapters end with an event)
 
 CAREER_PATH.md's second rung. The LAST world of each chapter (career

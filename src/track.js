@@ -13009,6 +13009,14 @@ export class Track {
       // last road defect that world had. The shoulder lump beside it reaches
       // 1.1 scales further out, so the clearance is asked for the pair.
       if (!this._clearsRoad(bx, bz, sscale * 1.7, 0.6)) continue;
+      // r349 (#55): a shallow, solid-grade stack downstream of a kicker is a
+      // wall a flying car lands on (OLIVE COAST: r 2.77 at lat 14.2 in a
+      // landing fan). Only the reachable-and-solid class defers; deep-water
+      // scenery stacks stand wherever the shore wants them.
+      if (dn <= 24 && sscale >= 2) {
+        const sgi = this.nearestIndex ? this.nearestIndex({ x: bx, z: bz }, null) : 0;
+        if (this._inCrestFanLat(sgi, bx, bz)) continue;
+      }
       srTaken.push([du, dn]);
       iq.setFromAxisAngle(iup, hsh2(cand + 4.1) * Math.PI * 2);
       im4.compose(new THREE.Vector3(bx, y - sscale * 0.45, bz), iq,
@@ -14610,6 +14618,12 @@ export class Track {
         for (const i of [(want0 + d) % N, (want0 - d + N) % N]) {
           if (this._circDist(i, 0) < 60) continue;       // not over the grid
           if (this.curvature[i] > 0.02) continue;        // a square is not on a bend
+          // r349 (#55): nor downstream of a kicker — a raised square's
+          // retaining face is a row of hard stones (CLIFF KNOT: six RS-1.5
+          // records in one landing fan at lat 12.8), and the face cannot be
+          // left unregistered without leaving the drawn plate penetrable.
+          // The hunt simply keeps walking to a fan-clear station.
+          if (this._inCrestFanLat(i, this.center[i].x, this.center[i].z)) continue;
           for (const side of [1, -1]) {
            for (const tier of TIERS) {
             const D = D0 * tier, W = W0 * tier;
@@ -15881,7 +15895,12 @@ export class Track {
       for (const dv of [0, -3, 3, -6, 6, -9]) {
         for (const du of [0, -5, 5, -10, 10]) {
           const c = at(cn[0] + du, -19 + dv);
-          if (this._clearsRoad(c.x, c.z, 1.5, 0.5)) { p = c; break; }
+          // r349 (#55): ...and not in a kicker landing fan either (HARBOR
+          // QUAY parked one at lat 14.6 downstream of a crest) — same rule
+          // as the road, the gun nudges on or is not built
+          const cgi = this.nearestIndex ? this.nearestIndex(c, null) : 0;
+          if (this._clearsRoad(c.x, c.z, 1.5, 0.5)
+            && !this._inCrestFanLat(cgi, c.x, c.z)) { p = c; break; }
         }
         if (p) break;
       }
@@ -19510,7 +19529,13 @@ export class Track {
     // player has now pointed at it twice as the building they see
     // everywhere. Worlds that do not want it say so.
     if (this.T.archGates !== false) {
-      for (const sec of (this._narrowSecs || []).slice(0, 2)) this._buildArchGateway(sec.mid, F);
+      // r349 (#55): a pinch can sit inside an UPSTREAM crest's landing fan
+      // even though crests are excluded from pinches themselves (AEGEAN
+      // BLUE: both piers at gi 112 in crest 65's fan). Prefer fan-clear
+      // pinches for the gateways; a later pinch takes the slot.
+      const gateSecs = (this._narrowSecs || []).filter((s) =>
+        !this._inCrestFanLat(s.mid, this.center[s.mid].x, this.center[s.mid].z));
+      for (const sec of gateSecs.slice(0, 2)) this._buildArchGateway(sec.mid, F);
     }
 
     // ---- 4: the campanile ----
@@ -22754,9 +22779,25 @@ export class Track {
     if (T.heroRock === false) return;
     const fallbackP = this.pointAt((N * 0.42) | 0, WALL_OFF + 7);
     const heroP = T.cliffWalls ? this.pointAt(48, -(WALL_OFF + 5.5)) : null;
-    const hp = heroP
-      ? { x: heroP.x, z: heroP.z }
-      : (this._trackSidePos(14, 18) || { x: fallbackP.x, z: fallbackP.z });
+    // r349 (#55): the hero stands close to the line BY DESIGN, so a spot
+    // downstream of a kicker turns it into a landing wall (OLIVE COAST:
+    // its _stoneFit-shrunk r 2.77 sat at lat 14.2 inside a fan). Walk the
+    // candidates until one is fan-clear; a hero with no clear ground is
+    // not built — dressing yields to landing zones, as everywhere since
+    // r344.
+    const heroCands = [];
+    if (heroP) heroCands.push({ x: heroP.x, z: heroP.z });
+    for (let tr = 0; tr < 7; tr++) {
+      const c = this._trackSidePos(14, 18);
+      if (c) heroCands.push({ x: c.x, z: c.z });
+    }
+    heroCands.push({ x: fallbackP.x, z: fallbackP.z });
+    let hp = null;
+    for (const c of heroCands) {
+      const hgi = this.nearestIndex ? this.nearestIndex(c, null) : 0;
+      if (!this._inCrestFanLat(hgi, c.x, c.z)) { hp = c; break; }
+    }
+    if (!hp) return;
     const hero = new THREE.Mesh(this._topLitRockGeo(1), rockMat);
     hero.scale.set(4.6, 3.3, 4.1);
     hero.rotation.y = 1.3;
