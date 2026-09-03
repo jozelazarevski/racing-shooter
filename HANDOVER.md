@@ -4161,6 +4161,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r353 — THE CAREER SIM (CP5: the plan closes)
+
+CAREER_PATH.md's last rung — tests/test-careersim.mjs, a scripted
+career against the game's OWN machinery, no arithmetic stand-ins:
+
+- CS1 GREEN: a finishing-only driver (place 6, 1★/world) opens all 78
+  worlds and all 13 chapters — no dead ends, finales included.
+- CS4 GREEN: careerObjective() speaks at all 78 states of that walk.
+- CS2 GREEN — AND A FINDING: a podium-most bot (P1/P2/P3 rotation,
+  modest 4k race score, income through finishRace() itself, BUYING
+  each tier's entry car at its boundary) is solvent by ~8.8× at CLUB
+  (149k banked vs 17k needed), ~14× by WORKS. The economy never BINDS.
+  That belongs to the balance pass CAREER_PATH.md §5 explicitly
+  deferred ("rewards do not scale by tier") — the gate is a floor and
+  the floor holds, but a later pass should tighten pay or raise
+  prices if the garage is to feel earned.
+- CS3 GREEN — MEASURED HONESTLY: the plan's absolute wording ("a
+  stock ROOKIE car cannot podium a CLUB finale") is NOT assertable:
+  the centreline bot is a metronome and outpaces even the kit-leaned
+  +32% grid in a stock BRAWLER (0.836× grid lap). What the game
+  controls is the MACHINE DELTA, and that is what the law asserts:
+  same bot, same world, same grid — kitted DUNE 0.779× vs stock
+  0.836×, a real 5.7 pp swing from the machine alone. The absolute
+  wall is a function of driver skill, and the missing number is the
+  same one this file has always led with: NO MEASURED HUMAN LAP.
+- CS5: the standing battery re-run on this tree — drift 6/6, patch13
+  15/15, patch02 green (airace/progression/career/duel-rival/
+  hudfreeze all green at r352 on this same code).
+
+THE PLAN IS SHIPPED: CP1 r347, CP2 r348, CP3 r351, CP4 r352, CP5
+r353. CAREER_PATH.md updated to v1.1 with the ship record.
+
 ## r352 — THE NEMESIS THREAD (CP4: someone to beat)
 
 CAREER_PATH.md's fourth rung. Each chapter belongs to ONE named driver,

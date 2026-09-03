@@ -1,5 +1,11 @@
 # CAREER_PATH.md — the progression path, planned
 
+Version 1.1. SHIPPED: CP1 r347 (signpost) · CP2 r348 (finales +
+trophies) · CP3 r351 (machine ladder) · CP4 r352 (nemesis thread) ·
+CP5 r353 (career sim gate, tests/test-careersim.mjs — CS3 asserts the
+MACHINE DELTA, see the suite header; CS2 measured ~8.8× solvent,
+handed to the deferred balance pass of §5).
+
 Version 1.0 (r345 planning). Owner request: "I still miss a career
 progression path — Plan this out."
 
