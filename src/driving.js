@@ -278,6 +278,22 @@ export const DRIVING = {
     // roster's spread; the exponent calibrates the dilution away. Swept in
     // r313 against Q11's [8, 25] s lap-1 band.
     paceCornerExp: 6,
+    // r342 (owner: "Opponents should have progressing in the tracks. Like
+    // this I need to be forced to buy upgrades. Now I am not. And that is
+    // a gap."): THE ROSTER RAMP. Rival machines were catalogue stats at a
+    // flat 0.96 handicap — identical hardware on world 1 and world 78, so
+    // the garage economy had nothing to push against once a world's two
+    // feat gates were met. The grid now gets quicker with roster position:
+    // top speed × (1 + progRampPct·prog), corner budget × ramp² (corner
+    // SPEED goes as sqrt(aLat), so the ramp reaches the corners at the
+    // same rate as the straights). prog is the world's index over the
+    // roster; free roam and missions are exempt like the kit lean. At 0.10
+    // the last chapter's grid runs +10% — past the stock car, inside a
+    // kitted one's reach (engine 5 nets +10% over the parity rule, tires 5
+    // +9.5% corner speed). EASY keeps half the ramp: casual players still
+    // finish the campaign; NORMAL/HARD are forced to the garage.
+    progRampPct: 0.10,
+    progRampEasyMul: 0.5,
   },
 };
 

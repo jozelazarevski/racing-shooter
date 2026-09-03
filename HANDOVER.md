@@ -4161,6 +4161,36 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r342 — THE ROSTER ASKS FOR THE GARAGE (owner: "I need to be forced to buy upgrades. Now I am not. And that is a gap.")
+
+THE GAP, measured: rival machines are catalogue stats at a flat 0.96
+handicap — identical hardware on world 1 and world 78. The only pressure
+was the tier knob (global) and the kit lean (binary, two feat gates per
+world). Nothing progressed with the roster, so a stock car that met a
+world's two gates cruised the whole campaign.
+
+THE RAMP: rosterProg() = world index / 77, exempt in free roam and
+missions like the kit lean. Rivals get maxSpeed × (1 + progRampPct·prog)
+and corner budget × ramp² (corner speed goes as sqrt(aLat)), and the
+narrow-road pinch cap carries the ramp like it carries the persona's
+pace. progRampPct 0.10, EASY at progRampEasyMul 0.5. Composes with the
+tier, the engine-parity rule (+2%/player engine level) and the kit lean;
+the 0.96 showroom guard is deliberately outgrown late-roster — that is
+what the garage is for. Sizing: engine 5 nets the player +10% over
+parity, tires 5 +9.5% corner speed — a full kit covers the +10% grid
+with skill as the margin; a stock car gives it away.
+
+MEASURED (tests/test-progression.mjs, 7/7): ramp exactly 1 on world 1
+(every suite tuned on the fixture worlds untouched), 1.100 on world 78,
+1.050 on EASY, free roam 0 — and the stopwatch: GLACIER COL (prog 0.84)
+rival lap-1 mean 77.0 -> 73.3 s, +4.7%, same grid ramp off vs on.
+
+THE HONEST NULL: on world 78 (Riviera streets) +10% top and +21% corner
+budget moved mean rival speed 0% — the field there is EXECUTION-bound
+(traffic, building gaps), and so is the player. Streets equalize by
+design; the ramp expresses where the road opens. The stopwatch law
+therefore measures a late OPEN world, not the last street.
+
 ## r341 — A HELD DRIFT HOLDS ITS ANGLE (owner: "Drift is spinning the car way too much")
 
 MEASURED FIRST (tools-scratch/driftspin.mjs, dbg-driftspin/driftlaw):

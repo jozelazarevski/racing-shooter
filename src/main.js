@@ -7399,6 +7399,17 @@ class Game {
     return 1 + 0.32 * (1 - this.kitReady());
   }
 
+  /** r342 — how far through the ROSTER this world sits, 0 (first) to 1
+   *  (last). The rival ramp reads it (DRIVING.ai.progRampPct): the grid
+   *  gets quicker with roster position, which is what makes the garage a
+   *  requirement instead of a museum. Free roam and missions are exempt
+   *  for the same reason the kit lean exempts them — no grid to lose to. */
+  rosterProg() {
+    if (this.freeRoam || this.missionMode) return 0;
+    const n = LEVELS.length;
+    return n > 1 ? THREE.MathUtils.clamp((this.levelIndex ?? 0) / (n - 1), 0, 1) : 0;
+  }
+
   /** THE OTHER HALF OF THE LOCK, AND THE HALF THAT MAKES IT A LOCK.
    *
    *  A quicker grid alone is a difficulty knob: you lose by more. A lock has to
