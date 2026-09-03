@@ -308,6 +308,12 @@ export const DRIVING = {
   // and the signpost's garage rung.
   career: {
     finaleMul: 2,
+    // CP4 (r352) THE NEMESIS THREAD: one grid slot per chapter, the driver
+    // that chapter belongs to. Deterministic, all seven feature, and the
+    // racers hold the hard end — R. VOSS (slot 0, the rabbit) owns WORKS.
+    // Slots index the AI_COLORS grid: 0 VOSS, 1 MARIC, 2 OKADA,
+    // 3 LINDQVIST, 4 FERRO, 5 DUARTE, 6 KOVACS.
+    nemeses: [2, 5, 3, 6, 2, 4, 1, 5, 4, 6, 1, 0, 0],
     tiers: [
       { name: 'ROOKIE', toChapter: 2, ramp: 0.0, carMin: 0 },
       { name: 'CLUB', toChapter: 6, ramp: 0.4, carMin: 13000 },

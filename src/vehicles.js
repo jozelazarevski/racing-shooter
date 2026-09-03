@@ -4636,7 +4636,7 @@ const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiCorner: 1, aiAggression: 1 };
 
 // ---------- AI rival ----------
 // The Voxel Racers collection — rival lineup
-const AI_COLORS = [
+export const AI_COLORS = [
   { name: 'CROWN', driver: 'R. VOSS', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [0xf2f0e8, 0xd8342a], number: 77, brand: 'VOLT' },
   { name: 'SLEEK', driver: 'K. MARIC', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, number: 3, brand: 'ECO-PWR' },
   { name: 'DUNE', driver: 'T. OKADA', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [0x4a9ad8], number: 12, brand: 'RAIDER' },

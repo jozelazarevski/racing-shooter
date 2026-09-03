@@ -4161,6 +4161,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r352 — THE NEMESIS THREAD (CP4: someone to beat)
+
+CAREER_PATH.md's fourth rung. Each chapter belongs to ONE named driver,
+from the career block's slot table (`nemeses`, indices into AI_COLORS):
+
+  T. OKADA, J. DUARTE, A. LINDQVIST | E. KOVACS, T. OKADA, S. FERRO,
+  K. MARIC | J. DUARTE, S. FERRO, E. KOVACS, K. MARIC | R. VOSS, R. VOSS
+
+All seven feature; the racers hold the hard end; VOSS (the rabbit)
+owns WORKS. Machinery:
+
+- `nemesisOf(k)` / `nemesisRival()` beside the tier primitives.
+- THE LEASE: §5.2's pressure pick is untouched except that the
+  nemesis, when alive, holds the lease by default — same ±3% clamp,
+  same per-lap cadence, never a force; nearest-pace stands in only
+  when the nemesis is out. ("K. MARIC IS HUNTING YOU" now names the
+  chapter's own rival all chapter long.)
+- THE INTRODUCTION: the CP2 finale grid toast adds "— <name> ON POLE
+  FORM".
+- THE BEAT: seasonHistory records `nem`; a championship card reads
+  "🏆 TOOK THE TITLE FROM T. OKADA" instead of a bare CHAMPION; the
+  season strip's foot carries "🎯 <name>".
+
+GATES: dbg-nemesis.mjs proves the thread end to end (mapping, the
+live lease on a chapter-0 grid = T. OKADA, strip, history beat, card
+line); airace green (§5.6 budget intact under the lease change,
+including Q14's one-hunter law), career 20/20, duel-rival 11/11,
+hudfreeze pinned.
+
+NEXT: CP5 (the career sim gate, #60) closes the plan: CS1-CS5, and
+the CS2 economy budget CP3 deferred to it.
+
 ## r351 — THE MACHINE LADDER (CP3: the garage becomes a career)
 
 CAREER_PATH.md's third rung. Four tiers across the 13 chapters, all
