@@ -81,8 +81,35 @@ const r = await p.evaluate(async () => {
   const feeds = [];
   const hudFeed = g.hud.feed.bind(g.hud);
   g.hud.feed = (txt, cls) => { feeds.push(String(txt)); return hudFeed(txt, cls); };
+  // r346: hop DRY samples only. r340's river re-plan put a ford exactly on
+  // hop 17's old spot (idx 319, distance 0 u) and the suite spent a day
+  // red for it — but a ford splash wetting the tyres is the game being
+  // RIGHT (one toast per state change, cooldown respected), not 6.5's
+  // per-sample defect. The law here is about DRY grass, so the fixture
+  // steps over ford bands.
+  const fordNear = (i) => (t.fords ?? []).some((f) =>
+    Math.min((i - f.i + N) % N, (f.i - i + N) % N) * t.segLen < (f.half ?? 4) + 10);
+  // ...and the spot must answer DRY to the game's OWN water question
+  // (t.waterAt — the same call that sets _wetT at 3486). The first proxy
+  // (verge elevation vs road) passed a stretch where the ROAD ITSELF runs
+  // along the river's valley floor: level verge, honest water. Ask the
+  // water, both verge sides and the carriageway.
+  // ...along the WHOLE second of driving, not just the landing: each hop
+  // runs ~28 u forward at full throttle, and a dry spot 20 u short of the
+  // river still ends in it (measured: toasts at gi 284/327, spots dry).
+  const wetVerge = (i) => {
+    if (!t.waterAt) return false;
+    for (let k = 0; k <= 14; k += 2) {
+      for (const lat of [0, 13, -13]) {
+        const v = t.pointAt((i + k) % N, lat);
+        if (t.waterAt(v.x, v.z) > 0.02) return true;
+      }
+    }
+    return false;
+  };
   for (let s = 0; s < 30; s++) {
-    const idx = (200 + s * 7) % N;
+    let idx = (200 + s * 7) % N;
+    while (fordNear(idx) || wetVerge(idx)) idx = (idx + 4) % N;
     pl.placeAt(idx, s % 2 ? 0 : 13, true);   // alternate centreline / grass verge
     for (let k = 0; k < 60; k++) {
       g.input.analog = { steer: 0, throttle: 1, brake: 0 };
@@ -115,3 +142,6 @@ check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe strip tells the truth');
+// r346: the suite printed its verdict but never EXITED with it — every
+// batch since r331 read "strip rc=0" whatever the checks said.
+process.exit(fail ? 1 : 0);

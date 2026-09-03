@@ -4161,6 +4161,67 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r346 — THE SUITES LEARN TO FAIL, AND THE POD COMES BACK
+
+THE SYSTEMIC FIND: EIGHT suites never wired their verdict to the exit
+code — test-strip printed "1 FAILED" and exited 0 since r331, and
+containment/droplip/naming/pickupsurface/slopegrip/traffic/whales all
+shared the hole (destruction/roam stay informal probes). Every batch's
+"rc=0" for those proved nothing. Seven gate honestly now; their first
+truthful run found five green and two real r340 regressions hidden for
+five deploys:
+
+- THE OWNER'S WHALES WERE GONE. test-whales red: SERPENT PASS (his
+  hand-drawn world, his "P the whale tho" pod) had NO whales — r339's
+  water-seeking placer guessed at fixed offsets (150-690 u) sized for
+  the 1x coasts, and at 2x the sea is a band starting ~60 u off the
+  scaled line with dry ground beyond, so every guess landed dry and no
+  whale built. The placer WALKS to the water now (scan 44-720 u, both
+  sides, first wet spot clear of the road) — scale-proof by
+  construction. Pods restored: 23 (3 whales, terr −13), 60 (5), 57
+  correctly empty.
+- test-slopegrip red was three fixture faults in a row, each measured:
+  its world-12 face hunt found the r340 river gorge wall beneath an
+  overpass (car seated at terr −12.6, deck capture lifted it to +12.8 —
+  T1 measured a road drive); world 12 at 2x has NO dry sustained 55°
+  face within 195 u at all (12 raw steep points, 2 sustained, both
+  wet); and T2's meter passed on a kill-return's 458 u displacement.
+  The suite now runs on HIGHCROWN PEAK, validates candidates against
+  the game itself (seat + one input-free frame, accept < 6 u settle —
+  the deck capture snapped 25), and T2 measures deepest DESCENT (21.8 u
+  honest slide before the rescue). 4/4.
+
+And the thread that started it: test-strip's WET TIRES red was the game
+being RIGHT — r340's rivers put a ford dead on hop 17's teleport spot
+and ran a valley under two more that the hops drive into. Every toast
+was honest water, once per state change. The T3 fixture asks the game's
+own water question (t.waterAt) along each hop's whole path now.
+
+Lesson for the ledger, twice over: a suite that cannot fail is worse
+than no suite, and at 2x every fixture that guesses at geometry has to
+be re-audited against the world it actually runs in.
+
+Filed as a 6.5 toast regression; the bisect (green r339, red r340) and
+three instrumented passes say otherwise. test-strip's T3 teleports the
+player through 30 blind hops on REDWOOD RAMPAGE — r340's river re-plan
+put a FORD dead on hop 17's spot (distance 0 u) and ran the river's
+valley under two more stretches the hops DRIVE into (car at terr −11,
+road along the valley floor, wet timer live). Every toast was honest
+water, once per state change, cooldown respected — the wet system's own
+"ask the WATER, not a list of crossings" doctrine working as written.
+
+The real defects were the SUITE's, both fixed:
+- test-strip had NO process.exit — it printed "1 FAILED" and exited 0
+  since it was written (r331). Every batch's "strip rc=0" since proved
+  nothing. It gates now.
+- The T3 fixture asks the game's own water question (t.waterAt) along
+  each hop's whole one-second path, both verges and the carriageway —
+  the first two proxies (ford list, verge elevation) each measured wrong
+  in a different way before the honest one landed.
+
+Lesson for the ledger: a suite that cannot fail is worse than no suite —
+audit the other suites' exit wiring when convenient.
+
 ## r345 — OFF THE ROUTE IS A CHOICE, NOT A CRIME (owner: "Don't reset the car when I go off route")
 
 §3.6c OWNER OVERRIDE, recorded in CLAUDE.md beside 3.4a/3.6b: the

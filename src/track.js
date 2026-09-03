@@ -24664,12 +24664,19 @@ export class Track {
     for (let k = 0; k < count; k++) {
       const t = (k + 0.7) / (count + 0.4);
       const along = t * L + (Math.random() - 0.5) * L * 0.18;
-      const out0 = 150 + Math.random() * 260;              // well past the beach
       const bx = C.a[0] + (abx / L) * along;
       const bz = C.a[1] + (abz / L) * along;
       let x = null, z = null;
+      // r346: WALK to the water, don't guess at it. The fixed offsets
+      // (150-690 u) dated from the 1x coasts; at 2x SERPENT PASS's sea is
+      // a band starting ~60 u off the scaled line with dry ground beyond,
+      // so every guess landed dry and the owner's own pod vanished —
+      // hidden five deploys by the suite's missing exit code. Scan
+      // outward on each side and take the first spot that is wet and
+      // clear of the road; a genuinely dry coast still builds no whale.
+      const jitter = Math.random() * 24;
       for (const side of [1, -1]) {
-        for (const out of [out0, out0 + 140, out0 + 280]) {
+        for (let out = 44 + jitter; out <= 720; out += 22) {
           const cx = bx + nx * side * out, cz = bz + nz * side * out;
           if (wet(cx, cz) && clearOfRoad(cx, cz)) { x = cx; z = cz; break; }
         }

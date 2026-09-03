@@ -48,3 +48,6 @@ check(`R9  string scan over ${r.length} roster entries: zero protected names`,
 
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nevery stage wears its own name');
+
+// r346: the verdict must reach the exit code (the test-strip lesson).
+process.exit(fail ? 1 : 0);

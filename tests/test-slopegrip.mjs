@@ -21,7 +21,7 @@ const browser = await chromium.launch({
 const p = await browser.newPage({ viewport: { width: 800, height: 520 } });
 const errs = [];
 p.on('pageerror', (e) => errs.push(String(e).slice(0, 140)));
-await p.goto(`${BASE}/?level=12&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
+await p.goto(`${BASE}/?level=25&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
   undefined, { timeout: 300000 });
 
@@ -33,12 +33,15 @@ const r = await p.evaluate(async () => {
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
   // a genuinely steep face well beyond the rejoin band
   let spot = null;
-  for (let i = 0; i < N && !spot; i += 12) {
+  // r346: wider hunt — the 2x route runs through flatter neighborhoods,
+  // and with the game-validated candidate gate below the old 70-120 u
+  // sweep found nothing honest on world 12.
+  for (let i = 0; i < N && !spot; i += 8) {
     const c = t.center[i], c2 = t.center[(i + 1) % N];
     let sx = c2.z - c.z, sz = -(c2.x - c.x);
     const sl = Math.hypot(sx, sz) || 1; sx /= sl; sz /= sl;
     for (const side of [1, -1]) {
-      for (const dist of [70, 90, 120]) {
+      for (const dist of [70, 90, 120, 155, 195]) {
         const x = c.x + sx * side * dist, z = c.z + sz * side * dist;
         const E = 4;
         const gx = (t.terrainHeight(x + E, z) - t.terrainHeight(x - E, z)) / (2 * E);
@@ -47,6 +50,27 @@ const r = await p.evaluate(async () => {
         if (gm < 1.4 || gm > 5) continue;
         const ux = gx / gm, uz = gz / gm;
         if ((t.terrainHeight(x + ux * 14, z + uz * 14) - t.terrainHeight(x, z)) / 14 < 1.0) continue;
+        // r346: a face the GAME agrees is a face. At 2x this hunt's first
+        // match on world 12 was the river gorge wall beneath an overpass —
+        // the car seated at terr −12.6 and the deck capture lifted it to
+        // +12.8, so T1 measured a road drive. Water checks missed it
+        // (waterAt is 0 there); the honest validator is the game itself:
+        // seat the car, run one input-free frame, and accept only a spot
+        // where it stays put on the analytic ground.
+        if (t.waterAt && (t.waterAt(x, z) > 0
+          || t.waterAt(x - ux * 12, z - uz * 12) > 0
+          || t.waterAt(x + ux * 20, z + uz * 20) > 0)) continue;
+        const terrHere = t.terrainHeight(x, z);
+        pl.pos.x = x; pl.pos.z = z; pl.y = terrHere;
+        pl.vel.set(0, 0, 0); pl.vy = 0; pl.airborne = false;
+        pl.invuln = 20; pl._lostT = 0; pl._wedgeT = 0; pl._voidT = 0; pl._steepT = 0;
+        g.input.analog = { steer: 0, throttle: 0, brake: 0 };
+        g.frame();
+        // 6 u, not 3: on a 55°+ ridge the drawn mesh chord honestly cuts
+        // a few units under the analytic curve and the game seats on the
+        // mesh — the deck-capture defect this gate exists for snapped 25.
+        if (Math.abs(pl.y - terrHere) > 6
+          || Math.hypot(pl.pos.x - x, pl.pos.z - z) > 3) continue;
         spot = { x, z, ux, uz, grade: +gm.toFixed(2) };
         break;
       }
@@ -78,11 +102,18 @@ const r = await p.evaluate(async () => {
   seat(midX, midZ, 0, 0);
   pl.heading = Math.atan2(spot.ux, spot.uz);
   const yMid = pl.y;
+  // r346: measure the DEEPEST descent during the run, not the end state —
+  // on HIGHCROWN the shed car slid clean off the face into a kill-return
+  // (moved 458 u, final drop 0.3) and the old meter passed on the
+  // teleport's displacement. A slide shows y going DOWN before any rescue;
+  // a return cannot fake that.
+  let minY = pl.y;
   for (let k = 0; k < 4 * 60; k++) {
     g.input.analog = { steer: 0, throttle: 1, brake: 0 };
     g.frame();
+    if (pl.y < minY) minY = pl.y;
   }
-  const t2 = { dropped: +(yMid - pl.y).toFixed(1),
+  const t2 = { dropped: +(yMid - minY).toFixed(1),
     moved: +Math.hypot(pl.pos.x - midX, pl.pos.z - midZ).toFixed(1) };
   // T3: flat off-road control — idle car stays put
   let flat = null;
@@ -123,3 +154,6 @@ check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe mountain sheds what it cannot hold');
+
+// r346: the verdict must reach the exit code (the test-strip lesson).
+process.exit(fail ? 1 : 0);
