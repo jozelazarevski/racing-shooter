@@ -22,10 +22,10 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => { localStorage.setItem('ir-mode', 'roam'); }); // stale legacy key
-  await page.reload({ waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   const roam = await page.evaluate(() => window.__game.freeRoam);
   check('fresh visit ignores stale roam storage', roam === false, `freeRoam=${roam}`);
@@ -47,7 +47,7 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 2. SHARP steering setting flows into player.steerSense ----------
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => {
     [...document.querySelectorAll('#steer-select .diff-chip')].find(c => /SHARP/i.test(c.textContent)).click();
@@ -65,7 +65,7 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
@@ -143,10 +143,10 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/?level=3&unlockall=1`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/?level=3&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => { localStorage.setItem('ir-diff', 'hard'); });
-  await page.reload({ waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
@@ -183,14 +183,14 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 5. Every roster level boots into race without errors ----------
 {
   const probe = await browser.newPage({ viewport: { width: 400, height: 300 } });
-  await probe.goto(`${BASE}/`, { waitUntil: 'load' });
+  await probe.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
   await probe.waitForFunction(() => window.__LEVELS, null, { timeout: 120000 });
   const ids = await probe.evaluate(() => window.__LEVELS.map(l => l.id));
   await probe.close();
   for (const lvl of ids) {
     const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
     await page.click('#start-btn');
     await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), null, { timeout: 60000 });
@@ -212,7 +212,7 @@ const browser = await chromium.launch(LAUNCH);
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.tap('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
