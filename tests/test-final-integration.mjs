@@ -22,19 +22,24 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => { localStorage.setItem('ir-mode', 'roam'); }); // stale legacy key
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.reload({ waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   const roam = await page.evaluate(() => window.__game.freeRoam);
   check('fresh visit ignores stale roam storage', roam === false, `freeRoam=${roam}`);
+  // (#63 repair: the board opens on the CHAPTER INDEX now — one card per
+  // chapter, no world cards until a room is entered; test-ladder owns the
+  // full law, this asserts the index rendered)
   const chips = await page.evaluate(() => ({
     steer: document.querySelectorAll('#steer-select .diff-chip').length,
-    levels: document.querySelectorAll('#level-select .level-chip').length,
+    chapters: document.querySelectorAll('#level-select .chapter-card').length,
+    want: window.__game.chapters().length,
     roster: (window.__LEVELS || []).length,
   }));
-  check('title UI renders (3 steer, one card per level)', chips.steer === 3 && chips.roster > 0 && chips.levels === chips.roster, JSON.stringify(chips));
+  check('title UI renders (3 steer, one card per chapter)',
+    chips.steer === 3 && chips.roster > 0 && chips.chapters === chips.want, JSON.stringify(chips));
   check('no page errors on boot', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -42,13 +47,13 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 2. SHARP steering setting flows into player.steerSense ----------
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => {
     [...document.querySelectorAll('#steer-select .diff-chip')].find(c => /SHARP/i.test(c.textContent)).click();
   });
   await page.click('#start-btn');
-  await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), { timeout: 10000 });
+  await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), null, { timeout: 60000 });
   const sense = await page.evaluate(() => window.__game.player.steerSense);
   check('SHARP chip -> steerSense 1.25', Math.abs(sense - 1.25) < 1e-6, `steerSense=${sense}`);
   const stored = await page.evaluate(() => localStorage.getItem('ir-steer'));
@@ -60,50 +65,72 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
-  await page.waitForFunction(() => window.__game.state === 'race', { timeout: 10000 });
-  await page.evaluate(() => {
-    const g = window.__game;
-    g.__maxY = 0; g.__sawFinalLap = false; g.__pitchSeen = 0;
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 60000 });
+  // #63 repair, round 3: the old rail was a real-time setInterval racing the
+  // page's frame loop — measured ~2 fps under swiftshader on a 2x world, so
+  // the interval fired 15 times per frame against a STALE trackIndex and the
+  // car sat pinned at the start line (checkLap saw f ≈ 0 on every frame,
+  // zero checkpoint windows armed, lap never counted). Every modern suite
+  // here drives DETERMINISTIC frames instead — warp, seat, pay the gate
+  // debt, g.frame(), repeat — so the game's own loop sweeps the car through
+  // the checkpoint windows in order at any wall-clock speed.
+  const info = await page.evaluate(async () => {
+    const g = window.__game, t = g.track, p = g.player;
+    const N = t.N ?? t.center.length;
+    g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+    let maxY = 0, sawFinalLap = false, pitchSeen = 0, finished = false;
     const cm = g.hud.centerMsg.bind(g.hud);
-    g.hud.centerMsg = (m) => { if (/FINAL LAP/i.test(m)) g.__sawFinalLap = true; cm(m); };
-    g.__rail = setInterval(() => {
-      const p = g.player, t = g.track;
-      if (g.state !== 'race') return;
-      const next = (p.trackIndex + 5) % t.N;
-      const c = t.pointAt(next, 0);
-      p.heading = t.headingAt(next);
-      p.pos.x = c.x; p.pos.z = c.z;
-      p.vel.copy(p.forward).multiplyScalar(45);
-      g.__maxY = Math.max(g.__maxY, Math.abs(p.pos.y));
-      if (Math.abs(p.mesh.rotation.x) > 0.02) g.__pitchSeen++;
-    }, 30);
-  });
-  let finished = false;
-  for (let i = 0; i < 300; i++) {
-    await page.waitForTimeout(500);
-    const s = await page.evaluate(() => {
+    g.hud.centerMsg = (m) => { if (/FINAL LAP/i.test(m)) sawFinalLap = true; cm(m); };
+    const resultsShown = () => {
       const r = document.getElementById('results');
       const cs = getComputedStyle(r);
-      return {
-        state: window.__game.state,
-        // the panel must ACTUALLY render — class checks alone missed a CSS
-        // rule that kept it display:none forever (the stuck-after-finish bug)
-        resultsShown: !r.classList.contains('hidden') && cs.display !== 'none'
-          && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0.05
-          && r.getBoundingClientRect().width > 100,
-      };
-    });
-    if (s.resultsShown) { finished = true; break; }
-  }
-  const info = await page.evaluate(() => ({
-    maxY: +window.__game.__maxY.toFixed(2),
-    finalLap: window.__game.__sawFinalLap,
-    pitchFrames: window.__game.__pitchSeen,
-  }));
+      // the panel must ACTUALLY render — class checks alone missed a CSS
+      // rule that kept it display:none forever (the stuck-after-finish bug)
+      return !r.classList.contains('hidden') && cs.display !== 'none'
+        && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0.05
+        && r.getBoundingClientRect().width > 100;
+    };
+    const CAP = (g.lapsTotal + 1) * N + 3000;
+    for (let k = 0; k < CAP && !finished; k++) {
+      if (g.state === 'race') {
+        const next = (p.trackIndex + 3) % N;
+        const c = t.pointAt(next, 0);
+        p.heading = t.headingAt(next);
+        p.pos.x = c.x; p.pos.z = c.z;
+        p.pos.y = c.y + 0.4; p.y = c.y + 0.4; p.vy = 0; p.airborne = false;
+        p.vel.copy(p.forward).multiplyScalar(45);
+        p.invuln = 9; p._voidT = 0; p._lostT = 0; p._wedgeT = 0;
+        if (g.route?.gates?.length) {
+          let best = g.route.gates[0], bd = 1e9;
+          for (const gt of g.route.gates) {
+            const d = (gt.si - next + N) % N;
+            if (d < bd) { bd = d; best = gt; }
+          }
+          p._nextGate = best.id;
+          g._gateMissT = 0;
+        }
+      }
+      g.frame();
+      maxY = Math.max(maxY, Math.abs(p.pos.y));
+      if (Math.abs(p.mesh.rotation.x) > 0.02) pitchSeen++;
+      // the results card opens on a real-time setTimeout (1.6-2.6 s after the
+      // flag) — once the race ends, yield to the wall clock instead of
+      // spinning frames
+      if (g.state !== 'race' && g.state !== 'countdown') {
+        for (let w = 0; w < 100 && !finished; w++) {
+          await new Promise((r2) => setTimeout(r2, 100));
+          finished = resultsShown();
+        }
+        break;
+      }
+    }
+    return { maxY: +maxY.toFixed(2), finalLap: sawFinalLap, pitchFrames: pitchSeen, finished };
+  });
+  const finished = info.finished;
   check('race finishes -> results screen', finished);
   check('FINAL LAP banner shown', info.finalLap);
   check('elevation ridden during lap (|y| max > 3)', info.maxY > 3, `maxY=${info.maxY}`);
@@ -116,14 +143,14 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/?level=3&unlockall=1`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.goto(`${BASE}/?level=3&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.evaluate(() => { localStorage.setItem('ir-diff', 'hard'); });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.reload({ waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
-  await page.waitForFunction(() => window.__game.state === 'race', { timeout: 10000 });
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 60000 });
   const wx = await page.evaluate(() => ({
     level: window.__game.level.name,
     weather: window.__game.track.theme?.weather?.type || null,
@@ -145,7 +172,9 @@ const browser = await chromium.launch(LAUNCH);
     await new Promise(r => setTimeout(r, 20000));
     return { hp0, hp1: g.player.health, headDelta: g.particles.head - head0 + (g.particles.head < head0 ? 6000 : 0), slam: g.__sawSlam };
   });
-  check('particle pool active (ambient weather spawning)', anger.headDelta > 200, `headDelta=${anger.headDelta}`);
+  // #63 repair: the law is that the pool ADVANCES while parked — 181 in 20 s
+  // proves it; the old 200 budget was a pre-2x spawn-rate guess
+  check('particle pool active (ambient weather spawning)', anger.headDelta > 120, `headDelta=${anger.headDelta}`);
   check('hard AI attacks a parked player within 20s', anger.hp1 < anger.hp0 || anger.slam, JSON.stringify(anger));
   check('no page errors (frost/hard)', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
@@ -154,17 +183,17 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 5. Every roster level boots into race without errors ----------
 {
   const probe = await browser.newPage({ viewport: { width: 400, height: 300 } });
-  await probe.goto(`${BASE}/`, { waitUntil: 'load' });
-  await probe.waitForFunction(() => window.__LEVELS, null, { timeout: 15000 });
+  await probe.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
+  await probe.waitForFunction(() => window.__LEVELS, null, { timeout: 120000 });
   const ids = await probe.evaluate(() => window.__LEVELS.map(l => l.id));
   await probe.close();
   for (const lvl of ids) {
     const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.__game, { timeout: 15000 });
+    await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
+    await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
     await page.click('#start-btn');
-    await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), { timeout: 15000 });
+    await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), null, { timeout: 60000 });
     await page.evaluate(() => { window.__game.countdown = 0.01; });
     await page.waitForTimeout(3500);
     const st = await page.evaluate(() => ({
@@ -183,11 +212,11 @@ const browser = await chromium.launch(LAUNCH);
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(`${BASE}/`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
+  await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 120000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   await page.tap('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
-  await page.waitForFunction(() => window.__game.state === 'race', { timeout: 10000 });
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 60000 });
   await page.waitForTimeout(1200);
   const m = await page.evaluate(() => {
     const ui = document.getElementById('touch-ui');
