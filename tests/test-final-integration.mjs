@@ -70,57 +70,67 @@ const browser = await chromium.launch(LAUNCH);
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
   await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 60000 });
-  await page.evaluate(() => {
-    const g = window.__game;
-    g.__maxY = 0; g.__sawFinalLap = false; g.__pitchSeen = 0;
+  // #63 repair, round 3: the old rail was a real-time setInterval racing the
+  // page's frame loop — measured ~2 fps under swiftshader on a 2x world, so
+  // the interval fired 15 times per frame against a STALE trackIndex and the
+  // car sat pinned at the start line (checkLap saw f ≈ 0 on every frame,
+  // zero checkpoint windows armed, lap never counted). Every modern suite
+  // here drives DETERMINISTIC frames instead — warp, seat, pay the gate
+  // debt, g.frame(), repeat — so the game's own loop sweeps the car through
+  // the checkpoint windows in order at any wall-clock speed.
+  const info = await page.evaluate(async () => {
+    const g = window.__game, t = g.track, p = g.player;
+    const N = t.N ?? t.center.length;
+    g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+    let maxY = 0, sawFinalLap = false, pitchSeen = 0, finished = false;
     const cm = g.hud.centerMsg.bind(g.hud);
-    g.hud.centerMsg = (m) => { if (/FINAL LAP/i.test(m)) g.__sawFinalLap = true; cm(m); };
-    g.__rail = setInterval(() => {
-      const p = g.player, t = g.track;
-      if (g.state !== 'race') return;
-      const next = (p.trackIndex + 5) % t.N;
-      const c = t.pointAt(next, 0);
-      p.heading = t.headingAt(next);
-      p.pos.x = c.x; p.pos.z = c.z;
-      p.vel.copy(p.forward).multiplyScalar(45);
-      // #63 repair: a rail that WARPS hops straight over gate planes, so the
-      // corridor model never registers a crossing and the lap never counts —
-      // pay the gate debt per hop, exactly as test-strip's sweep does
-      if (g.route?.gates?.length) {
-        let best = g.route.gates[0], bd = 1e9;
-        for (const gt of g.route.gates) {
-          const d = (gt.si - next + t.N) % t.N;
-          if (d < bd) { bd = d; best = gt; }
-        }
-        p._nextGate = best.id;
-        g._gateMissT = 0;
-      }
-      g.__maxY = Math.max(g.__maxY, Math.abs(p.pos.y));
-      if (Math.abs(p.mesh.rotation.x) > 0.02) g.__pitchSeen++;
-    }, 30);
-  });
-  let finished = false;
-  for (let i = 0; i < 300; i++) {
-    await page.waitForTimeout(500);
-    const s = await page.evaluate(() => {
+    g.hud.centerMsg = (m) => { if (/FINAL LAP/i.test(m)) sawFinalLap = true; cm(m); };
+    const resultsShown = () => {
       const r = document.getElementById('results');
       const cs = getComputedStyle(r);
-      return {
-        state: window.__game.state,
-        // the panel must ACTUALLY render — class checks alone missed a CSS
-        // rule that kept it display:none forever (the stuck-after-finish bug)
-        resultsShown: !r.classList.contains('hidden') && cs.display !== 'none'
-          && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0.05
-          && r.getBoundingClientRect().width > 100,
-      };
-    });
-    if (s.resultsShown) { finished = true; break; }
-  }
-  const info = await page.evaluate(() => ({
-    maxY: +window.__game.__maxY.toFixed(2),
-    finalLap: window.__game.__sawFinalLap,
-    pitchFrames: window.__game.__pitchSeen,
-  }));
+      // the panel must ACTUALLY render — class checks alone missed a CSS
+      // rule that kept it display:none forever (the stuck-after-finish bug)
+      return !r.classList.contains('hidden') && cs.display !== 'none'
+        && cs.visibility === 'visible' && parseFloat(cs.opacity) > 0.05
+        && r.getBoundingClientRect().width > 100;
+    };
+    const CAP = (g.lapsTotal + 1) * N + 3000;
+    for (let k = 0; k < CAP && !finished; k++) {
+      if (g.state === 'race') {
+        const next = (p.trackIndex + 3) % N;
+        const c = t.pointAt(next, 0);
+        p.heading = t.headingAt(next);
+        p.pos.x = c.x; p.pos.z = c.z;
+        p.pos.y = c.y + 0.4; p.y = c.y + 0.4; p.vy = 0; p.airborne = false;
+        p.vel.copy(p.forward).multiplyScalar(45);
+        p.invuln = 9; p._voidT = 0; p._lostT = 0; p._wedgeT = 0;
+        if (g.route?.gates?.length) {
+          let best = g.route.gates[0], bd = 1e9;
+          for (const gt of g.route.gates) {
+            const d = (gt.si - next + N) % N;
+            if (d < bd) { bd = d; best = gt; }
+          }
+          p._nextGate = best.id;
+          g._gateMissT = 0;
+        }
+      }
+      g.frame();
+      maxY = Math.max(maxY, Math.abs(p.pos.y));
+      if (Math.abs(p.mesh.rotation.x) > 0.02) pitchSeen++;
+      // the results card opens on a real-time setTimeout (1.6-2.6 s after the
+      // flag) — once the race ends, yield to the wall clock instead of
+      // spinning frames
+      if (g.state !== 'race' && g.state !== 'countdown') {
+        for (let w = 0; w < 100 && !finished; w++) {
+          await new Promise((r2) => setTimeout(r2, 100));
+          finished = resultsShown();
+        }
+        break;
+      }
+    }
+    return { maxY: +maxY.toFixed(2), finalLap: sawFinalLap, pitchFrames: pitchSeen, finished };
+  });
+  const finished = info.finished;
   check('race finishes -> results screen', finished);
   check('FINAL LAP banner shown', info.finalLap);
   check('elevation ridden during lap (|y| max > 3)', info.maxY > 3, `maxY=${info.maxY}`);
