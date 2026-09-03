@@ -4161,6 +4161,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r355 — TWO SUITES COME BACK FROM THE DEAD (#63)
+
+test-menu-noreset and test-final-integration were both broken on
+PRISTINE bases — unrunnable or asserting dead contracts — which means
+"rc=0 last time it mattered" proved nothing for either. Four rounds
+of repair, each ending in a measured fact:
+
+- menu-noreset: the track-pick half expected a PAGE RELOAD with
+  ?level=2 (dead since the "a tap must feel like a tap" rework) and
+  clicked a world chip in the chapter-grid view where none exist. It
+  now walks the real UX (chapter card → chip), and meters "no reload"
+  by WINDOW IDENTITY — Playwright's framenavigated fires for the
+  swap's replaceState too, which red-flagged a correct pass. ALL OK.
+- final-integration, the compounding faults in order: `BASE ?? BASE`
+  (instant ReferenceError — unrunnable for many builds, fixed r348);
+  13 waitForFunction calls passing {timeout} in Playwright's ARG slot
+  (silent 30 s default); pre-2x 10-15 s budgets; the title check
+  counting world chips on what is now a chapter-index board; a parked
+  -snow budget guessing 200 where the law only needs "advances"; the
+  finish RAIL as a real-time setInterval racing a ~2 fps swiftshader
+  frame loop (15 stale-index warps per frame pinned the car at the
+  line — checkLap's quarter-point windows never armed, the lap never
+  counted, no FINAL LAP, no results screen) — now the standard
+  deterministic in-page frame loop with Y-seating and gate-debt
+  payment; and finally Playwright's default 30 s page.goto budget,
+  which killed a green run at world 57/78. 98/98 PASSED, rc 0.
+
+THE LESSON, again in this file because it keeps being the lesson: a
+suite that cannot run is indistinguishable from a suite that passes,
+until somebody runs it and reads the exit code (the r346 test-strip
+lesson, one layer up).
+
 ## r354 — THE SEGMENTAL ARCH (#65: the floating gatehouse, solved twice)
 
 The "MOUNTAIN TO SEA arch floats 20.7 u" finding was NOT stilted piers
