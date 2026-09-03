@@ -4161,6 +4161,48 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r341 — A HELD DRIFT HOLDS ITS ANGLE (owner: "Drift is spinning the car way too much")
+
+MEASURED FIRST (tools-scratch/driftspin.mjs, dbg-driftspin/driftlaw):
+with the handbrake down the over-budget lag pins the velocity vector, so
+slip is the raw INTEGRAL of yaw. The entry kick (~1.9 rad/s), the drift
+yaw assist (0.85 rad/s, active to 65°) and the slip-relaxed steer cap
+(x2.5 at full slip) all keep adding rotation, and nothing pulls the
+angle back — a 0.8 s flick at ANY speed sailed through the controllable
+band to ~89° of slip: a spin-out dressed as a drift, scrubbing 140 -> 19
+km/h. The owner's race log shows where those end: rocks (vNormal 66),
+three wreck-returns, a gate missed by 37 m.
+
+THE LAW, two constants and one diverted share (vehicles.js, after the
+csAssist block):
+- driftBetaMax 1.0 rad (~57°, under the 65° earned-spin line),
+  driftBetaEase 6/s: approaching the ceiling, the DEEPENING share of the
+  yaw stops going into the slip angle and rotates the velocity WITH the
+  nose instead — the turn continues, the angle parks.
+- driftCarryCap 1.0: the carried turn OBEYS THE TYRE. The first cut
+  passed the whole yaw stack through — measured 3.5 rad/s at 66 km/h, a
+  5 m donut at 7 g. Capped at 1.0x the same aMax every yaw law prices
+  against; grip's own cap multiplier is 1.45 but grip only REALISES
+  ~0.8x of it (the over-budget spiral trims it), so the drift still
+  out-turns grip honestly: 210° vs 108° over test-drift's 2 s hold.
+- Consumed in the lag block: lagAng = dTheta·lag − carry. Counter-steer
+  (yaw away from the slide) is never touched; without the handbrake
+  nothing here runs, so the earned spin stays earnable.
+
+AFTER: slip parks 49-56° at every speed 40-170, zero frames past 65°
+across the whole sweep (was 8-97 per trial), recovery 0.3-1.4 s,
+exits carry 39-113 km/h. test-drift 6/6 — its turn meter now
+ACCUMULATES per-frame deltas; the old |wrap(end−start)| folded a 210°
+arc to 129 and a harder one to less. drivingspec / patch02 / slopegrip /
+restart-stopped green.
+
+KNOWN, NOT r341's: test-shortcut's "off-road 41.3 vs road 38.6 at
+sample 808" red is BYTE-IDENTICAL on the pristine r340 base (fa4e990) —
+an r340 fallout the final sweep missed (suspects: dragOffRoad 0.0775,
+or the 2x geometry handing that bank a faster line). Filed, next. The
+owner's race log also flagged a kicker-landing stageViolation (5
+kickers, 30 unculled) on a 2x world — filed alongside.
+
 ## r340 — THE LAP IS TWICE AS LONG (owner: "Expand the length of the tracks 2x")
 
 ONE CONSTANT, ONE AUTHORING POINT. `export const ROUTE_SCALE = 2` in
