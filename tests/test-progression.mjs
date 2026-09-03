@@ -112,6 +112,28 @@ const rivalLap1 = async (p, rampPct) => p.evaluate(async (rampPct) => {
   check(`EASY runs ${easy.mul}× the ramp`,
     easy.ramps.every((x) => Math.abs(x - wantEasy) < 0.005),
     `ramps ${easy.ramps.slice(0, 3).join(', ')} vs ${wantEasy.toFixed(3)}`);
+  // ---- CP3 (r351): THE LADDER STEPS. One grid speed per tier — the ramp
+  // is constant across a tier's chapters and rises only at the boundaries,
+  // which is what makes each step a buy-a-car moment instead of a creep.
+  const steps = await p.evaluate(() => {
+    const g = window.__game;
+    const ch = g.chapters();
+    const at = (k) => {
+      const saved = g.level;
+      g.level = ch[k].levels[0];
+      const v = g.rosterProg();
+      g.level = saved;
+      return v;
+    };
+    const tiers = window.__DRIVING.career.tiers;
+    const perChapter = ch.map((c, k) => at(k));
+    return { tiers: tiers.map((t) => `${t.name}@${t.ramp}`), perChapter };
+  });
+  const monotone = steps.perChapter.every((v, i) => i === 0 || v >= steps.perChapter[i - 1]);
+  const distinct = new Set(steps.perChapter).size;
+  check('CP3: the ramp STEPS by tier — monotone, one value per tier',
+    monotone && distinct === steps.tiers.length,
+    `${steps.perChapter.join(',')} (${distinct} steps for ${steps.tiers.length} tiers)`);
   await p.close();
 }
 

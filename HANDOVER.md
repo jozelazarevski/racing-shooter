@@ -4161,6 +4161,49 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r351 — THE MACHINE LADDER (CP3: the garage becomes a career)
+
+CAREER_PATH.md's third rung. Four tiers across the 13 chapters, all
+data in driving.json's career block (`tiers`: name, toChapter, ramp,
+carMin):
+
+  ROOKIE ch 1-3 (grid +0%) · CLUB 4-7 (+4%) · PRO 8-11 (+7%) ·
+  WORKS 12-13 (+10%)
+
+THE RE-ANCHOR: rosterProg() now returns the CURRENT WORLD's chapter
+tier ramp instead of the smooth levelIndex creep — the career grid
+runs ONE speed per tier and STEPS at the boundaries, which is the
+plan's "the step IS the buy-a-car moment". vehicles.js is untouched
+(it already reads g.rosterProg() × ai.progRampPct); EASY keeps its
+half ramp, free roam and missions stay exempt, off-roster editor
+scenes keep the old smooth ramp.
+
+THE MACHINES: carTierOf(price) maps the catalog onto the tiers
+(carMin 0 / 13k / 22k / 32k → BRAWLER-SLEEK-CROWN / DUNE-FLATSIX /
+ALPINE-BASTION / PIT-99); ownedTier() is the best band the player
+owns a car in.
+
+SURFACES (menus only): the showroom groups under tier band headers
+("CLUB MACHINES · CHAPTERS 4-7", the player's current tier marked);
+every chapter card carries its tier chip; careerObjective() gains the
+garage rung AT THE TOP of the ladder — entering a tier with only last
+tier's machines signposts "THE CLUB GARAGE AWAITS — DUNE, 13,000 CR"
+before anything else, because nothing below it is winnable
+under-tiered. Also fixed: chapters named with their own article
+("THE WORLD RALLY") no longer render "THE THE … FINALE".
+
+GATES: test-progression grew the step law (ramp monotone, exactly one
+value per tier: 0,0,0,.4,.4,.4,.4,.7,.7,.7,.7,1,1) — 8/8 with the
+stopwatch at 3.9% on GLACIER COL; career 20/20, hudfreeze, ladder
+31/31, showroom/cars/parts green; dbg-tiers.mjs probes the garage
+rung end to end (fresh → CLUB with ROOKIE cars → signpost names DUNE;
+buy DUNE → rung clears).
+
+DEFERRED TO CP5 BY DESIGN: the economy budget ("podium-most player
+affords the next tier's entry car + 2 kit levels by each boundary")
+is the sim's CS2 gate — the plan says the PRIZE TABLE adjusts, not
+the test, and that needs the sim, not arithmetic.
+
 ## r350 — TUNNELS UNDER MOUNTAINS (owner: "All Tunels needs to be under a mountain otherwise makes no sense")
 
 Three separate defects, found by measuring 38 bores on 30 worlds

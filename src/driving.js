@@ -297,10 +297,23 @@ export const DRIVING = {
   },
 
   // CP2 (r348, CAREER_PATH.md): the career block. finaleMul multiplies the
-  // finale race's own pay (score pay + podium bonus); CP3 adds the tier
-  // table and prize budget here.
+  // finale race's own pay (score pay + podium bonus).
+  //
+  // CP3 (r351) THE MACHINE LADDER: four tiers across the 13 chapters. Each
+  // tier's `ramp` is the FRACTION of ai.progRampPct the career grid runs at
+  // inside that tier — the grid STEPS UP at tier boundaries instead of
+  // creeping, and the step is the "buy a car" moment (free roam and
+  // missions stay exempt; EASY keeps its half ramp). `carMin` is the
+  // catalog price floor of each tier's machines, for the showroom bands
+  // and the signpost's garage rung.
   career: {
     finaleMul: 2,
+    tiers: [
+      { name: 'ROOKIE', toChapter: 2, ramp: 0.0, carMin: 0 },
+      { name: 'CLUB', toChapter: 6, ramp: 0.4, carMin: 13000 },
+      { name: 'PRO', toChapter: 10, ramp: 0.7, carMin: 22000 },
+      { name: 'WORKS', toChapter: 12, ramp: 1.0, carMin: 32000 },
+    ],
   },
 };
 
