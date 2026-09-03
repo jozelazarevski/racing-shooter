@@ -102,10 +102,16 @@ for (const lvl of ['4', '66']) {
     JSON.stringify(r.v1));
   // Handle-less corridor obstacles (merged-geometry rock lines, bare
   // {x,z,r,y,mat} records) CANNOT be culled without orphaning their visuals —
-  // Law of Solidity. They are pinned at the measured baseline as debt for
-  // the feature-aware re-author (streets where the walls really are);
-  // everything cullable is enforced at zero.
-  const FIXED_BASELINE = { 4: 62, 66: 48 };
+  // Law of Solidity. They were pinned at 62/48 in r299 as debt for a
+  // feature-aware re-author (task #31). THE DEBT PAID ITSELF: the 2x
+  // re-plan (r340) and the r343-r350 stage-rules builds re-sited the rock
+  // lines, and the r356 re-measurement reads Canyon ~30 in the suite's
+  // broad filter — of which only 5 are truly bare, ALL outside the road
+  // (nearest 6.9 u past the edge, inside §7.3's legal 4-12 u band) — and
+  // Glacier 0. #31 closed as overtaken by events; the pins now hold the
+  // MEASURED level (small headroom for per-load dice) so the debt can
+  // never quietly grow back.
+  const FIXED_BASELINE = { 4: 34, 66: 4 };
   check(`V2 [${lvl}] cullable obstacles honour the exclusion + band budget`,
     r.v2.inExcl === 0 && r.v2.overBudget === 0,
     `${r.v2.inExcl} cullable in exclusion, ${r.v2.overBudget}/${r.v2.windows} windows over`);

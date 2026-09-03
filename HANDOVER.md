@@ -4161,6 +4161,34 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r357 — THE DEBT THAT PAID ITSELF (#31 closed by measurement; the board is clear)
+
+Task #31 — the feature-aware corridor re-author, scoped in r299
+against 62 (Canyon) + 48 (Glacier) merged-rock-line boulders standing
+un-cullable in route corridors — was the last open task. Before
+committing to a heavy generator rework, the r299 defect was
+RE-MEASURED on today's worlds, and it is gone:
+
+- GLACIER COL: 0 handle-less corridor obstacles (was 48).
+- CANYON RUN: the suite's broad filter counts ~30, but only 5 are
+  truly bare records — and every one stands OUTSIDE the road, the
+  nearest 6.9 u past the edge (inside §7.3's legal 4-12 u obstacle
+  band, which V2's budget law confirms is honoured: 0 windows over),
+  the rest 37-80 u out in open country.
+
+The 2x re-plan (r340) and the r343-r350 stage-rules builds re-sited
+the rock lines without anyone scoping them to. A re-author now would
+be repairing a solved problem across 78 worlds of regression risk —
+repair-only says no. CLOSED AS OVERTAKEN BY EVENTS, with the
+test-corridor3 debt pins TIGHTENED to the measured level (62→34,
+48→4) so the debt can never quietly grow back. The r299 design note
+("gate placement wants geography") stays true as a design idea; it
+just no longer has a defect to justify it.
+
+THE BOARD IS CLEAR. Remaining known work, none of it urgent: the
+career economy balance pass (CS2 measured ~8.8× solvent), MOUNTAIN TO
+SEA's scatter-tree dice, and whatever the owner reports next.
+
 ## r356 — THE LADDER MEASURED HONESTLY (#22: test-difficulty redesign)
 
 The oldest open task on the board. Its tier laws failed on pristine
