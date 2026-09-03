@@ -4161,6 +4161,63 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r340 — THE LAP IS TWICE AS LONG (owner: "Expand the length of the tracks 2x")
+
+ONE CONSTANT, ONE AUTHORING POINT. `export const ROUTE_SCALE = 2` in
+track.js, applied where the raw route points become `pts` (right after
+routeFlipX/routeReverse — the single place every world's line passes
+through): `[x*RS, z*RS]`. N stays 900, so segLen doubles (~2.65 -> ~5.3 u)
+and every index-denominated law silently halves its metre meaning — that
+is the whole fallout story below. Measured on the roster: every world
+exactly 2.00x (CANYON 1700 -> 3400 m etc.), maxR 627 u, still inside the
+±1000 near patch; RIM_RADIUS 1620 untouched. T.coast is CLONE-scaled
+where T is assembled (tuneless worlds share the theme object — scale in
+place and the second world scales it again).
+
+GATES: route.js doubles the kinds layout (10-12 gates -> 20-24) to keep
+§7's metre caps on gate spacing. The seam can weld IL BUDELLO's trailing
+street,street,street onto its leading run — past 3 consecutive the first
+repeated gate turns trail (§7.1 pacing).
+
+THE FALLOUT LEDGER (each found by a red, each a metre law that had been
+counting samples):
+- RIVERS: the bed's running-min could trade a ford dry — _finishFords now
+  culls any ford the water left (>= 4 u of freeboard becomes a culvert),
+  and _planRiver's keep-clear cap is FORD_KEEP = 46*RS. The ribbon flew
+  off side slopes at the doubled span: `raw` samples the MIN of centre and
+  ±half·1.4 flanks, smoothing is clamped to raw+1.5, and extend()'s tails
+  follow the valley (0.62 outward / 0.38 downhill, radial-escape guard)
+  instead of marching straight out of the massif. Three iterations; the
+  tail routing was the fix.
+- TUNNELS "NEVER ENTERED": the car was DROWNING on approach — the jump
+  gorge re-planned itself at station 110 with the bore at 129, inside the
+  landing zone. _nearGorge gained a downstream landing window
+  (landS = round(180/segLen)); the bore re-sited to 177-191 and drives.
+- RETURNS: returnToGate seats the car ON gate 0's plane, and Route.step's
+  crossing law (prev < 0 && along >= 0) never fired — the gate debt never
+  cleared (patch13 R9). returnToGate now primes _gateAlong = -0.01.
+- AI MISTAKES VANISHED: the mistake gate's curvature thresholds are 1/R
+  absolutes — at 2x every corner reads half as sharp. Thresholds /RS,
+  scan windows converted to metres (round(25/segL) etc.).
+- F7 DRAG: with 2x straights the road top reads an honest 171 (was 166
+  when no straight was long enough), pushing grass over the 75% bound.
+  dragOffRoad/dragOffRoadRoam 0.08 -> 0.0775; grass 54%, accel bound holds.
+
+HARNESSES THAT COUNTED SAMPLES, NOW COUNTING METRES: goat's lookahead
+(round(80/segL), CUT_LAT 58), cliff's shelf hunt (laterals swept),
+nature's ford-rise exemption, and airace's whole frame of reference —
+"per lap" budgets (overtakes, collisions) and the GO+45 "field has
+sorted" epoch are per-metre conduct denominated in the OLD lap, so they
+scale with RS; the instantaneous rules (>3 within 20 m, SETUP before
+COMMIT, GO+20 tokens) stay absolute.
+
+DEBTS, RECORDED NOT FIXED: world 60 carries one marginal rail foot (1 of
+457 barriers, 1.2 u inside the road edge); world 57's coast still
+declares its waterline below its own seabed (r339); and user-edited
+scenes store ABSOLUTE warp deltas — an edit authored at 1x lands
+mid-hillside at 2x. If an owner report names a moved decoration on an
+edited world, that is why.
+
 ## r339 — THE POD STAYS IN THE SEA (owner: "P the whale tho")
 
 SERPENT PASS's three whales were breaching out of the HILLSIDE, 27-63 u
