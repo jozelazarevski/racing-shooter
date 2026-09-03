@@ -137,7 +137,13 @@ const run = async (page, diff, skill) => page.evaluate(({ diff, skill }) => {
     });
   }
   const best = Math.max(0, ...rd);
-  return { player: Math.round(dist), best: Math.round(best), place: rd.filter((d) => d > dist).length + 1 };
+  // #22: the MAX of seven dice-rolling rivals is a noisy tier estimator —
+  // one lucky draft/nitro chain and NORMAL's best outruns HARD's (measured
+  // 757 vs 686 on PINE). The MEDIAN is the tier's pace.
+  const srt = rd.slice().sort((a2, b2) => a2 - b2);
+  const med = srt.length ? srt[Math.floor(srt.length / 2)] : 0;
+  return { player: Math.round(dist), best: Math.round(best), med: Math.round(med),
+    place: rd.filter((d) => d > dist).length + 1 };
 }, { diff, skill });
 
 for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
@@ -183,14 +189,15 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
 
   // 1. THE LADDER IS A LADDER. This is the one the old numbers failed: with the
   //    band inverted, HARD rivals were barely quicker than EASY ones.
-  // ...adjacent tiers MAY tie where physics floors them (#22): on FURKA the
-  // width-pinch caps are tier-blind — the law-2 comment below measures three
-  // hard configs lapping identically there — and one run read normal 528 =
-  // hard 528 exactly. The ladder's ENDS must still separate; the middle may
-  // sit on the floor.
-  check(`${name}: rival pace rises with difficulty`,
-    e.best < n.best && n.best <= h.best && e.best < h.best,
-    `easy ${e.best} < normal ${n.best} <= hard ${h.best}`);
+  // ...on the MEDIAN rival, with a 2% noise allowance between adjacent
+  // tiers (#22): the max-of-seven estimator flipped tiers run to run
+  // (normal 757 vs hard 686 once, 528 = 528 another), and physics floors
+  // adjacent tiers on pinch worlds by design. The ladder's ENDS separate
+  // strictly; neighbours may sit inside noise or on a shared floor.
+  const tol = h.med * 0.02;
+  check(`${name}: rival pace rises with difficulty (median rival)`,
+    e.med < n.med + tol && n.med < h.med + tol && e.med < h.med,
+    `easy ${e.med} < normal ${n.med} < hard ${h.med} (±${Math.round(tol)})`);
 
   // 2. The tiers must be far enough apart to feel different — but the RATIO is
   //    a proxy, and on a tight track it misfires. A rival's no-slip lateral
