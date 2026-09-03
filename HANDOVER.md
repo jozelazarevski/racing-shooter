@@ -4161,6 +4161,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r356 — THE LADDER MEASURED HONESTLY (#22: test-difficulty redesign)
+
+The oldest open task on the board. Its tier laws failed on pristine
+bases because three of its estimators had no range left under honest
+grip on 2x worlds:
+
+- RANK SATURATION: "same drive, different result per tier" asserted
+  P-ranks of a 75%-throttle robot — which reads P8 on both NORMAL and
+  HARD (a discriminator pinned at last place measures nothing) and P4
+  on an EASY field packed inside 8 points (which is casual-FRIENDLY,
+  and rank read it as failure). Both laws are GAP laws now: the signed
+  player-vs-best-rival gap must be strictly better on EASY than HARD
+  beyond ~3% run noise, and EASY keeps the casual within 2% of the
+  best rival (the drift-dividend argument cuts both ways: the bot has
+  no drift, so "in touch for the bot" IS "winnable for a human").
+- MAX-OF-SEVEN: "rival pace rises with difficulty" read the FASTEST
+  rival, and one lucky draft/nitro chain flipped tiers run to run
+  (measured normal 757 vs hard 686 once, 528 = 528 another). The tier
+  is the MEDIAN rival now, with a 2% adjacent-tier allowance (physics
+  floors neighbours on pinch worlds by design); the ladder's ends
+  separate strictly.
+
+Two consecutive 12/12 greens (medians: PINE 572 < 651 < 660, FURKA
+463 < 508 < 514; gaps EASY −1.7%/+4.0% vs HARD −20.6%/−8.4%).
+
+REMAINING BOARD: #31 corridor re-author (the last open task), plus
+the two flagged balance items (career economy ~8.8× solvent — CS2's
+finding; MOUNTAIN TO SEA scatter-tree dice).
+
 ## r355 — TWO SUITES COME BACK FROM THE DEAD (#63)
 
 test-menu-noreset and test-final-integration were both broken on
