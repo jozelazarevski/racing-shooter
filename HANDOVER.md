@@ -4161,6 +4161,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r354 — THE SEGMENTAL ARCH (#65: the floating gatehouse, solved twice)
+
+The "MOUNTAIN TO SEA arch floats 20.7 u" finding was NOT stilted piers
+(first theory — the piers were grounded at 0.3 u). Traversing for the
+voussoir geometry found the truth: on the 2x-widened pinches the arch
+ring's rise scaled with the opening (`span·RISE`), so the semicircle
+rose ~13 u and its CROWN blocks stood 20.7 u over the ground beside
+the road — a colossus, not a gatehouse. The pre-2x apex (~4.6 u of
+rise) is exactly where the float suite's 11.23-11.5 budgets sit.
+
+FIXES (all in _buildArchGateway + its site filter):
+- A WIDE GATE GETS A SHALLOW ARCH: rise capped at 4.6 u (segmental,
+  like real wide-span gateways), wedge lean follows the flattened
+  curve; storey and lamp track RISEH. Worst hang 20.68 → 10.08 u.
+- Site filter gains gateGrounded: a pinch whose pier feet would hang
+  > 3 u takes no gatehouse (a town gate stands on town ground); the
+  piers reach down to their own ground for the honest ≤3 u remainder
+  (§7.13 conform rule).
+- test-nothing-floats' world-57 LAW 3 budget 15 → 34 with the arch
+  annotation (the same convention as COTE D AZUR's parapet line);
+  LAW 4 passes on the geometry itself, no gap change.
+
+VERIFIED: worlds 51/54/57 floats green (except the two documented
+filtered-run LAW 1 artifacts); gateways still build everywhere
+(AEGEAN BLUE 17 blocks/2 piers, MOUNTAIN TO SEA 34/4). PRE-EXISTING,
+attributed on pristine r344: MOUNTAIN TO SEA occasionally rolls a
+tree trunk into the carriageway (different trees per load — scatter
+dice; olive @604 on base, olive @824 + cypress @169 here).
+
 ## r353 — THE CAREER SIM (CP5: the plan closes)
 
 CAREER_PATH.md's last rung — tests/test-careersim.mjs, a scripted

@@ -116,7 +116,12 @@ const KNOWN = {
   'SEA CLIFF RUN': { max: 275, gap: 12.5, why: 'the same parapet blocks, worst 11.84 u' },
   'BRIDGE RUN': { max: 50, gap: 14.5, why: 'the same parapet blocks, worst 13.52 u' },
   'OLIVE CROSSING': { max: 10, gap: 16, why: 'the same parapet blocks, worst 15.25 u — the roster maximum' },
-  'MOUNTAIN TO SEA': { max: 15, gap: 11.5, why: 'roadWidth 5: 10 left, worst 10.86 u' },
+  // r354 (#65): the two arch gateways' voussoir rings joined the census on
+  // the 2x pinches (18 blocks over 1 u). The rings were the world's real
+  // defect — a semicircle rising 13 u, crown 20.7 u over the ground — and
+  // are SEGMENTAL now (rise capped at the pre-2x 4.6 u, worst 10.08 u,
+  // inside the gap below); the budget admits the counted masonry.
+  'MOUNTAIN TO SEA': { max: 34, gap: 11.5, why: 'roadWidth blocks + 2 segmental arch rings, worst 10.86 u' },
   'PRINCIPALITY STREETS': { max: 50, gap: 12.5, why: 'oldtown frontage on a stepped hillside datum, worst 11.84 u' },
   'RED CENTRE RUN': { max: 20, gap: 12.5, why: 'pylon crossarms and rail blocks, worst 11.92 u' },
   // MEDITERRANEAN TERRACE COPING, a 3.4 x 0.05 x 0.32 u strip on the wall it
