@@ -9031,6 +9031,23 @@ export class Track {
       if (dDown < len + fanS + reach) return 0;    // inside the hump or its fan
       if ((N - dDown) < reach + 4) return 0;       // bore overruns into the crest from behind
     }
+    // r350 (owner: "All Tunels needs to be under a mountain otherwise makes
+    // no sense"): a bore needs ROOM FOR ITS MOUNTAIN. On CLIFF KNOT the
+    // planner sited the bore beside the start-straight braid — another leg
+    // of the lap ran through BOTH flanks 26-130 u out, so _roadCeil (rightly)
+    // capped the ridge to that carriageway and the tube stood on an 8 u
+    // mound. Refuse any station where a DIFFERENT leg passes within the
+    // ridge's near footprint; the planner walks on to a clear stretch.
+    for (const off of [0, reach, -reach]) {
+      const j = ((i + off) % N + N) % N;
+      const cj = this.center[j], nj = this.nrm[j];
+      for (const lat of [34, -34, 58, -58]) {
+        const x = cj.x + nj.x * lat, z = cj.z + nj.z * lat;
+        const ns2 = this._nearestSample(x, z);
+        const gap2 = Math.min(Math.abs(ns2.i - j), N - Math.abs(ns2.i - j));
+        if (gap2 > 40 && ns2.d < 26) return 0;
+      }
+    }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
       mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
@@ -9337,6 +9354,14 @@ export class Track {
     const nd = ns.d, bi = ns.i;
     let h = this._blendHeight(nd, this.center[bi].y, x, z);
     if (this.T.coast) h = this._coastDepress(x, z, h, nd);
+    // r350 (owner: tunnels under mountains): the ridge is built inside
+    // _blendHeight, and on a coast world _coastDepress then pulled it to the
+    // SEABED wherever the bore sits seaward of the coastline — SERPENT PASS
+    // read 10 u flanks over a −11.7 plain, SEA CLIFF RUN 5 u. Re-apply the
+    // ridge after the depression: a coastal bore stands in a HEADLAND that
+    // rises out of the sea, which is what a coastal tunnel is. (The corridor
+    // carve inside _tunnelRidge re-applies too, so the roadway stays open.)
+    if (this.T.coast && this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // THE EDITOR'S SCULPT, applied BEFORE the road clamps below - never
     // after. The clamps are what keep the carriageway drivable (the road is
     // the floor, and a tunnel stretch inverts it); a sculpt added after them
@@ -9589,6 +9614,9 @@ export class Track {
     // With the term only in the latter, the physics said "seabed at -7" while
     // the rendered land stayed dry — the sea existed as scattered pokes.
     if (this.T.coast) h = this._coastDepress(x, z, h, d);
+    // r350: the headland re-application, in BOTH ground functions like the
+    // coast term itself — see terrainHeight.
+    if (this.T.coast && this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // AND SO MUST THE EDITOR'S SCULPT, for exactly the same reason. Added to
     // terrainHeight alone, an Apply moved the physics, the scatter and the
     // road drape onto a 34 u hill while the drawn ground stayed dead flat —

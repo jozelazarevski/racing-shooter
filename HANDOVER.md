@@ -4161,6 +4161,42 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r350 — TUNNELS UNDER MOUNTAINS (owner: "All Tunels needs to be under a mountain otherwise makes no sense")
+
+Three separate defects, found by measuring 38 bores on 30 worlds
+(tools-scratch/dbg-tunnelmtn.mjs — flank peaks at mid and quarter
+points, lat 14..150 both sides):
+
+1. **The lens.** The ridge's along-bore ease started AND ended at the
+   portals, and an ~80 u bore is barely longer than two 48 u ramps —
+   flanks 29-45 u only at mid, 5-30 u at the quarters, ground at ROAD
+   LEVEL 25 u outside every mouth. FIX: the ridge LINE now runs ~60 u
+   past each portal along the road (the TUBE stays s0..e0; the grid
+   clear zone trims, never drops). Ease reaches full height at the
+   mouth, the bore lies under 39-55 u end to end, approaches are
+   cuttings into the face.
+
+2. **The seabed pull.** On coast themes _coastDepress runs AFTER
+   _blendHeight (which carries the ridge) and lerped the mountain to
+   the sea floor wherever a bore sits seaward of the coastline:
+   SERPENT PASS 10 u flanks over a −11.7 plain, CINQUE BORGHI 11,
+   SEA CLIFF RUN 5. FIX: re-apply _tunnelRidge after the depression in
+   BOTH ground functions (terrainHeight and _terrainMeshHeight, same
+   twin-function rule as the coast term itself) — a coastal bore now
+   stands in a HEADLAND rising from the sea (44-58 u).
+
+3. **No room for a mountain.** CLIFF KNOT's bore sat beside the
+   start-straight braid — another LEG of the lap ran through both
+   flanks 26-130 u out, so _roadCeil (correctly) capped the ridge to
+   that carriageway: an 8 u mound. FIX: tunnelFitAt refuses stations
+   with a different leg (index gap > 40) within 26 u of the ridge
+   footprint (probed at ±34/±58 u, at centre and both reach ends). The
+   planner re-sited CLIFF KNOT to mid 284 and SEA CLIFF RUN to 122 —
+   both now 58 u end to end, no world starved.
+
+LAW: CLAUDE.md gains §7.4a; test-tunnels gains the per-bore
+"under a mountain, end to end" check (worst flank >= 25 u).
+
 ## r349 — THE LAST FOUR EMITTERS (kicker-fan residue closed, #55)
 
 The r343 sweep left ~10 unculled kicker-landing records on 4-6 worlds
