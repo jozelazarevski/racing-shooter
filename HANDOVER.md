@@ -4161,6 +4161,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r343 — NO BORE IN A LANDING FAN (owner race log: kicker-landing violations)
+
+THE OWNER'S LOG carried `stageViolation kicker-landing k5 c0 u30` — an
+exact match for HIGHCROWN PEAK. The sweep found the rule firing on 41 of
+78 worlds, ~1600 unculled records, and dbg-kickerfan classified every
+one: TUNNEL BORE WALL COLLIDERS (r 1.4 at HW−0.5 = 11.1, consecutive
+pairs), plus a handful of culvert masonry at the fan's lateral boundary.
+
+THREE REPAIRS, each at the right layer:
+- tunnelFitAt's crest guard is DIRECTIONAL and fan-sized: a bore may not
+  start inside a crest's hump or its 150 m landing fan downstream (the
+  old symmetric reach+len reservation was 8-20 samples short); upstream
+  it only needs to end clear of the hump. test-tunnels green — no asking
+  world starves (the GLACIAL PASS lesson held).
+- A wall whose collider stands in ANOTHER leg's landing fan yields the
+  collider, mesh stays (the carriageway-drop rule extended; one record,
+  COTE D AZUR — the world whose own comment predicted the class).
+- Culvert masonry (src-tagged parapet/headwall) is §7.13 STRUCTURE, not
+  a §7.3 "obstacle prop": classified out of the kicker rule; its own
+  _clearsRoad discipline stands. Bore walls stay IN the rule.
+
+Also: the validator counted a stuck record once PER OVERLAPPING FAN —
+deduped (AEGEAN's "2" was one spot; CLIFF KNOT's "7" partly pairs). And
+report-stagerules.mjs writes its JSON script-relative now — the old
+cwd-relative path silently lost a full 78-world sweep to the
+tools-scratch/tools-scratch trap.
+
+AFTER: 41 worlds -> 5, ~1600 records -> 12 (filed with dbg evidence —
+the one that matters is CLIFF KNOT's r1.6 at lat 2.1, IN the
+carriageway; GLACIER COL's is a logpile element square in a fan). src
+tags on bore walls / culvert furniture are the new census handles.
+
 ## r342 — THE ROSTER ASKS FOR THE GARAGE (owner: "I need to be forced to buy upgrades. Now I am not. And that is a gap.")
 
 THE GAP, measured: rival machines are catalogue stats at a flat 0.96

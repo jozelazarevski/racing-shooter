@@ -28,7 +28,8 @@ for (const id of WORLDS) {
       if (rel > span) return null;
       const c = t.center[gi];
       if (Math.hypot(pnt.x - c.x, pnt.z - c.z) > half(gi) + 6) return null;
-      return { rel, lat: +Math.hypot(pnt.x - c.x, pnt.z - c.z).toFixed(1) };
+      return { rel, lat: +Math.hypot(pnt.x - c.x, pnt.z - c.z).toFixed(1),
+        dy: +(((pnt.y ?? c.y)) - c.y).toFixed(1), gi };
     };
     for (const cr of t.crests ?? []) {
       const from = (cr.index + Math.round(cr.len * 0.5)) % N;
@@ -42,6 +43,7 @@ for (const id of WORLDS) {
       for (const ob of t.solids ?? []) {
         if (ob.culled || !(ob.r > 0)) continue;
         if (ob.mat !== 'stone' || ob.r > 8 || propClassOf(ob) !== 'obstacle') continue;
+        if (ob.src === 'culvertParapet' || ob.src === 'culvertHeadwall') continue;
         const f = inFan(ob, from, span);
         if (!f) continue;
         if (!(ob.im && ob.inst !== undefined && ob.im.setMatrixAt)) {

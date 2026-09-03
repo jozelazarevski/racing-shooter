@@ -10422,6 +10422,22 @@ export class Track {
     }
   }
 
+  /** r343 — does sample gi sit inside a crest hump-or-landing-fan window,
+   *  with the point (x, z) inside the fan's lateral band (half + 6, the
+   *  validator's own §7.3 margin)? For builders whose colliders can stand
+   *  near ANOTHER leg of the lap than the one they were built along. */
+  _inCrestFanLat(gi, x, z) {
+    const c = this.center[gi];
+    if (Math.hypot(x - c.x, z - c.z) > (this.widthAt?.(gi) ?? 9) + 6) return false;
+    const fanS = Math.round(150 / this.segLen);
+    for (const cr of (this.crests ?? [])) {
+      const ci = cr.index ?? cr.i ?? cr;
+      const len = cr.len ?? 22;
+      if (((gi - ci + N) % N) < len + fanS) return true;
+    }
+    return false;
+  }
+
   /** OUTBACK RED DIRT: dry creek crossings — the region's signature terrain
    *  event, and the reason it needs geometry that did not exist.
    *
@@ -16700,6 +16716,13 @@ export class Track {
         // road is five times normal width, so a fixed 11.6 u bore is inside
         // its own carriageway for the whole length of the tunnel.
         if (!this._clearsRoad(wx, wz, 1.4, 0.2)) continue;
+        // r343: ...and a wall whose collider stands in ANOTHER leg's kicker
+        // landing fan yields it (mesh stays — the same rule as the
+        // carriageway drop above). One record on COTE D AZUR: a bore wall
+        // 10.5 u off a different stretch of road, inside a crest's fan.
+        const gi2 = this.nearestIndex ? this.nearestIndex({ x: wx, z: wz }, null) : i;
+        const own = this._circDist(gi2, Math.round((s0 + e0) / 2) % N) <= (e0 - s0) / 2 + 8;
+        if (!own && this._inCrestFanLat(gi2, wx, wz)) continue;
         this.solids.push({
           x: wx, z: wz, r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
           src: 'boreWall',

@@ -147,7 +147,9 @@ export function runStageValidator(game) {
     for (const tr of t.trees ?? []) {
       if (tr.dead || tr.culled || propClassOf(tr) !== 'obstacle') continue;
       if (!inFan(tr, from, span)) continue;
-      if (cullTree(tr)) lzCulled++; else lzStuck++;
+      // r343: a stuck record inside two overlapping fans counted once per
+      // crest — the report doubled. Count each record once.
+      if (cullTree(tr)) lzCulled++; else if (!tr._lzCounted) { tr._lzCounted = true; lzStuck++; }
     }
     for (const ob of t.solids ?? []) {
       if (ob.culled || !(ob.r > 0)) continue;
@@ -159,7 +161,7 @@ export function runStageValidator(game) {
       // race log); their fix is tunnelFitAt's directional fan guard.
       if (ob.src === 'culvertParapet' || ob.src === 'culvertHeadwall') continue;
       if (!inFan(ob, from, span)) continue;
-      if (cullSolid(ob)) lzCulled++; else lzStuck++;
+      if (cullSolid(ob)) lzCulled++; else if (!ob._lzCounted) { ob._lzCounted = true; lzStuck++; }
     }
   }
   if (lzCulled || lzStuck) {
