@@ -169,6 +169,8 @@
     "lateralNoiseTrailM": 4,
     "lateralNoiseOpenM": 12,
     "parCornerALat": 44,
-    "paceCornerExp": 6
+    "paceCornerExp": 6,
+    "progRampPct": 0.10,
+    "progRampEasyMul": 0.5
   }
 }

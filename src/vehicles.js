@@ -2685,7 +2685,12 @@ export class Car {
       // and the angle parks under the 65° spin line. Yaw away from the
       // slide (counter-steer) is never touched, and without the handbrake
       // nothing here runs — the earned spin stays earnable.
-      if (inputs.drift && Math.abs(vl) > 0.01) {
+      // PLAYER ONLY, same precedent as the over-budget law below: the AI
+      // plans within the budget and its errSlide handbrake is a recovery
+      // look, not a drift ask — the ceiling's carry math priced against
+      // the rival's near-zero lag over-rotated their slides (airace Q12
+      // measured the field re-packing on CANYON after r341).
+      if (inputs.drift && this === this.game.player && Math.abs(vl) > 0.01) {
         const intoDir = -Math.sign(vl);
         const into = dTheta * intoDir;
         const maxInto = Math.max(0, (DRIVING.driftBetaMax ?? 1.0) - beta)
@@ -4938,7 +4943,17 @@ export class EnemyCar extends Car {
     // so the beating is legible rather than mysterious. Meet both gates and
     // this is exactly 1 — the balance every other test was tuned against.
     const kit = g.kitHandicap?.() ?? 1;
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * pace;
+    // r342 THE ROSTER RAMP (owner: "I need to be forced to buy upgrades"):
+    // the grid gets quicker with roster position — see DRIVING.ai. This is
+    // the one place the 0.96 showroom handicap is deliberately outgrown:
+    // a late-roster grid is SUPPOSED to be past the stock showroom, that
+    // is what the garage is for. EASY runs half the ramp.
+    const rampPct = (DRIVING.ai?.progRampPct ?? 0.10)
+      * ((g.difficulty?.id ?? 'normal') === 'easy'
+        ? (DRIVING.ai?.progRampEasyMul ?? 0.5) : 1);
+    const ramp = 1 + rampPct * (g.rosterProg?.() ?? 0);
+    this._progRamp = ramp;
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * pace * ramp;
 
     // (The corner band — the half of the rubber band that actually bound,
     // rivals being corner-limited 95% of the time — is deleted with it.
@@ -5325,7 +5340,10 @@ export class EnemyCar extends Car {
     // the mechanism is still pace and nothing else.
     const aLat = (DRIVING.ai?.parCornerALat ?? 44)
       * Math.pow(pace, DRIVING.ai?.paceCornerExp ?? 4)
-      * D.aiSpeed * (D.aiCorner ?? 1);
+      * D.aiSpeed * (D.aiCorner ?? 1)
+      // r342: the roster ramp reaches the corners at the same rate as the
+      // straights — corner speed goes as sqrt(aLat), hence ramp².
+      * (this._progRamp ?? 1) * (this._progRamp ?? 1);
     const sqA = Math.sqrt(aLat);
     // 15, down from 26 (r288): the player's brake learned its real-world cap
     // (~1.5g = 14.7 u/s²), and a field that PLANS 2.65g stops would outbrake
@@ -5342,7 +5360,13 @@ export class EnemyCar extends Car {
       // constant here compressed the roster's whole spread on the narrow
       // worlds (everyone threaded every pinch at the same 16 + 3.6w).
       const wj = t.widthAt ? t.widthAt(j) : ROAD_HALF;
-      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, (16 + 3.6 * wj) * pace);
+      // r342: the roster ramp reaches the pinch cap like the persona's pace
+      // does — same precedent, no orphan cap. Note the honest measurement:
+      // the narrow street worlds stay EXECUTION-bound (traffic, building
+      // gaps — world 78's mean rival speed was identical under the full
+      // ramp), so streets equalize by design; the ramp expresses where the
+      // road opens.
+      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, (16 + 3.6 * wj) * pace * (this._progRamp ?? 1));
       // ---- viz-zones: rivals can't see through fog/trees either
       if (t.vizZones && t.vizZones.length) {
         for (const z of t.vizZones) {
