@@ -12005,6 +12005,11 @@ export class Track {
       for (const [off, side] of [[15, 1], [19, -1]]) {
         const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
         if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
+        // r344: a logpile is obstacle-class stone (r 2.4) and this spot is
+        // 16 u past a gorge at lat 15 — inside a kicker landing fan on
+        // GLACIER COL. Timber dressing yields to landing zones.
+        const pgi = this.nearestIndex ? this.nearestIndex({ x: px, z: pz }, null) : ci;
+        if (this._inCrestFanLat(pgi, px, pz)) continue;
         this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
       }
       // a couple of loose fallen logs
@@ -17066,7 +17071,12 @@ export class Track {
         this._element(B, type, p.x, p.z, site.rot + (Math.random() - 0.5) * 0.7, K);
       }
       const dp = at(-4, 16);
-      if (this._buildableSpot(dp.x, dp.z, 4, 3.0)) {
+      // r344: yard dressing is stone and obstacle-class (the logpile is
+      // r 2.4) — a farmstead whose yard corner pokes into a kicker landing
+      // fan keeps its buildings but skips the dress item (GLACIER COL's
+      // logpile sat square in a fan at lat 15).
+      const dgi = this.nearestIndex ? this.nearestIndex(dp, null) : 0;
+      if (this._buildableSpot(dp.x, dp.z, 4, 3.0) && !this._inCrestFanLat(dgi, dp.x, dp.z)) {
         this._element(B, K.dress[(Math.random() * K.dress.length) | 0], dp.x, dp.z,
           Math.random() * Math.PI * 2, K);
       }

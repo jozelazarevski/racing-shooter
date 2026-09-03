@@ -4161,6 +4161,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r344 — THE METERS LEARN WHAT THEY MEASURE, AND THE DRESSING YIELDS
+
+Four small repairs riding one deploy, every one evidence-first:
+
+- Q12's late law measures PERSISTENCE, not presence (test-airace).
+  dbg-canyonpack mapped every observed CANYON red to one contiguous
+  11-14 s battle group rolling down the road and dispersing on its own —
+  clean zero-tick races exist on the same build. Ticks < 2 s apart join
+  an episode; an episode over 30 s or 120 cumulative late ticks is the
+  old band's four-wide train, an incident-bunch that clears is racing.
+  Green with worst episode 5.5 s. Task #54 closed.
+- test-shortcut's controlled pair holds its lanes: the flat pick is also
+  a STRAIGHT pick (relax ladder). On the old FALKEN RIDGE sample the
+  road curved into the off lane — the off-road runner converged ONTO the
+  carriageway by 1.3 s and the law read road-vs-road, calling grass 7%
+  faster. Honest pair: road 42.7 vs grass 39.0. Task #53 closed.
+- The validator's fan rule learned the physics' vertical window (a
+  no-`h` solid is solid only ±6 u of its own y — CLIFF KNOT's
+  "carriageway blocker" was 12 u underground and inert), and stuck
+  records count once, not once per overlapping fan.
+- Dressing yields to landing fans: the farmstead yard's stone dress item
+  (logpile/well) and the timber-gorge logpiles (placed at lat 15-19,
+  GLACIER COL's sat square in a fan) skip fan spots. Buildings stay.
+  Kicker-fan residue now ~10 boundary records on 4 worlds (task #55,
+  emitters unidentified, dbg-kickerid.mjs is the census tool).
+
 ## r343 — NO BORE IN A LANDING FAN (owner race log: kicker-landing violations)
 
 THE OWNER'S LOG carried `stageViolation kicker-landing k5 c0 u30` — an
