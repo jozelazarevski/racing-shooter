@@ -18,7 +18,7 @@ import { Route } from './route.js';
 // — no file shipped means the defaults in driving.js ARE the tune.
 loadDrivingOverrides();
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
-import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
+import { PlayerCar, EnemyCar, CAR_CATALOG, AI_COLORS, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
   applyUpgradeKit, buildPartIcon, worldIsDark, fadeCarLights } from './vehicles.js';
 import { Chopper } from './choppers.js';
@@ -3369,9 +3369,12 @@ class Game {
       if (meAt <= 3) this.hud.feed('SEASON PODIUM — THE NEXT CHAPTER IS OPEN', 'good');
       // r318 C5: the record and the backer, both written at this one moment.
       // History is append-only — a season lived is a season kept.
+      // CP4 (r352): the season remembers WHO the title was taken from —
+      // the chapter's nemesis, named in the history beat the card shows.
       (this.career.seasonHistory ??= []).push({
         k, name: ch.name, pos: meAt,
         pts: table[meAt - 1]?.[1] ?? 0, champion: table[0]?.[0] ?? 'YOU',
+        nem: this.nemesisOf?.(k)?.name ?? null,
         when: Date.now(),
       });
       const tier = meAt <= 3 ? Game.SPONSOR_TIERS[meAt - 1] : null;
@@ -3474,7 +3477,9 @@ class Game {
     strip.innerHTML = `<div class="cal-row">${cells}</div>
       <div class="cal-foot">
         <span>🏁 ${raced ? `P${meAt} · ${table[meAt - 1]?.[1] ?? 0} PTS` : 'SEASON NOT STARTED'}${
-  raced && lead && lead[0] !== 'YOU' ? ` — ${lead[0]} LEADS ON ${lead[1]}` : ''}</span>
+  raced && lead && lead[0] !== 'YOU' ? ` — ${lead[0]} LEADS ON ${lead[1]}` : ''}${
+  /* CP4 (r352): the chapter's nemesis, named where the season lives */
+  this.nemesisOf?.(k) ? ` · 🎯 ${this.nemesisOf(k).name}` : ''}</span>
         ${sp ? `<span class="cal-sp">🤝 ${sp.name} · +${sp.perRace} CR PER TOP-${Game.SPONSOR_TOP}</span>` : ''}
       </div>`;
     sel.appendChild(strip);
@@ -3542,6 +3547,26 @@ class Game {
     }
     return tiers.length ? { ...tiers[tiers.length - 1], idx: tiers.length - 1 }
       : { name: 'ROOKIE', ramp: 0, carMin: 0, idx: 0 };
+  }
+
+  /** CP4 (CAREER_PATH.md, r352) — THE NEMESIS. Which named driver a chapter
+   *  belongs to, from the career block's slot table (§5.2 machinery is
+   *  untouched — the nemesis merely holds the pressure lease by default). */
+  nemesisOf(k) {
+    const slots = window.__DRIVING?.career?.nemeses ?? [];
+    const slot = slots[k];
+    if (slot == null || !AI_COLORS[slot]) return null;
+    return { slot, name: AI_COLORS[slot].driver ?? AI_COLORS[slot].name };
+  }
+
+  /** The nemesis as a LIVE car on the current grid, or null. */
+  nemesisRival() {
+    if (this.freeRoam || this.missionMode) return null;
+    const k = this.chapterOf(this.level?.id);
+    if (k < 0) return null;
+    const nem = this.nemesisOf(k);
+    if (!nem) return null;
+    return this.enemies?.find((e) => (e.driverName ?? e.name) === nem.name) ?? null;
   }
 
   /** Which tier a MACHINE belongs to, by its catalog price. */
@@ -4182,10 +4207,14 @@ class Game {
       // r318 C5: a lived season is part of the card — the history in one word
       const hist = (this.career.seasonHistory ?? []).find((h) => h.k === c._k);
       const trophy = this.career.trophies?.[c._k];
+      // CP4 (r352): a title has a NAME on it — champion of a chapter with a
+      // recorded nemesis reads "TOOK THE TITLE FROM K. MARIC".
       const line = open
         ? `${raced}/${c.levels.length} RACED · ${done} CLEARED${
   trophy ? ` · 🏆 TROPHY P${trophy.place}` : ''}${
-  hist ? ` · ${hist.pos === 1 ? '🏆 CHAMPION' : `SEASON P${hist.pos}`}` : ''}`
+  hist ? ` · ${hist.pos === 1
+    ? (hist.nem ? `🏆 TOOK THE TITLE FROM ${hist.nem}` : '🏆 CHAMPION')
+    : `SEASON P${hist.pos}`}` : ''}`
         : `NEEDS ${short}★ MORE IN CHAPTER ${prev ? prev.n : ''}`;
       card.innerHTML = `
         <div class="cc-top">
@@ -10560,9 +10589,12 @@ class Game {
       }
       // CP2 (r348): the finale announces itself on the grid — behaviour
       // only, the toast lane the tyre warning above already uses.
+      // CP4 (r352): ...and introduces the chapter's nemesis by name.
       if (!this.missionMode && this.isFinale?.(this.level.id)) {
         const fk = this.chapterOf(this.level.id);
+        const nem = this.nemesisOf?.(fk);
         this.hud.feed(`🏆 ${this.chapters()[fk]?.name ?? 'CHAPTER'} FINALE`
+          + `${nem ? ` — ${nem.name} ON POLE FORM` : ''}`
           + ' — DOUBLE PAY, TROPHY ON A PODIUM', 'good');
       }
     }
@@ -11159,6 +11191,11 @@ class Game {
           const d = Math.abs((e.progress ?? 0) - (this.player.progress ?? 0));
           if (d < bestD) { bestD = d; best = e; }
         }
+        // CP4 (r352): the chapter's NEMESIS holds the lease by default —
+        // same clamp, same re-pick cadence, never a force; the nearest-pace
+        // pick stands in only when the nemesis is out of the race.
+        const nem = this.nemesisRival?.();
+        if (nem?.alive) best = nem;
         if (best && best !== this._pressureRival) {
           this._pressureRival = best;
           this.telemetry?.log('aiState', { rival: best.persona ?? best.name,
