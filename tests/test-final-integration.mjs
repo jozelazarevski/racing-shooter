@@ -12,7 +12,7 @@ const LAUNCH = { executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=s
 // hardcoded localhost:8901 in seven places — the fourth file in this suite with
 // that defect, and HANDOVER lists it as a trap precisely because a gate you
 // cannot baseline cannot tell a regression from a pre-existing failure.
-const BASE = process.env.BASE ?? BASE;
+const BASE = process.env.BASE ?? 'http://localhost:8901';
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); };
 

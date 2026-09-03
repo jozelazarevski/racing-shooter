@@ -142,7 +142,10 @@ const R = await page.evaluate(async () => {
   // ---- a fresh career ----------------------------------------------------
   g.career.finished = {};
   out.freshOpen = LEVELS.filter((l) => g.isLevelUnlocked(l.id)).length;
-  out.freshIsChapterOne = out.freshOpen === c0.levels.length;
+  // CP2 (r348): the chapter's finale keeps its own door, so a fresh career
+  // opens chapter one EXCEPT its last world
+  out.freshIsChapterOne = out.freshOpen === c0.levels.length - 1
+    && !g.isLevelUnlocked(g.finaleOf(0).id);
   out.freshNext = g.nextTrack()?.lv?.id;
   out.freshNextIsFirst = out.freshNext === c0.levels[0].id;
 
@@ -225,7 +228,8 @@ ok(R.racedStaysOpen, 'it stays open even though its chapter has not been reached
 ok(R.racedChapterStillShut, 'and racing it does not open the chapter around it');
 
 console.log('\n--- a fresh career ---');
-ok(R.freshIsChapterOne, 'opens exactly chapter one', `${R.freshOpen} worlds open`);
+ok(R.freshIsChapterOne, 'opens exactly chapter one, its finale shut (CP2)',
+  `${R.freshOpen} worlds open`);
 ok(R.freshNextIsFirst, 'and points at its first world');
 
 console.log('\n--- and the surfaces say so ---');

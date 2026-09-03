@@ -170,7 +170,10 @@
     "lateralNoiseOpenM": 12,
     "parCornerALat": 44,
     "paceCornerExp": 6,
-    "progRampPct": 0.10,
+    "progRampPct": 0.1,
     "progRampEasyMul": 0.5
+  },
+  "career": {
+    "finaleMul": 2
   }
 }
