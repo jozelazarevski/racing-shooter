@@ -152,6 +152,12 @@ export function runStageValidator(game) {
     for (const ob of t.solids ?? []) {
       if (ob.culled || !(ob.r > 0)) continue;
       if (ob.mat !== 'stone' || ob.r > 8 || propClassOf(ob) !== 'obstacle') continue;
+      // r343: §7.3's words are "obstacle PROPS" — culvert masonry is §7.13
+      // structure with its own _clearsRoad discipline, and until the src
+      // tags existed this filter could not tell a parapet from a rock. Bore
+      // walls stay IN the rule (a landing at a tunnel mouth was the owner's
+      // race log); their fix is tunnelFitAt's directional fan guard.
+      if (ob.src === 'culvertParapet' || ob.src === 'culvertHeadwall') continue;
       if (!inFan(ob, from, span)) continue;
       if (cullSolid(ob)) lzCulled++; else lzStuck++;
     }

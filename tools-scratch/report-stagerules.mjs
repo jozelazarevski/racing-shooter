@@ -39,7 +39,7 @@ for (const [id, name] of ids) {
   }
   await p.close();
 }
-writeFileSync('tools-scratch/stagerules-report.json', JSON.stringify(report, null, 1));
+writeFileSync(new URL('./stagerules-report.json', import.meta.url), JSON.stringify(report, null, 1));
 const counts = {};
 for (const w of report) for (const v of w.violations ?? []) counts[v.rule] = (counts[v.rule] ?? 0) + 1;
 console.log('SUMMARY', JSON.stringify(counts));
