@@ -66,7 +66,16 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
         // is meant to, and this exception is recorded in NATURE.md rather than
         // being quietly absorbed by a loose threshold.
         const df = t._distToTrackCoarse ? t._distToTrackCoarse(xs[s], zs[s]) : 999;
-        if (df < 30) { fordRises++; continue; }
+        // r340: the dam's climb is anchored on the FORD, and its graded
+        // approach stretched with the 2x plan — measure the exception from
+        // the crossing itself (measured dams sit 15-33 u out), keeping the
+        // road-radius test for worlds whose fords the river list misses
+        let dFord = 1e9;
+        for (const fdd of (t._river?.fords ?? [])) {
+          const cf = t.center[fdd.i];
+          if (cf) dFord = Math.min(dFord, Math.hypot(xs[s] - cf.x, zs[s] - cf.z));
+        }
+        if (df < 30 || dFord < 48) { fordRises++; continue; }
         rises++;
         if (up > worstRise) worstRise = up;
       }
@@ -119,6 +128,12 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
         // radii of 61 to 107 u, and they are half-buried on purpose; reading
         // them as floating furniture reported 11 false violations.
         if ((o.r ?? 0) > 20) continue;
+        // r340: landforms are recognised by CLASS, not just size — massif
+        // and glacier records carry `prof` (the band profile the height
+        // gate reads) and anchor their collider +2 over the half-buried
+        // drawn base on purpose. A 22 u cone slipped under the radius
+        // exemption and reported its deliberate anchor as floating.
+        if (o.prof) continue;
         if ((t._distToTrackCoarse ? t._distToTrackCoarse(o.x, o.z) : 999) < 16) continue;
         n++;
         const a = t.terrainHeight(o.x, o.z);

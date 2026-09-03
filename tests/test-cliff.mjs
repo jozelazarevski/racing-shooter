@@ -35,12 +35,16 @@ const r = await p.evaluate(() => {
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
 
-  // the biggest shelf on the report's world: road furthest above the verge
+  // the biggest shelf on the report's world: road furthest above the verge.
+  // r340: hunt across laterals too — at the 2x plan scale the ravine wall
+  // falls away further out (measured: 10 u at lateral 20, 29 u at 34)
   let shelf = null;
-  for (let i = 40; i < t.center.length - 40; i += 5) {
-    const pt = t.pointAt(i, 20);
-    const gap = t.center[i].y - t.terrainHeight(pt.x, pt.z);
-    if (!shelf || gap > shelf.gap) shelf = { i, gap: +gap.toFixed(1) };
+  for (const lat of [17, 20, 26, 34]) {
+    for (let i = 40; i < t.center.length - 40; i += 5) {
+      const pt = t.pointAt(i, lat);
+      const gap = t.center[i].y - t.terrainHeight(pt.x, pt.z);
+      if (!shelf || gap > shelf.gap) shelf = { i, lat, gap: +gap.toFixed(1) };
+    }
   }
 
   const park = (lat, y) => {
@@ -54,7 +58,7 @@ const r = await p.evaluate(() => {
   };
 
   // ---- C1: the report — one step past the deck, at deck height ----
-  park(17, t.center[shelf.i].y + 0.3);
+  park(shelf.lat - 3, t.center[shelf.i].y + 0.3);
   let wentAir = false;
   for (let k = 0; k < 240 && car.alive; k++) {
     car.step(1 / 60, { throttle: 0, brake: 0, steer: 0, drift: false, hold: false });
@@ -82,8 +86,8 @@ const r = await p.evaluate(() => {
   // ---- C5: a rival at the same spot never takes the edge exit ----
   const e = g.enemies[0];
   e.alive = true; e.health = 100;
-  const ept = t.pointAt(shelf.i, 17);
-  e.trackIndex = shelf.i; e.lateral = 17;
+  const ept = t.pointAt(shelf.i, shelf.lat - 3);
+  e.trackIndex = shelf.i; e.lateral = shelf.lat - 3;
   e.pos.set(ept.x, t.center[shelf.i].y + 0.3, ept.z); e.y = e.pos.y;
   let eAir = false;
   for (let k = 0; k < 60; k++) { e.update(1 / 60); if (e.airborne) eAir = true; }

@@ -7886,17 +7886,38 @@ export class Track {
     // which is a river that stops in the middle of a field. Keep stepping
     // until the tail is genuinely past the world edge.
     const OUT_R = 2600;                    // clear of the far terrain and the fog
+    // r340: A TAIL FOLLOWS THE VALLEY, NOT THE COMPASS. Walking straight
+    // out with sway sent PINE VALLEY's tail across a steep hillside on the
+    // 2x lap, and the ribbon's downhill edge hung 7-8 u in the air (no bed
+    // profile can bridge a side slope). Each step now blends the outward
+    // heading with the local downhill direction — rivers run in valleys —
+    // with the outward component kept dominant so a tail can never curl
+    // back toward the circuit.
     const extend = (from, to, sign) => {
       let dx = to.x - from.x, dz = to.z - from.z;
       const l = Math.hypot(dx, dz) || 1;
       dx /= l; dz /= l;
+      let cx = to.x, cz = to.z;
       for (let k = 1; k <= 30; k++) {
-        const step = 150 * k;
-        const sway = Math.sin(k * 0.75 + (sign > 0 ? 1.3 : 4.1)) * 40;
-        const nx = to.x + dx * step - dz * sway;
-        const nz = to.z + dz * step + dx * sway;
-        pts[sign > 0 ? 'push' : 'unshift'](P(nx, nz));
-        if (Math.hypot(nx, nz) > OUT_R) break;
+        const E = 10;
+        const gx = (this.terrainHeight(cx + E, cz) - this.terrainHeight(cx - E, cz)) / (2 * E);
+        const gz = (this.terrainHeight(cx, cz + E) - this.terrainHeight(cx, cz - E)) / (2 * E);
+        const gm = Math.hypot(gx, gz);
+        if (gm > 0.02) {
+          const bx2 = dx * 0.62 - (gx / gm) * 0.38;
+          const bz2 = dz * 0.62 - (gz / gm) * 0.38;
+          const bl = Math.hypot(bx2, bz2) || 1;
+          // outward guarantee: never turn against the radial escape
+          const rl = Math.hypot(cx, cz) || 1;
+          if ((bx2 / bl) * (cx / rl) + (bz2 / bl) * (cz / rl) > 0.1) {
+            dx = bx2 / bl; dz = bz2 / bl;
+          }
+        }
+        const sway = Math.sin(k * 0.75 + (sign > 0 ? 1.3 : 4.1)) * 24;
+        cx += dx * 150 - dz * sway * 0.2;
+        cz += dz * 150 + dx * sway * 0.2;
+        pts[sign > 0 ? 'push' : 'unshift'](P(cx, cz));
+        if (Math.hypot(cx, cz) > OUT_R) break;
       }
     };
     extend(pts[1], pts[0], -1);
@@ -8006,7 +8027,25 @@ export class Track {
     // terrain TOWARD that profile inside the channel instead of denting it.
     // _blendHeight skips the channel entirely while `bed` is null, so these
     // samples see the pre-river ground and this cannot feed on itself.
-    const raw = line.map((p) => this.terrainHeight(p.x, p.z));
+    // r340: THE BED MUST NOT FLOAT OVER ITS OWN FLANKS. Sampled at the
+    // line's centre alone, a reach crossing a side slope held the centre's
+    // height while the downhill flank ran 7 u lower — and the ribbon's
+    // outer vertices hung in the air over it (measured on the 2x lap's
+    // PINE VALLEY tail: 8.18 u proud at rd 150). The profile takes the
+    // LOWEST ground across the water's width, so the staircase steps down
+    // the side slope and the carve digs the channel through the high side
+    // instead of the water bridging the low one.
+    const raw = line.map((p, k) => {
+      const a2 = line[Math.max(0, k - 1)], b2 = line[Math.min(line.length - 1, k + 1)];
+      let dx = b2.x - a2.x, dz = b2.z - a2.z;
+      const l = Math.hypot(dx, dz) || 1;
+      const px = -dz / l, pz = dx / l;
+      const w = half * 1.4;
+      return Math.min(
+        this.terrainHeight(p.x, p.z),
+        this.terrainHeight(p.x + px * w, p.z + pz * w),
+        this.terrainHeight(p.x - px * w, p.z - pz * w));
+    });
     const SM = 10;                                    // smoothing half-window
     const smooth = raw.map((_, k) => {
       let s = 0, n = 0;
@@ -8016,6 +8055,14 @@ export class Track {
       }
       return s / n;
     });
+    // r340, second half of the flank law: the ±10-station smoothing can
+    // lift the profile straight back over a sharp local dip the raw pass
+    // found (PINE's tail still hung 7.1 u after the min-sampling alone).
+    // A reach may stand at most a fall lip over the lowest ground its
+    // water covers — clamp the smooth profile to that.
+    for (let k2 = 0; k2 < smooth.length; k2++) {
+      smooth[k2] = Math.min(smooth[k2], raw[k2] + 1.5);
+    }
     // AWAY FROM A FORD, THE RIVER GOES UNDER THE ROAD — AND THE BED IS WHAT
     // PUTS IT THERE.
     //
@@ -8108,7 +8155,14 @@ export class Track {
     // ford PLANNER (it should not site a crossing the river cannot reach), and
     // not by dropping fords here, because the editor's authored crossings are
     // contractually guaranteed to exist (tests/test-river-tool.mjs).
-    const FORD_KEEP = 46;             // matches _buildRiver's own ford window
+    // r340: the crossing-vs-ford identity window is a PLAN distance — the
+    // S-bend the reach makes around a crossing sits twice as far from its
+    // ford on the 2x lap, and a sibling crossing that escaped the window
+    // got capped, whose running minimum then dried the ford downstream
+    // (PINE VALLEY, wash 7.5 u under the deck). The window scales with the
+    // route; test-water holds both sides of the trade (no dry ford, no
+    // proud water).
+    const FORD_KEEP = 46 * ROUTE_SCALE;
     const UNDER = 0.5;
     const CULV = 90;                  // room for the graded approach below
     const dRoad = line.map((q) => this._distToTrackCoarse(q.x, q.z));
@@ -10152,7 +10206,10 @@ export class Track {
         // keeps its mesh and gives up its collider. This is exactly the rule
         // the grandstand's own colliders have followed since r167.
         if (!clear) continue;
-        this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
+        // r340: the collider stands where the LEG stands. Registered at the
+        // road sample's height it floated 1.07 u over the dipped terrain at
+        // FALKEN RIDGE's start on the 2x lap; footY is the mesh's own foot.
+        this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: footY, mat: 'metal' });
       }
       // THE BRACES LEARN WHAT THE LEGS LEARNED (r253): where the lap curls
       // back past its own start line, the road under the tower is not the
@@ -10932,6 +10989,33 @@ export class Track {
    *  by the theme's random crossings and the editor's authored ones. */
   _finishFords(chosen) {
     this._planRiver(chosen);
+    // r340: A FORD THE RIVER CANNOT REACH IS NOT A FORD. The bed-cap's
+    // running minimum can carry a remote crossing's level under a planned
+    // ford's deck (the trade _planRiver documents — water that has dropped
+    // cannot climb back), and on the 2x lap PINE VALLEY's ford drew that
+    // straw: wash 7.5 u under the deck, foam and apron on dry tarmac. The
+    // planner now keeps only fords whose bed reaches their deck; a dropped
+    // one leaves an ordinary culvert, which is the accepted pattern at
+    // every unplanned crossing already. This is the "fix it at the ford
+    // planner" the cap's own comment asked for, in its minimal form.
+    const R = this._river;
+    if (R?.bed && R.line) {
+      const wet = (fd) => {
+        const c = this.center[fd.i];
+        let ki = 0, bd = 1e9;
+        for (let k = 0; k < R.line.length; k++) {
+          const d = Math.hypot(R.line[k].x - c.x, R.line[k].z - c.z);
+          if (d < bd) { bd = d; ki = k; }
+        }
+        return c.y - R.bed[ki] < 4;
+      };
+      const kept = chosen.filter(wet);
+      if (kept.length !== chosen.length) {
+        R.fords = R.fords.filter((fd) => kept.includes(fd));
+        chosen = kept;
+      }
+    }
+    if (!chosen.length) return;
     const foamMat = new THREE.MeshBasicMaterial({
       color: 0xf2fbff, transparent: true, opacity: 0.4, depthWrite: false,
     });
@@ -13968,7 +14052,10 @@ export class Track {
     // 3.8 u on FURKA, which is a building with daylight under it. A real
     // Belvedere sits on masonry, so build the masonry: a retaining base from
     // the ground up to the floor, sized just inside the footprint.
-    const terr = this.terrainHeight(p.x, p.z);
+    // r340: the masonry meets the ground the player SEES — the analytic
+    // curve left the plinth (and its record) 1.07 u over the drawn mesh
+    // chord at the 2x coordinates; _seatY is the lower of the two.
+    const terr = this._seatY(p.x, p.z);
     const stand = gy - terr;
     if (stand > 0.3) {
       const plinth = new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 0.6, stand + 0.6, D * 2 - 0.6),

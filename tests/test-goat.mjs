@@ -338,8 +338,14 @@ for (const id of [6, 21]) {
 // ---- LAW 4 — THE CUT NEVER LEAVES THE COURSE (control) ------------------
 // The off-course rule hangs on a 70 u band. This is the measurement that says
 // the band is clear of every racing line: cutting the inside of the ten
-// tightest corners reaches 25 u of lateral at most.
-const CUT_LAT = 40;
+// tightest corners must never reach the 60 u wilds fence.
+// r340: at the 2x plan scale a proportional cut line doubles in metres
+// while the fences stay absolute (they are road-relative), so the old 40
+// margin ceiling — measured 25 u when it was set — no longer describes a
+// healthy lap. Measured post-scale: 50-53 u. The ceiling is now the fence
+// itself minus clearance; the binding law (the band never engages during
+// a cut) is unchanged below.
+const CUT_LAT = 58;
 for (const id of [6, 62]) {
   if (!await load(id)) { ok(false, `world ${id} did not build`); continue; }
   const r = await page.evaluate(() => {
@@ -354,6 +360,11 @@ for (const id of [6, 62]) {
       if (picks.length >= 10) break;
     }
     let maxLat = 0, offFrames = 0;
+    // r340: aim in METRES, not samples — at 2x segLen a 40-sample chord
+    // doubled and the cut depth doubled with it (chord²/8R), which measured
+    // the probe, not the course
+    const segL = (() => { let su = 0; for (let i = 0; i < 64; i++) { const a = t.center[(i*37)%N], b2 = t.center[((i*37)%N+1)%N]; su += Math.hypot(b2.x-a.x, b2.z-a.z); } return Math.max(0.5, su/64); })();
+    const LOOK = Math.max(8, Math.round(80 / segL));
     for (const q of picks) {
       const s0 = ((q.i - 30) % N + N) % N, c = t.center[s0];
       p.pos.set(c.x, c.y + 0.4, c.z); p.y = c.y; p.vy = 0; p.airborne = false;
@@ -363,7 +374,7 @@ for (const id of [6, 62]) {
       p.vel.set(Math.sin(p.heading) * v0, 0, Math.cos(p.heading) * v0);
       p.slip = 0; p.steerSmooth = 0; p._climbRate = 0; p._lastGY = c.y;
       for (let k = 0; k < 420; k++) {
-        const aim = t.center[(p.trackIndex + 40) % N];
+        const aim = t.center[(p.trackIndex + LOOK) % N];
         let want = Math.atan2(aim.x - p.pos.x, aim.z - p.pos.z) - p.heading;
         while (want > Math.PI) want -= 2 * Math.PI;
         while (want < -Math.PI) want += 2 * Math.PI;
