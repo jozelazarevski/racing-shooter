@@ -2690,7 +2690,19 @@ export class Car {
         const into = dTheta * intoDir;
         const maxInto = Math.max(0, (DRIVING.driftBetaMax ?? 1.0) - beta)
           * (DRIVING.driftBetaEase ?? 6) * dt;
-        if (into > maxInto) this._driftCarry = (into - maxInto) * intoDir;
+        if (into > maxInto) {
+          // ...and the carried turn OBEYS THE TYRE: an unbounded carry let
+          // the whole yaw stack rotate the trajectory — measured 3.5 rad/s
+          // at 66 km/h, a 5 m donut at 7 g. The handbrake tyre carries the
+          // corner at driftCarryCap × budget (the same ceiling the kinetic
+          // scrub grants it); nose rotation past deepening + carry is
+          // neither turn nor slide and is clamped off.
+          const carryCap = (DRIVING.driftCarryCap ?? 2.1)
+            * aMax / Math.max(sp, 1) * dt;
+          const carry = Math.min(into - maxInto, carryCap);
+          this._driftCarry = carry * intoDir;
+          dTheta = intoDir * (maxInto + carry);
+        }
       }
     }
     // DRIVING AID: a gentle nudge back toward the road's direction when the

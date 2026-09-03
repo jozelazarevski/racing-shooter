@@ -92,9 +92,14 @@ export const DRIVING = {
   // band to ~89° of slip, a guaranteed spin-out. Past driftBetaMax the nose
   // and the velocity rotate TOGETHER: the turn continues at full rate (the
   // r307 drift promise), the angle stops deepening, and the 65° "earned"
-  // spin stays reachable — just not handed out by the assist stack.
+  // spin stays reachable — just not handed out by the assist stack. The
+  // carried turn is budget-priced (driftCarryCap), so the ceiling is a
+  // controlled arc, not free rotation.
   driftBetaMax: 1.0,         // rad (~57°): held-drift slip ceiling, under the spin line
   driftBetaEase: 6,          // 1/s: rate the remaining room closes at (τ ≈ 0.17 s)
+  driftCarryCap: 1.0,        // × budget: lateral the carried turn may spend — over yawCapLo (1.45,
+                             // the flat-out grip arc), under the scrub's 2.1: the drift out-turns
+                             // grip without the 7 g donut
 
   // §5-equivalent — the yaw caps (this engine steers in yaw-rate space).
   // 1.45 mid-range (r294, "impossible to steer in this curve at this
