@@ -65,15 +65,20 @@ const R = await p.evaluate(() => {
     const v0 = kmh0 / 3.6;
     pl.vel.set(Math.sin(pl.heading) * v0, 0, Math.cos(pl.heading) * v0);
     pl.speedAlong = v0; pl.airborne = false;
-    const h0 = pl.heading;
     let slipAt05 = 0, maxSlip = 0;
+    // r341: turn ACCUMULATES per-frame deltas. The old |wrap(end - start)|
+    // folded at 180° — once the drift ceiling let a held drift rotate past
+    // a half-turn, a 231° arc measured as 129 and a harder one as less.
+    let turn = 0, prevH = pl.heading;
     for (let f = 0; f < 120; f++) {
       pl.step(1 / 60, { throttle: 0.6, brake: 0, steer: 1, drift, hold: false });
+      turn += Math.abs(wrap(pl.heading - prevH)) * 180 / Math.PI;
+      prevH = pl.heading;
       const slip = Math.abs(wrap(pl.heading - Math.atan2(pl.vel.x, pl.vel.z))) * 180 / Math.PI;
       maxSlip = Math.max(maxSlip, slip);
       if (f === 29) slipAt05 = slip;
     }
-    return { turn: Math.abs(wrap(pl.heading - h0)) * 180 / Math.PI,
+    return { turn,
       slipAt05, maxSlip, endKmh: Math.hypot(pl.vel.x, pl.vel.z) * 3.6 };
   };
   const out = { d70: run(true, 70), p70: run(false, 70), d110: run(true, 110) };
