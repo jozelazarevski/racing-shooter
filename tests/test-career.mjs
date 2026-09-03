@@ -17,6 +17,10 @@
  *   K10-K12 (r318, C5) a season podium signs a sponsor for the next
  *           chapter (stipend on top-5 only), the chapter room carries the
  *           calendar strip, and the season history keeps one record
+ *   K13-K16 (r348, CP2) the finale: the chapter's last world is shut behind
+ *           the chapter's own gate, the raced-out floor opens it (CS1), a
+ *           trophy opens the next chapter, and a staged finale podium
+ *           writes the trophy and doubles the race pay
  */
 import { chromium } from 'playwright-core';
 
@@ -167,6 +171,57 @@ check('K11 the chapter room carries the calendar strip, one cell per round',
 check('K12 the season history keeps ONE record per lived season',
   r.hist.length === 1 && r.hist[0].pos === 2,
   JSON.stringify(r.hist));
+// ---- CP2 (r348): THE FINALE — unit laws on a clean career ----
+const f0 = await p.evaluate(() => {
+  const g = window.__game;
+  const k = g.chapterOf(g.level.id);
+  const fin = g.finaleOf(k);
+  g.career.finished = {}; g.career.trophies = {}; g.career.seasons = {};
+  const isLast = g.chapters()[k].levels.at(-1) === fin && g.isFinale(fin.id);
+  const shut = !g.isLevelUnlocked(fin.id) && g.isChapterOpen(k);
+  // the floor: racing every OTHER world of the chapter opens the finale
+  for (const l of g.chapters()[k].levels) {
+    if (l !== fin) g.career.finished[l.id] = { place: 6, stars: 1 };
+  }
+  const floorOpen = g.isFinaleOpen(k) && g.isLevelUnlocked(fin.id);
+  // the trophy door: a finale podium opens the next chapter by itself
+  const doorShut = !g.isChapterOpen(k + 1);
+  g.career.trophies[k] = { at: Date.now(), car: 'starter', place: 3 };
+  const doorOpen2 = g.isChapterOpen(k + 1);
+  delete g.career.trophies[k];
+  return { finId: fin.id, isLast, shut, floorOpen, doorShut, doorOpen2 };
+});
+check('K13 the chapter\'s LAST world is its finale, shut inside an open chapter',
+  f0.isLast && f0.shut, JSON.stringify(f0));
+check('K14 the raced-out floor opens the finale (CS1 — no dead end)',
+  f0.floorOpen, `floorOpen ${f0.floorOpen}`);
+check('K15 a finale trophy opens the next chapter on its own',
+  f0.doorShut && f0.doorOpen2, `before ${!f0.doorShut}, after ${f0.doorOpen2}`);
+
+// K16: on the finale itself, a staged podium writes the trophy and the
+// breakdown carries the doubled pay
+await p.goto(`${BASE}/?level=${f0.finId}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
+await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
+  undefined, { timeout: 300000 });
+const f1 = await p.evaluate(() => {
+  const g = window.__game;
+  g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+  for (let k2 = 0; k2 < 900 && g.state !== 'race'; k2++) { g.countdown = 0.01; g.frame(); }
+  const k = g.chapterOf(g.level.id);
+  g.career.trophies = {};
+  g.state = 'race';
+  g.enemies.forEach((e, i) => { e.alive = true; e._wraps = 10 - (i + 1); e.trackIndex = 0; });
+  g.playerRank = 2;
+  g.player.finished = false;
+  g.raceOver = false;
+  g.finishRace();
+  const tr = g.career.trophies?.[k] ?? null;
+  const rows = document.getElementById('cb-rows')?.textContent ?? '';
+  return { onFinale: g.isFinale(g.level.id), tr, doubled: rows.includes('FINALE — DOUBLE PAY') };
+});
+check('K16 a staged finale podium writes the trophy and doubles the pay',
+  f1.onFinale && f1.tr?.place === 2 && f1.doubled, JSON.stringify(f1));
+
 check('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 await browser.close();

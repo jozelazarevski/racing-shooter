@@ -152,14 +152,18 @@ const states = await page.evaluate(() => {
     // price per world (`NEEDS 27★`); under chapters no world has a price of
     // its own, so what a locked card owes the player is the CHAPTER it is
     // waiting on — and the chapter's own header carries the number.
-    lockedGatesPriced: rows.filter((r) => r.locked).every((r) => /CHAPTER \d+/.test(r.gate)),
+    // CP2 (r348): the one exception is a chapter's own FINALE, whose door is
+    // inside its own chapter — its card prices that door instead
+    lockedGatesPriced: rows.filter((r) => r.locked)
+      .every((r) => /CHAPTER \d+/.test(r.gate) || /FINALE — \d+★ OR RACE/.test(r.gate)),
     matchesRule: rows.every((r) => r.locked !== g.isLevelUnlocked(r.id)),
     chapterOneSize: g.chapters()[0].levels.length,
+    finaleShut: !g.isLevelUnlocked(g.finaleOf(0).id),
     lockedSeen: rows.filter((r) => r.locked).length,
   };
 });
-ok(states.open === states.chapterOneSize,
-  'a fresh career shows exactly the first chapter as available',
+ok(states.open === states.chapterOneSize - 1 && states.finaleShut,
+  'a fresh career shows the first chapter as available, its finale shut (CP2)',
   `${states.open} open, chapter 1 holds ${states.chapterOneSize}`);
 ok(states.lockedSeen > 0,
   'and the second chapter really is shut — otherwise the checks below prove nothing',

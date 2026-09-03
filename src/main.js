@@ -2494,6 +2494,14 @@ class Game {
     // everywhere — the correct default for an existing player.
     this.career = loadJSON(this._pkey('career'), { finished: {}, rungs: {} });
     this.career.rungs ??= {};
+    // CP2 (r348) MIGRATION: seasons already lived grant their trophies — a
+    // season podium IS the chapter conquered under the new finale rule, so an
+    // existing save keeps every door it had opened (CAREER_PATH.md §CP2).
+    for (const h of this.career.seasonHistory ?? []) {
+      if (h.pos <= 3 && !this.career.trophies?.[h.k]) {
+        (this.career.trophies ??= {})[h.k] = { at: h.when ?? Date.now(), car: '', place: h.pos };
+      }
+    }
     this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
     this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
     // RENAMED MACHINES. r142 shipped two cars under marque names and r143
@@ -3426,6 +3434,12 @@ class Game {
       + `<span>${i + 1}. ${n}</span><b>${p}</b></div>`).join('');
     box.innerHTML = `<div style="letter-spacing:1.5px;font-weight:800;margin-bottom:4px">`
       + `🏁 ${name} CHAMPIONSHIP</div>${rows}`;
+    // CP2 (r348): the trophy on the board — the chapter's finale, conquered
+    const tr = this.career.trophies?.[k];
+    if (tr) {
+      box.innerHTML += `<div style="margin-top:5px;opacity:.9">🏆 CHAPTER TROPHY`
+        + ` — FINALE P${tr.place}</div>`;
+    }
     // CP1 (r347): the results card closes with the signpost — the same one
     // sentence every other surface shows, so leaving a race always hands
     // the player their next move.
@@ -3511,7 +3525,36 @@ class Game {
     // championship. Neither door closes the other; stars stay the casual
     // path, the season table is the racer's.
     if (this.seasonPodium(k - 1)) return true;
+    // CP2 (r348): the finale door — a podium at the previous chapter's
+    // finale (the trophy) opens this one. The intended path; the star
+    // fraction and the floors below stay as safety valves.
+    if (this.career.trophies?.[k - 1] != null) return true;
     return prev.levels.every((l) => this.career.finished[l.id]);   // the floor
+  }
+
+  /** CP2 (CAREER_PATH.md, r348) — THE FINALE. The LAST world of each
+   *  chapter, in career order, is that chapter's finale: the event the
+   *  chapter builds toward instead of a fraction that ticks over. */
+  finaleOf(k) {
+    const c = this.chapters()[k];
+    return c?.levels?.[c.levels.length - 1] ?? null;
+  }
+
+  isFinale(id) {
+    const k = this.chapterOf(id);
+    return k >= 0 && this.finaleOf(k)?.id === id;
+  }
+
+  /** The finale's own door: the chapter's gate stars — OR every other world
+   *  of the chapter raced (the same floor rule the chapter doors carry, so a
+   *  finishing-only driver is never walled out of their own finale; CS1). */
+  isFinaleOpen(k) {
+    if (this.unlockAll) return true;
+    const c = this.chapters()[k];
+    if (!c) return false;
+    if (this.chapterStars(k) >= this.chapterNeed(k)) return true;
+    const fin = this.finaleOf(k);
+    return c.levels.every((l) => l === fin || this.career.finished[l.id]);
   }
 
   /** CP1 (CAREER_PATH.md, r347) — THE SIGNPOST. One computed sentence,
@@ -3526,6 +3569,16 @@ class Game {
     const c = ch[k];
     if (!c) return null;
     const next = ch[k + 1];
+    // 0 — CP2: the finale is the destination the stars buy. Unwon and open →
+    // go win it; unwon and shut → the stars name their purpose.
+    const fin = this.finaleOf(k);
+    if (fin && !this.career.trophies?.[k]) {
+      if (this.isFinaleOpen(k) || this.career.finished[fin.id]) {
+        return `WIN THE ${c.name} FINALE — ${fin.name}`;
+      }
+      const short = Math.max(0, this.chapterNeed(k) - this.chapterStars(k));
+      if (short > 0) return `${short}★ OPENS THE ${c.name} FINALE`;
+    }
     // 1 — the gate: stars still owed toward the next chapter
     if (next && !this.isChapterOpen(k + 1)) {
       const short = Math.max(0, this.chapterNeed(k) - this.chapterStars(k));
@@ -3565,7 +3618,12 @@ class Game {
     const k = this.chapterOf(id);
     // a world off the roster (an editor scene) is not gated by a chapter
     if (k < 0) return true;
-    return this.isChapterOpen(k);
+    if (!this.isChapterOpen(k)) return false;
+    // CP2 (r348): the chapter's finale keeps its own door — the gate stars,
+    // or the rest of the chapter raced (isFinaleOpen). The gate becomes an
+    // event you arrive at instead of a fraction that ticks over.
+    if (this.isFinale(id) && !this.isFinaleOpen(k)) return false;
+    return true;
   }
 
   /** WHERE YOU ARE UP TO — one answer, used by everything.
@@ -4078,8 +4136,10 @@ class Game {
       // that is where the player has to go and do something about it.
       // r318 C5: a lived season is part of the card — the history in one word
       const hist = (this.career.seasonHistory ?? []).find((h) => h.k === c._k);
+      const trophy = this.career.trophies?.[c._k];
       const line = open
         ? `${raced}/${c.levels.length} RACED · ${done} CLEARED${
+  trophy ? ` · 🏆 TROPHY P${trophy.place}` : ''}${
   hist ? ` · ${hist.pos === 1 ? '🏆 CHAMPION' : `SEASON P${hist.pos}`}` : ''}`
         : `NEEDS ${short}★ MORE IN CHAPTER ${prev ? prev.n : ''}`;
       card.innerHTML = `
@@ -4373,9 +4433,17 @@ class Game {
       // chapter — so the card names the chapter it is waiting on and stops
       // there, which is the part a player tapping THIS card does not already
       // have on screen.
-      const bestTxt = unlocked
-        ? (best ? `BEST: ${ordinal(best.place)}` : '★ UNRACED')
-        : `CHAPTER ${ch ? ch.n : '?'} · ${ch ? ch.name : ''}`;
+      const isFin = this.isFinale?.(lv.id) ?? false;
+      const tr = isFin ? this.career.trophies?.[ck] : null;
+      // CP2 (r348): a shut finale in an OPEN chapter names its own door —
+      // the one lock in the roster whose price is inside its own chapter.
+      const finShut = isFin && !unlocked && ch && this.isChapterOpen(ck);
+      const bestTxt = finShut
+        ? `FINALE — ${Math.max(1, this.chapterNeed(ck) - this.chapterStars(ck))}★`
+          + ' OR RACE THE CHAPTER'
+        : unlocked
+          ? (tr ? `🏆 TROPHY — P${tr.place}` : best ? `BEST: ${ordinal(best.place)}` : '★ UNRACED')
+          : `CHAPTER ${ch ? ch.n : '?'} · ${ch ? ch.name : ''}`;
       // THE LADDER, STATED ON THE CARD. `i` is the career rung — the same
       // index `starCost` prices from — so the number, the gate and the lock
       // are three faces of one rule rather than three things to keep in sync.
@@ -4391,7 +4459,7 @@ class Game {
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="tl-rung">${i + 1}</div>
-        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        <div class="wc-name">${unlocked ? '' : '🔒 '}${isFin ? '🏆 ' : ''}${lv.name}</div>
         ${this._surfaceChip(lv)}
         <div class="wc-tags">${timeline && lv.region
     ? `<b class="tl-rg">${lv.region}</b> · ` : ''}${WORLD_TAGS[lv.theme] || ''}</div>
@@ -4845,6 +4913,27 @@ class Game {
     const up = this.carUpgrades();
     const rec = this.carParts();
     host.innerHTML = '';
+
+    // CP2 (r348): THE TROPHY SHELF — every chapter finale conquered, on the
+    // shop floor where the machines that won them live. Menu element only.
+    {
+      const trs = Object.entries(this.career.trophies ?? {});
+      if (trs.length) {
+        const shelf = document.createElement('div');
+        shelf.className = 'bay';
+        const cups = trs
+          .sort(([a], [b]) => (+a) - (+b))
+          .map(([k, tr]) => {
+            const cname = this.chapters()[+k]?.name ?? `CHAPTER ${+k + 1}`;
+            const car = CAR_CATALOG.find((cc) => cc.key === tr.car)?.name;
+            return `<span style="display:inline-block;margin:2px 10px 2px 0;opacity:.95">`
+              + `🏆 ${cname} — P${tr.place}${car ? ` · ${car}` : ''}</span>`;
+          }).join('');
+        shelf.innerHTML = `<div class="bay-head"><span>🏆 TROPHY SHELF</span></div>`
+          + `<div style="padding:6px 10px;font-size:13px">${cups}</div>`;
+        host.appendChild(shelf);
+      }
+    }
 
     const BAYS = [
       { name: 'ENGINE SHOP', icon: '🔩', slot: 'engine', ups: ['engine'] },
@@ -10392,6 +10481,13 @@ class Game {
           this.hud.feed('DIG IN ON THESE AND THE CAR IS WRITTEN OFF — KEEP IT ROLLING', 'bad');
         }
       }
+      // CP2 (r348): the finale announces itself on the grid — behaviour
+      // only, the toast lane the tyre warning above already uses.
+      if (!this.missionMode && this.isFinale?.(this.level.id)) {
+        const fk = this.chapterOf(this.level.id);
+        this.hud.feed(`🏆 ${this.chapters()[fk]?.name ?? 'CHAPTER'} FINALE`
+          + ' — DOUBLE PAY, TROPHY ON A PODIUM', 'good');
+      }
     }
     this.audio.start();
     document.getElementById('title-screen').classList.add('hidden');
@@ -10700,6 +10796,12 @@ class Game {
     const slate = (this.contracts ?? []).filter((c) => !c.job);
     const sweepCr = slate.length > 0 && slate.every((c) => c.done) ? SWEEP_CR : 0;
     const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
+    // CP2 (r348): THE FINALE PAYS DOUBLE — the race's own earnings (score
+    // pay + podium bonus), not the championship purse, which prices itself.
+    // Multiplier from driving.json's career block, per the constants rule.
+    const isFin = !this.freeRoam && !this.missionMode && this.isFinale(this.level.id);
+    const finaleMul = window.__DRIVING?.career?.finaleMul ?? 2;
+    const finaleCr = isFin ? Math.round((raceCr + podium) * (finaleMul - 1)) : 0;
     // r317 C4: the championship purse joins the pot (points pay only their
     // improvement; the rival duel pays live; the season prize pays once)
     const purse = this._recordSeasonRound(rank)
@@ -10707,7 +10809,8 @@ class Game {
         sponsorCr: 0, sponsorName: null };
     const purseCr = purse.pointsCr + purse.rivalCr + purse.prizeCr
       + (purse.sponsorCr ?? 0);
-    const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr + purseCr;
+    const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr + purseCr
+      + finaleCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
     if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
@@ -10720,6 +10823,7 @@ class Game {
         let html = `<div class="cb-row"><span>RACE SCORE${diffMult !== 1 ? ` ×${diffMult}` : ''}</span><b>+${raceCr.toLocaleString()}</b></div>`;
         if (podium) html += `<div class="cb-row"><span>PODIUM — ${sfx}</span><b>+${podium}</b></div>`;
         if (firstClear) html += `<div class="cb-row"><span>FIRST CONQUEST</span><b>+${firstClear}</b></div>`;
+        if (finaleCr) html += `<div class="cb-row"><span>🏆 FINALE — DOUBLE PAY</span><b>+${finaleCr}</b></div>`;
         for (const q of questsWon) {
           const part = UPGRADES.find((u) => u.key === q.reward.part)?.name ?? q.reward.part;
           html += `<div class="cb-row contract"><span>🏆 QUEST ${q.name} — FREE ${part}</span>`
@@ -10776,6 +10880,21 @@ class Game {
       bestLap: Number.isFinite(lapRec) ? Math.round(lapRec * 10) / 10 : 0,
       stars: bestStars,
     };
+    // CP2 (r348): THE CHAPTER TROPHY. A finale podium is a career beat —
+    // written once, only ever improved (a win upgrades a P3, a P3 never
+    // downgrades a win). The trophy is the intended door to the next
+    // chapter (isChapterOpen); _showStars announces any opening below.
+    if (isFin && rank <= 3) {
+      const fk = this.chapterOf(this.level.id);
+      const oldTr = this.career.trophies?.[fk];
+      if (fk >= 0 && (!oldTr || rank < oldTr.place)) {
+        (this.career.trophies ??= {})[fk] = {
+          at: Date.now(), car: this.cars?.selected ?? '', place: rank,
+        };
+        this.hud.feed(`🏆 CHAPTER TROPHY — THE ${this.chapters()[fk]?.name ?? ''}`
+          + ` FINALE IS YOURS (P${rank})`, 'good');
+      }
+    }
     // (r317: the season round was recorded up at the credits block — its
     // write rides this same save)
     saveJSON(this._pkey('career'), this.career);

@@ -4161,6 +4161,58 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r348 — THE FINALE (CP2: chapters end with an event)
+
+CAREER_PATH.md's second rung. The LAST world of each chapter (career
+order) is now its FINALE — the destination the chapter's stars buy,
+instead of a fraction that ticks over mid-menu.
+
+THE LAWS (all in main.js beside the chapter primitives):
+- `finaleOf(k)` / `isFinale(id)` — the chapter's last level.
+- `isFinaleOpen(k)` — the finale's own door: the chapter's gate stars
+  (chapterNeed), OR every other world of the chapter raced. That second
+  clause is CS1's no-dead-end guarantee restated for the finale: the
+  gate asks ~1.8★/world while a finishing-only driver banks 1, so
+  without the floor a 6-world chapter (5×1★ < 11★) walls them forever.
+- `isLevelUnlocked` — a finale needs BOTH its chapter open and
+  isFinaleOpen; every already-raced world stays yours (unchanged rule).
+- `isChapterOpen(k)` gains the trophy door: `career.trophies[k-1]`
+  (a finale podium) opens chapter k. Stars, season podium and the
+  raced-out floor all stand — nobody is walled who wasn't.
+- finishRace: on a finale podium writes
+  `career.trophies[k] = {at, car, place}` — only ever improved, a P3
+  never downgrades a win — and pays DOUBLE on the race's own earnings
+  (score pay + podium bonus; the championship purse prices itself):
+  `finaleMul: 2` in driving.json's new `career` block.
+- MIGRATION (constructor): each seasonHistory entry with pos ≤ 3
+  grants its chapter's trophy retroactively — existing saves keep
+  every door they had open.
+- careerObjective rung 0: "11★ OPENS THE FIRST LIGHT FINALE" while
+  shut, "WIN THE FIRST LIGHT FINALE — SUMMIT CLIMB" once open/unwon.
+
+SURFACES (menus only, race HUD untouched): the finale card carries 🏆
+and, when shut inside an open chapter, prices its own door ("FINALE —
+11★ OR RACE THE CHAPTER" — the one lock whose price is in its own
+chapter); the chapter card and season board show the trophy; the
+garage gets a TROPHY SHELF bay (chapter, place, the car that won it);
+the grid toast announces the finale (behaviour lane, 6.5 respected);
+the results breakdown itemizes "🏆 FINALE — DOUBLE PAY".
+
+GATES: test-career grew K13-K16 (finale shut in an open chapter,
+raced-out floor opens it, trophy opens the next chapter, a staged
+finale podium writes the trophy + doubles pay) — 20/20 green.
+test-ladder and test-timeline re-stated their fresh-career law
+(chapter one opens MINUS its finale) — 31/31 and 33/33.
+hudfreeze/progression/select/filters/jobs/quests/boot green.
+
+PRE-EXISTING (attributed on the pristine r344 worktree, not CP2's):
+test-menu-noreset crashes at its DUST CANYON click on base too;
+test-economy "maxing a car 110 races" red on base too (belongs to
+CP3's measured-economy pass); test-final-integration had
+`BASE ?? BASE` (self-reference crash on ANY base) — fixed here.
+
+NEXT: CP3 machine ladder (#58), CP4 nemesis (#59), CP5 sim (#60).
+
 ## r347 — THE SIGNPOST (CP1: the career learns to point)
 
 The owner's ask behind CAREER_PATH.md: "I still miss a carer progression

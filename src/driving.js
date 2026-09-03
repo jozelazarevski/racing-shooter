@@ -295,6 +295,13 @@ export const DRIVING = {
     progRampPct: 0.10,
     progRampEasyMul: 0.5,
   },
+
+  // CP2 (r348, CAREER_PATH.md): the career block. finaleMul multiplies the
+  // finale race's own pay (score pay + podium bonus); CP3 adds the tier
+  // table and prize budget here.
+  career: {
+    finaleMul: 2,
+  },
 };
 
 /** Boot override — main.js calls this once; failures are silent by design
