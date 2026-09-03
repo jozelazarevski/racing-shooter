@@ -4191,6 +4191,18 @@ budget moved mean rival speed 0% — the field there is EXECUTION-bound
 design; the ramp expresses where the road opens. The stopwatch law
 therefore measures a late OPEN world, not the last street.
 
+RIDE-ALONG: the r341 drift ceiling went PLAYER-ONLY (the over-budget
+law's own precedent) — rivals feed drift: errSlide as a recovery look
+and the carry math priced against their near-zero lag. And an
+attribution worth keeping: airace's CANYON gates at RACES=3 are DICE at
+2x — four runs across the pristine r340 base and this branch straddle
+Q12's and §5.6's fraction gates on BOTH codebases (Q12 late ticks
+{0,0,19} {31,28,0} {47,47,0} {1,33,0}; §5.6 failed only on the pristine
+base, {11,7,15}). PINE is solid green everywhere. Filed: size the
+sample (the spec's own RACES=20), don't widen budgets. test-difficulty's
+reds also reproduce byte-for-byte-class on the pristine base (standing
+task #22).
+
 ## r341 — A HELD DRIFT HOLDS ITS ANGLE (owner: "Drift is spinning the car way too much")
 
 MEASURED FIRST (tools-scratch/driftspin.mjs, dbg-driftspin/driftlaw):
