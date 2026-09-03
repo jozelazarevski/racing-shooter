@@ -4920,6 +4920,17 @@ const smoothstep01 = (t) => {
 };
 
 const N = 900;              // centerline samples
+/** r340 (owner: "Expand the length of the tracks 2x"): every route's
+ *  control polygon is authored at the ±250 u scale and multiplied here.
+ *  Everything downstream — elevation, road ribbon, terrain corridor,
+ *  props, tunnels, gorges, gates — generates FROM the scaled centreline,
+ *  so the worlds grow with their laps. Sample count stays N, so segLen
+ *  doubles; the systems that reason in metres convert through segLen
+ *  already (worlds have never shared one segLen). The gate layouts in
+ *  route.js double with it so §7 spacing keeps its metre caps, and
+ *  T.coast (the one absolute-coordinate tune) is scaled where T is
+ *  assembled. */
+export const ROUTE_SCALE = 2;
 /** Title-screen minimaps: the raw circuit control polygon for a theme. */
 export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
 
@@ -6327,6 +6338,14 @@ export class Track {
     const base = THEMES[themeName] || THEMES.forest;
     let T = (level && level.tune) ? { ...base, ...level.tune } : base;
     if (edit && edit.tune) T = { ...T, ...edit.tune };
+    // r340: the coast line is the one tune authored in absolute world
+    // coordinates, so it scales with the route — into a CLONE, because a
+    // tuneless world's T is the shared theme object itself
+    if (ROUTE_SCALE !== 1 && T.coast) {
+      T = { ...T, coast: { ...T.coast,
+        a: [T.coast.a[0] * ROUTE_SCALE, T.coast.a[1] * ROUTE_SCALE],
+        b: [T.coast.b[0] * ROUTE_SCALE, T.coast.b[1] * ROUTE_SCALE] } };
+    }
     this.T = T;
 
     // THE CITADEL'S HILL, raised by the world itself.
@@ -6412,7 +6431,10 @@ export class Track {
     // no placement can survive from the sibling world.
     if (level && level.routeFlipX) rawPts = rawPts.map(([x, z]) => [-x, z]);
     if (level && level.routeReverse) rawPts = [...rawPts].reverse();
-    const pts = rawPts;
+    // r340: the 2x lap — one multiplication, at the single point every
+    // world's shape passes through
+    const pts = ROUTE_SCALE === 1 ? rawPts
+      : rawPts.map(([x, z]) => [x * ROUTE_SCALE, z * ROUTE_SCALE]);
     this.curve = new THREE.CatmullRomCurve3(
       pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'
