@@ -133,8 +133,10 @@ const raceOn = async (level) => {
     'fix 8: every lap-gate flag dies with the race, on every car',
     `${A.stale}/${A.cars} cars still armed after resetRace()`);
 
-  // R9 — leave the next gate behind, and after the grace the route brings
-  // you back, still owing it. (resetRace above ended the race; re-enter.)
+  // R9, RESTATED (§3.6c owner override, r345: "Don't reset the car when I
+  // go off route"). The missed-gate return is DELETED for the player: a
+  // missed gate never yanks; the debt stays owed and clears by DRIVING
+  // back through the gate. (resetRace above ended the race; re-enter.)
   const B = await p.evaluate(async () => {
     const g = window.__game, t = g.track, N = t.center.length;
     for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g._frameBody(); }
@@ -142,50 +144,51 @@ const raceOn = async (level) => {
     let returns = 0, lastReturn = null;
     const realLog = g.telemetry.log.bind(g.telemetry);
     g.telemetry.log = (kind, data) => {
-      if (kind === 'return') { returns++; lastReturn = data; }
+      if (kind === 'return' && (!data.car || data.car === undefined)) { returns++; lastReturn = data; }
       return realLog(kind, data);
     };
     const owedId = pl._nextGate ?? 0;
     const gate = g.route?.gates?.[owedId];
     if (!gate) return { noRoute: true };
-    // teleport PAST the owed gate — the overshoot the grace exists for
+    // teleport PAST the owed gate — the overshoot that used to start the clock
     pl.placeAt((gate.si + 40) % N, 0, true);
     pl.vel.set(0, 0, 0);
     g.input.analog.throttle = 0; g.input.analog.brake = 0; g.input.analog.steer = 0;
-    let earlyReturns = 0;
-    for (let f = 0; f < 120; f++) g._frameBody();     // 2 s: inside the grace
-    earlyReturns = returns;
-    // measure AT the return, not later: the car re-enters at 40 km/h and
-    // honestly re-crosses the gate within a second or two — waiting and then
-    // measuring "still owed" would fail the fix for finishing its job
-    let atReturn = null;
-    for (let f = 0; f < 240 && !atReturn; f++) {      // ...to 6 s total
+    // sit there for 10 s — 2.5x the old grace. Nothing may TELEPORT the
+    // car (a parked car may still roll on a grade — that is physics, and
+    // the first run measured exactly that: 49.9 u of downhill coast).
+    let maxJump = 0, prevX = pl.pos.x, prevZ = pl.pos.z;
+    for (let f = 0; f < 600; f++) {
       g._frameBody();
-      if (returns > 0) {
-        atReturn = { behind: (gate.si - pl.trackIndex + N) % N,
-          stillOwed: pl._nextGate === owedId };
-      }
-      if (f % 120 === 0) await new Promise((rs) => setTimeout(rs, 0));
+      const j = Math.hypot(pl.pos.x - prevX, pl.pos.z - prevZ);
+      if (j > maxJump) maxJump = j;
+      prevX = pl.pos.x; prevZ = pl.pos.z;
+      if (f % 150 === 0) await new Promise((rs) => setTimeout(rs, 0));
     }
-    // ...and let it drive on: the owed gate should now be honestly passed
-    for (let f = 0; f < 180; f++) g._frameBody();
+    const stillOwed = pl._nextGate === owedId;
+    // now PAY the debt by driving: place just behind the owed gate rolling
+    // forward — the honest crossing must advance the route.
+    pl.placeAt((gate.si - 8 + N) % N, 0, true);
+    const h = Math.atan2(t.center[(gate.si) % N].x - pl.pos.x,
+      t.center[(gate.si) % N].z - pl.pos.z);
+    pl.heading = h; pl.vel.set(Math.sin(h) * 12, 0, Math.cos(h) * 12);
+    g.input.analog.throttle = 1;
+    for (let f = 0; f < 240; f++) g._frameBody();
+    g.input.analog.throttle = 0;
     const passedAfter = pl._nextGate !== owedId;
-    return { owedId, returns, earlyReturns, lastReturn,
-      behind: atReturn?.behind ?? -1, stillOwed: !!atReturn?.stillOwed, passedAfter };
+    return { owedId, returns, lastReturn, maxJump: +maxJump.toFixed(1), stillOwed, passedAfter };
   });
 
   if (B.noRoute) ok(false, 'R9: the race has a route to miss a gate on');
   else {
-    ok(B.earlyReturns === 0, 'R9: the 4 s grace is real — no yank inside it',
-      `${B.earlyReturns} returns in the first 2 s past the gate`);
-    ok(B.returns >= 1 && B.lastReturn?.reason === 'missed' && B.lastReturn?.gateId === B.owedId,
-      'R9: past the grace, the route returns the car to the missed gate',
-      `${B.returns} return(s), telemetry ${JSON.stringify(B.lastReturn)}`);
-    ok(B.stillOwed && B.behind >= 0 && B.behind < 60,
-      'R9: the car re-enters just BEHIND the gate it still owes',
-      `${B.behind} samples short of gate ${B.owedId} at the return, still owed: ${B.stillOwed}`);
+    ok(B.returns === 0,
+      'R9 (§3.6c): a missed gate NEVER yanks the player — 10 s parked past it, zero returns',
+      `${B.returns} player return(s)${B.lastReturn ? ' ' + JSON.stringify(B.lastReturn) : ''}`);
+    ok(B.maxJump < 3 && B.stillOwed,
+      'R9 (§3.6c): no frame teleports the car (rolling is physics), still owing the gate',
+      `max per-frame jump ${B.maxJump} u, still owed: ${B.stillOwed}`);
     ok(B.passedAfter,
-      'R9: the re-entry then crosses the gate honestly — the debt clears by driving',
+      'R9 (§3.6c): driving back through the owed gate clears the debt honestly',
       `next gate advanced past ${B.owedId}: ${B.passedAfter}`);
   }
   ok(errors.length === 0, 'Maple Mile: no page errors', errors.slice(0, 3).join(' | '));
