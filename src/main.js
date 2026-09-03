@@ -3426,6 +3426,15 @@ class Game {
       + `<span>${i + 1}. ${n}</span><b>${p}</b></div>`).join('');
     box.innerHTML = `<div style="letter-spacing:1.5px;font-weight:800;margin-bottom:4px">`
       + `🏁 ${name} CHAMPIONSHIP</div>${rows}`;
+    // CP1 (r347): the results card closes with the signpost — the same one
+    // sentence every other surface shows, so leaving a race always hands
+    // the player their next move.
+    const obj = this.careerObjective?.();
+    if (obj) {
+      box.innerHTML += `<div style="margin-top:7px;padding-top:6px;`
+        + `border-top:1px solid rgba(255,255,255,.14);font-weight:800;`
+        + `letter-spacing:.8px;color:var(--yellow,#e8b83a)">▸ NEXT: ${obj}</div>`;
+    }
   }
 
   /** r318 C5: THE CALENDAR STRIP — the season at a glance, at the top of the
@@ -3503,6 +3512,42 @@ class Game {
     // path, the season table is the racer's.
     if (this.seasonPodium(k - 1)) return true;
     return prev.levels.every((l) => this.career.finished[l.id]);   // the floor
+  }
+
+  /** CP1 (CAREER_PATH.md, r347) — THE SIGNPOST. One computed sentence,
+   *  the player's single next move, read by every surface that mentions
+   *  progress (the tracks tab, the chapter card, the results board) so
+   *  none of them can tell a different story. Priority ladder per the
+   *  plan; the finale and tier rungs join when CP2/CP3 build them. */
+  careerObjective() {
+    if (this.freeRoam || this.missionMode) return null;
+    const ch = this.chapters();
+    const k = this.currentChapter();
+    const c = ch[k];
+    if (!c) return null;
+    const next = ch[k + 1];
+    // 1 — the gate: stars still owed toward the next chapter
+    if (next && !this.isChapterOpen(k + 1)) {
+      const short = Math.max(0, this.chapterNeed(k) - this.chapterStars(k));
+      if (short > 0) return `${short}★ MORE OPENS ${next.name}`;
+    }
+    // 2 — the title: rounds left, or a leader to take it from
+    const rounds = this.career.seasons?.[k] ?? {};
+    const left = c.levels.filter((l) => !rounds[l.id]).length;
+    if (!this.seasonPodium(k)) {
+      const table = this.seasonTable(k);
+      const meAt = table.findIndex(([n]) => n === 'YOU');
+      const leader = table[0]?.[0];
+      if (left > 0 && meAt !== 0 && leader && leader !== 'YOU') {
+        return `TAKE THE ${c.name} TITLE — ${leader} LEADS, ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
+      }
+      if (left > 0) return `DEFEND THE ${c.name} TITLE — ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
+    }
+    // 3 — move on: the door is open
+    if (next) return `CHAPTER ${next.n} IS OPEN — ${next.name}`;
+    // 4 — the end of the road
+    const total = this.totalStars?.() ?? 0;
+    return `ROSTER COMPLETE — ${total}★ BANKED`;
   }
 
   /** The furthest chapter currently open, as an index. */
@@ -4048,7 +4093,12 @@ class Game {
           <span class="cc-stars">${have}/${max}★</span>
         </div>
         <div class="ch-bar"><i style="width:${max ? Math.round(100 * have / max) : 0}%"></i>
-          <u style="left:${max ? Math.min(100, Math.round(100 * need / max)) : 0}%"></u></div>`;
+          <u style="left:${max ? Math.min(100, Math.round(100 * need / max)) : 0}%"></u></div>${
+  /* CP1 (r347): the signpost rides the CURRENT chapter's card too, so the
+     grid view answers "what next" without opening the room */
+  c._k === here && this.careerObjective?.()
+    ? `<div style="margin-top:7px;font-size:12px;font-weight:800;letter-spacing:.8px;
+        color:var(--yellow,#e8b83a)">▸ ${this.careerObjective()}</div>` : ''}`;
       card.addEventListener('click', () => {
         // A SHUT CHAPTER STILL OPENS — you may look at what you are working
         // toward. Every world inside it stays locked and says so, which is
@@ -4094,6 +4144,22 @@ class Game {
     sel.innerHTML = '';
     this._renderSceneCards(sel);
     this._buildFilterBar();
+    // CP1 (r347): THE SIGNPOST — the career's single next move, at the top
+    // of the tracks tab. A menu element (the race HUD stays frozen), styled
+    // like the season board's inline convention.
+    {
+      const obj = this.careerObjective?.();
+      if (obj) {
+        const sp2 = document.createElement('div');
+        sp2.id = 'career-signpost';
+        sp2.style.cssText = 'margin:0 0 10px;padding:9px 14px;border-radius:8px;'
+          + 'background:linear-gradient(100deg,rgba(232,184,58,.16),rgba(0,0,0,.25) 70%);'
+          + 'border-left:4px solid var(--yellow,#e8b83a);font-weight:800;'
+          + 'letter-spacing:1px;font-size:14px';
+        sp2.textContent = `▸ ${obj}`;
+        sel.appendChild(sp2);
+      }
+    }
     const regionRows = new Map();
     this._regionRows = regionRows;
     const timeline = this.tracksView === 'timeline';

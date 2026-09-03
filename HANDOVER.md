@@ -4161,6 +4161,46 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r347 — THE SIGNPOST (CP1: the career learns to point)
+
+The owner's ask behind CAREER_PATH.md: "I still miss a carer progression
+path - Plan this out." r347 ships CP1, the plan's first rung — ONE
+computed sentence, `careerObjective()` (main.js, beside the chapter
+primitives it reads), that names the player's single next move, and
+three MENU surfaces that all read the same call so none can tell a
+different story. The race HUD is untouched (S9 re-pinned, 15 elements).
+
+The ladder, in priority order:
+1. stars still owed toward the next chapter → "11★ MORE OPENS INTO THE
+   WILD" (uses chapterNeed/chapterStars, skips itself when the door is
+   already open);
+2. the current chapter's championship — rounds left and who leads →
+   "TAKE THE FIRST LIGHT TITLE — R. VOSS LEADS, 3 ROUNDS LEFT" (or
+   DEFEND when you lead);
+3. the door is open → "CHAPTER 2 IS OPEN — INTO THE WILD";
+4. roster complete → total stars banked.
+Returns null in freeRoam/missionMode — free play stays untouched
+(CAREER_PATH.md §5). CP2/CP3 will splice finale and tier rungs in.
+
+The three surfaces (all menu DOM, all inline-styled to the season
+board's convention, no new CSS):
+- `#career-signpost` at the top of the tracks tab (_renderLevelCards,
+  right after the filter bar) — yellow-edged strip, `▸ <sentence>`;
+- the CURRENT chapter's card in the grid (guarded `c._k === here`) gets
+  the same line under its progress bar;
+- `_renderSeasonBoard` (the results card) closes with `▸ NEXT: …`, so
+  leaving a race always hands the player their move.
+
+VERIFIED (tools-scratch/dbg-signpost.mjs): fresh profile renders all
+three, zero page errors; raced-out-at-P5 advances the chapter and the
+sentence follows; freeRoam → null. Gates: test-hudfreeze green (Q23
+±1.5 px), test-career K1-K12 green.
+
+NEXT (CAREER_PATH.md): CP2 chapter finales + trophies (#57), CP3
+machine ladder (#58), CP4 nemesis (#59), CP5 sim gate (#60). Also open:
+#55 kicker-fan residue (12 boundary records, emitters unidentified),
+#22 test-difficulty redesign, #31 corridor re-author.
+
 ## r346 — THE SUITES LEARN TO FAIL, AND THE POD COMES BACK
 
 THE SYSTEMIC FIND: EIGHT suites never wired their verdict to the exit
