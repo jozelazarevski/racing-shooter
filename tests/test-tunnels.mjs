@@ -130,9 +130,31 @@ for (const lv of worlds) {
       };
     };
 
+    // r350 (owner: "All Tunels needs to be under a mountain otherwise makes
+    // no sense"): the WORST flank along the bore. At every 4th sample, the
+    // tallest terrain within 150 u to either side, relative to the road —
+    // the mountain's shoulder. Before the ridge-line extension the quarter
+    // points read 5-30 u (a pipe through a mound); with it the whole bore
+    // sits under ~45-50 u of rock and the approaches are cuttings.
+    const mtnOf = (bore) => {
+      let worst = Infinity, at = -1;
+      for (let i = bore.s; i <= bore.e; i += 4) {
+        const cc = t.center[((i % N) + N) % N], nn = t.nrm[((i % N) + N) % N];
+        let pk = -99;
+        for (let d2 = 14; d2 <= 150; d2 += 6) {
+          for (const sd of [1, -1]) {
+            const h2 = t.terrainHeight(cc.x + nn.x * d2 * sd, cc.z + nn.z * d2 * sd) - cc.y;
+            if (h2 > pk) pk = h2;
+          }
+        }
+        if (pk < worst) { worst = pk; at = i; }
+      }
+      return { worst: +worst.toFixed(1), at };
+    };
+
     return { name: t.level?.name, segLen: +t.segLen.toFixed(2),
       bores: T.map((b) => ({ s: b.s, e: b.e, mid: b.mid })),
-      runs: T.map(runBore) };
+      runs: T.map(runBore), mtns: T.map(mtnOf) };
   });
 
   if (!r.bores.length) {
@@ -153,6 +175,9 @@ for (const lv of worlds) {
       + `, ${q.frames} frames inside, headroom ${q.head} u`
       + (q.roofBreak ? `, THROUGH THE ROOF on ${q.roofBreak} frames` : '')
       + (q.stalled ? ', STOPPED DEAD' : `, slowest ${q.minSpeed} u/s`));
+    const m = r.mtns[k];
+    check(`${r.name} bore ${k + 1}: under a mountain, end to end (r350)`,
+      m.worst >= 25, `thinnest flank ${m.worst} u at sample ${m.at}`);
   }
 }
 

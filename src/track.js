@@ -9031,6 +9031,23 @@ export class Track {
       if (dDown < len + fanS + reach) return 0;    // inside the hump or its fan
       if ((N - dDown) < reach + 4) return 0;       // bore overruns into the crest from behind
     }
+    // r350 (owner: "All Tunels needs to be under a mountain otherwise makes
+    // no sense"): a bore needs ROOM FOR ITS MOUNTAIN. On CLIFF KNOT the
+    // planner sited the bore beside the start-straight braid — another leg
+    // of the lap ran through BOTH flanks 26-130 u out, so _roadCeil (rightly)
+    // capped the ridge to that carriageway and the tube stood on an 8 u
+    // mound. Refuse any station where a DIFFERENT leg passes within the
+    // ridge's near footprint; the planner walks on to a clear stretch.
+    for (const off of [0, reach, -reach]) {
+      const j = ((i + off) % N + N) % N;
+      const cj = this.center[j], nj = this.nrm[j];
+      for (const lat of [34, -34, 58, -58]) {
+        const x = cj.x + nj.x * lat, z = cj.z + nj.z * lat;
+        const ns2 = this._nearestSample(x, z);
+        const gap2 = Math.min(Math.abs(ns2.i - j), N - Math.abs(ns2.i - j));
+        if (gap2 > 40 && ns2.d < 26) return 0;
+      }
+    }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
       mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
@@ -9067,8 +9084,30 @@ export class Track {
       const half = Math.min(bestFit, lenS >> 1);
       if (best - half < 0 || best + half >= N) break;    // no wrap runs
       const s0 = best - half, e0 = best + half;
+      // r350 (owner: "All Tunels needs to be under a mountain otherwise
+      // makes no sense"). Measured on every tunnel world: flank peaks of
+      // 29-45 u ONLY at the bore's mid, 5-30 u at the quarter points, and
+      // ground at ROAD LEVEL 25 u outside every portal — because the
+      // along-bore ease started AND ended at the portals, and an ~80 u bore
+      // is barely longer than two 48 u ramps. The mountain was a lens that
+      // swelled mid-bore and died at the mouths: a pipe on a mound.
+      //
+      // So the RIDGE LINE now runs ~60 u past each portal along the road
+      // (the TUBE stays s0..e0). The ease reaches full height at the real
+      // mouth, the whole bore lies under thick rock, and each approach
+      // becomes a road cutting into the face — the corridor carve in
+      // _tunnelRidge holds the roadway itself open along the entire line.
+      // The extension is terrain only (no solids), and it stays out of the
+      // grid clear zone.
+      const extS2 = Math.round(60 / this.segLen);
+      let rs = Math.max(0, s0 - extS2), re = Math.min(N - 1, e0 + extS2);
+      // ...trimmed to the grid clear zone, not dropped: an all-or-nothing
+      // clamp left SUMMIT CLIMB's upstream quarter under 18 u of skin
+      // because its bore starts ~90 samples from the line.
+      while (rs < s0 && this._circDist(rs, 0) < 80) rs++;
+      while (re > e0 && this._circDist(re, 0) < 80) re--;
       const pts = [];
-      for (let j = s0; j <= e0; j += 3) {
+      for (let j = rs; j <= re; j += 3) {
         pts.push([this.center[j].x, this.center[j].z, this.center[j].y]);
       }
       // `ridge` 13 built a berm, not a mountain — see `_tunnelRidge`. 62 puts
@@ -9315,6 +9354,14 @@ export class Track {
     const nd = ns.d, bi = ns.i;
     let h = this._blendHeight(nd, this.center[bi].y, x, z);
     if (this.T.coast) h = this._coastDepress(x, z, h, nd);
+    // r350 (owner: tunnels under mountains): the ridge is built inside
+    // _blendHeight, and on a coast world _coastDepress then pulled it to the
+    // SEABED wherever the bore sits seaward of the coastline — SERPENT PASS
+    // read 10 u flanks over a −11.7 plain, SEA CLIFF RUN 5 u. Re-apply the
+    // ridge after the depression: a coastal bore stands in a HEADLAND that
+    // rises out of the sea, which is what a coastal tunnel is. (The corridor
+    // carve inside _tunnelRidge re-applies too, so the roadway stays open.)
+    if (this.T.coast && this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // THE EDITOR'S SCULPT, applied BEFORE the road clamps below - never
     // after. The clamps are what keep the carriageway drivable (the road is
     // the floor, and a tunnel stretch inverts it); a sculpt added after them
@@ -9567,6 +9614,9 @@ export class Track {
     // With the term only in the latter, the physics said "seabed at -7" while
     // the rendered land stayed dry — the sea existed as scattered pokes.
     if (this.T.coast) h = this._coastDepress(x, z, h, d);
+    // r350: the headland re-application, in BOTH ground functions like the
+    // coast term itself — see terrainHeight.
+    if (this.T.coast && this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // AND SO MUST THE EDITOR'S SCULPT, for exactly the same reason. Added to
     // terrainHeight alone, an Apply moved the physics, the scatter and the
     // road drape onto a 34 u hill while the drawn ground stayed dead flat —

@@ -30,6 +30,12 @@
     "culled": 6,
     "unculled": 0,
     "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.6,
+    "fix": "generator"
    }
   ],
   "ceilKmh": 190
@@ -145,7 +151,7 @@
    {
     "rule": "structure-hover",
     "count": 1,
-    "worstM": 0.4,
+    "worstM": 0.6,
     "fix": "generator"
    }
   ],
@@ -168,12 +174,6 @@
     "culled": 1,
     "unculled": 0,
     "fix": "auto"
-   },
-   {
-    "rule": "structure-hover",
-    "count": 1,
-    "worstM": 0.5,
-    "fix": "generator"
    }
   ],
   "ceilKmh": 212
@@ -271,6 +271,12 @@
     "culled": 3,
     "unculled": 0,
     "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.5,
+    "fix": "generator"
    }
   ],
   "ceilKmh": 190
@@ -423,7 +429,7 @@
    {
     "rule": "structure-hover",
     "count": 1,
-    "worstM": 0.5,
+    "worstM": 0.4,
     "fix": "generator"
    }
   ],
@@ -451,14 +457,20 @@
    {
     "rule": "street-obstacles",
     "culled": 11,
-    "unculled": 0,
-    "fix": "auto"
+    "unculled": 1,
+    "fix": "generator"
    },
    {
     "rule": "kicker-landing",
     "kickers": 5,
     "culled": 1,
-    "unculled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 2,
+    "worstM": 0.4,
     "fix": "generator"
    }
   ],
@@ -505,6 +517,12 @@
     "culled": 1,
     "unculled": 0,
     "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 1.2,
+    "fix": "generator"
    }
   ],
   "ceilKmh": 212
@@ -649,12 +667,6 @@
     "culled": 2,
     "unculled": 0,
     "fix": "auto"
-   },
-   {
-    "rule": "structure-hover",
-    "count": 1,
-    "worstM": 1.1,
-    "fix": "generator"
    }
   ],
   "ceilKmh": 210
@@ -788,13 +800,6 @@
     "culled": 1,
     "unculled": 0,
     "fix": "auto"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 5,
-    "culled": 0,
-    "unculled": 1,
-    "fix": "generator"
    }
   ],
   "ceilKmh": 160
@@ -806,7 +811,7 @@
   "violations": [
    {
     "rule": "street-obstacles",
-    "culled": 6,
+    "culled": 2,
     "unculled": 2,
     "fix": "generator"
    }
@@ -823,13 +828,6 @@
     "culled": 8,
     "unculled": 0,
     "fix": "auto"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 6,
-    "culled": 0,
-    "unculled": 2,
-    "fix": "generator"
    }
   ],
   "ceilKmh": 160
@@ -876,14 +874,7 @@
    {
     "rule": "street-obstacles",
     "culled": 11,
-    "unculled": 5,
-    "fix": "generator"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 5,
-    "culled": 0,
-    "unculled": 1,
+    "unculled": 2,
     "fix": "generator"
    }
   ],
@@ -919,13 +910,6 @@
     "culled": 15,
     "unculled": 0,
     "fix": "auto"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 5,
-    "culled": 1,
-    "unculled": 0,
-    "fix": "auto"
    }
   ],
   "ceilKmh": 160
@@ -935,11 +919,6 @@
   "name": "MOUNTAIN TO SEA",
   "rotated": null,
   "violations": [
-   {
-    "rule": "rail-over-road",
-    "count": 3,
-    "fix": "generator"
-   },
    {
     "rule": "street-obstacles",
     "culled": 5,
@@ -967,14 +946,7 @@
    {
     "rule": "street-obstacles",
     "culled": 4,
-    "unculled": 3,
-    "fix": "generator"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 4,
-    "culled": 0,
-    "unculled": 7,
+    "unculled": 1,
     "fix": "generator"
    }
   ],
@@ -1093,13 +1065,6 @@
     "culled": 12,
     "unculled": 54,
     "fix": "generator"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 4,
-    "culled": 0,
-    "unculled": 1,
-    "fix": "generator"
    }
   ],
   "ceilKmh": 190
@@ -1178,7 +1143,7 @@
    {
     "rule": "street-obstacles",
     "culled": 0,
-    "unculled": 2,
+    "unculled": 1,
     "fix": "generator"
    }
   ],
@@ -1228,16 +1193,9 @@
   "violations": [
    {
     "rule": "street-obstacles",
-    "culled": 3,
+    "culled": 7,
     "unculled": 1,
     "fix": "generator"
-   },
-   {
-    "rule": "kicker-landing",
-    "kickers": 5,
-    "culled": 1,
-    "unculled": 0,
-    "fix": "auto"
    }
   ],
   "ceilKmh": 160
@@ -1269,7 +1227,7 @@
   "violations": [
    {
     "rule": "street-obstacles",
-    "culled": 5,
+    "culled": 6,
     "unculled": 0,
     "fix": "auto"
    }
@@ -1309,6 +1267,12 @@
     "rule": "street-obstacles",
     "culled": 1,
     "unculled": 4,
+    "fix": "generator"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.5,
     "fix": "generator"
    }
   ],
