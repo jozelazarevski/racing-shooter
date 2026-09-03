@@ -98,11 +98,34 @@ const r = await p.evaluate(() => {
   // they are exactly what this test owns. The walls' own law is enforced
   // where it lives, in test-cornerwalls and test-edgerails.
   let best = null, flat = null;
-  for (let i = 60; i < t.center.length - 60; i += 11) {
-    const pt = t.pointAt(i, 30);
-    const rise = t.terrainHeight(pt.x, pt.z) - (t.center[i]?.y ?? 0);
-    if (!best || rise > best.rise) best = { i, rise: +rise.toFixed(1) };
-    if (!flat || Math.abs(rise) < Math.abs(flat.rise)) flat = { i, rise: +rise.toFixed(1) };
+  // r343b (2x fallout, measured): the flat pick must ALSO be STRAIGHT for
+  // the whole run, or the controlled pair inverts — on FALKEN RIDGE's old
+  // pick the road curved into the off lane, the "off-road" runner's blind
+  // straight line converged onto the carriageway by 1.3 s (lat 28 -> 0)
+  // and the "on-road" runner drifted off it (lat 1 -> 18), so the law read
+  // road-vs-road and called grass faster. Straightness over the run's
+  // reach (~110 m at the rolling start), with a relax ladder so twisty
+  // worlds still pick their best.
+  const runReachS = Math.round(110 / t.segLen);
+  const bendOver = (i) => {
+    let s = 0;
+    for (let k = 0; k < runReachS; k += 2) {
+      let d = t.headingAt((i + k + 2) % t.center.length) - t.headingAt((i + k) % t.center.length);
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      s += Math.abs(d);
+    }
+    return s;
+  };
+  for (const bendCap of [0.12, 0.25, 0.5, Infinity]) {
+    for (let i = 60; i < t.center.length - 60; i += 11) {
+      const pt = t.pointAt(i, 30);
+      const rise = t.terrainHeight(pt.x, pt.z) - (t.center[i]?.y ?? 0);
+      if (!best || rise > best.rise) best = { i, rise: +rise.toFixed(1) };
+      if (bendOver(i) > bendCap) continue;
+      if (!flat || Math.abs(rise) < Math.abs(flat.rise)) flat = { i, rise: +rise.toFixed(1) };
+    }
+    if (flat) break;
   }
   const kept = { obstacles: t.obstacles, solids: t.solids, barriers: t.barriers };
   t.obstacles = []; t.solids = []; t.barriers = [];
