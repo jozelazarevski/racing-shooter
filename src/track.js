@@ -8498,8 +8498,16 @@ export class Track {
     if (this._onOverpass(i, Math.min(pad, 24))) return true;
     if (this._gorge && this._circDist(i, this._gorge.i) < pad) return true;
     if (this._jumpGorges) {
+      // r340: a jump gorge owns its LANDING, not just its trench. The pad
+      // measured to the gorge's centre in samples, so at the 2x segLen a
+      // bore mouth was sited 19 samples (one station past the landing lip)
+      // downstream of CANYON RUN's jump — a tunnel portal in the landing
+      // zone. The downstream window is metres (the fan a committed jump
+      // covers); the upstream side keeps the plain pad.
+      const landS = Math.round(180 / (this.segLen ?? 3));
       for (const G of this._jumpGorges) {
-        if (this._circDist(i, G.i) < pad) return true;
+        const fwd = (i - G.i + N) % N;
+        if (fwd < landS || this._circDist(i, G.i) < pad) return true;
       }
     }
     if (this._tunnels) {

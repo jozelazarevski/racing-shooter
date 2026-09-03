@@ -11024,6 +11024,13 @@ class Game {
     // (r311, caught on the rival kill-respawn; same arithmetic here)
     const rawIdx = gt.si - back;
     car.placeAt(rawIdx < 0 ? gt.si : rawIdx, 0, true);
+    // r340: seated ON the line by the gate-0 wrap guard, the route's
+    // plane-crossing detector armed at along >= 0 and the owed gate could
+    // never clear by driving (patch13 R9 caught it once the 2x segLen made
+    // the guard fire with the seat exactly on the plane). Prime the
+    // detector as "just behind the plane": the first honest forward step
+    // crosses.
+    if (rawIdx < 0) car._gateAlong = -0.01;
     const sp = (RT.returnSpeedKmh ?? 40) / 3.6;
     car.vel.set(Math.sin(car.heading), 0, Math.cos(car.heading)).multiplyScalar(sp);
     car.vy = 0; car.airborne = false;

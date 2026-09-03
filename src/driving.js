@@ -34,8 +34,13 @@ export const DRIVING = {
   // both in band; 0-30 km/h off-road is 1.6 s (law: < 3). One value,
   // applied globally, racing and roam alike (racing sat above roam's
   // touring tune, which inverted r292's own reasoning the moment F7 bound).
-  dragOffRoad: 0.08,
-  dragOffRoadRoam: 0.08,
+  // r340: 0.0775, from 0.08 — the 2x straights let the ROAD top read its
+  // honest maximum (171 on GLACIER COL against ~166 before), which pushed
+  // grass to 54% of road and out of F7's 55-75 band by one point. The
+  // slightly lighter drag lifts grass ~1.5%; both fixture worlds re-measure
+  // in band.
+  dragOffRoad: 0.0775,
+  dragOffRoadRoam: 0.0775,
   // r315: the off-road CLIMB divisor (the uphill vCap term's slope divisor
   // when off-road; on-road keeps 0.55). F7 freed the flats; this is what
   // keeps a mountainside from being a road — "I can still enter a
