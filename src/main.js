@@ -3532,6 +3532,36 @@ class Game {
     return prev.levels.every((l) => this.career.finished[l.id]);   // the floor
   }
 
+  /** CP3 (CAREER_PATH.md, r351) — THE MACHINE LADDER. Which tier a chapter
+   *  belongs to, from the driving.json career block. Returns the tier def
+   *  with its index; chapters past the table take the last tier. */
+  tierOf(k) {
+    const tiers = window.__DRIVING?.career?.tiers ?? [];
+    for (let t = 0; t < tiers.length; t++) {
+      if (k <= tiers[t].toChapter) return { ...tiers[t], idx: t };
+    }
+    return tiers.length ? { ...tiers[tiers.length - 1], idx: tiers.length - 1 }
+      : { name: 'ROOKIE', ramp: 0, carMin: 0, idx: 0 };
+  }
+
+  /** Which tier a MACHINE belongs to, by its catalog price. */
+  carTierOf(price) {
+    const tiers = window.__DRIVING?.career?.tiers ?? [];
+    let idx = 0;
+    for (let t = 0; t < tiers.length; t++) if ((price ?? 0) >= tiers[t].carMin) idx = t;
+    return idx;
+  }
+
+  /** The best tier the player actually OWNS a machine in. */
+  ownedTier() {
+    let best = 0;
+    for (const key of this.cars?.owned ?? []) {
+      const car = CAR_CATALOG.find((c) => c.key === key);
+      if (car) best = Math.max(best, this.carTierOf(car.price));
+    }
+    return best;
+  }
+
   /** CP2 (CAREER_PATH.md, r348) — THE FINALE. The LAST world of each
    *  chapter, in career order, is that chapter's finale: the event the
    *  chapter builds toward instead of a fraction that ticks over. */
@@ -3569,15 +3599,30 @@ class Game {
     const c = ch[k];
     if (!c) return null;
     const next = ch[k + 1];
-    // 0 — CP2: the finale is the destination the stars buy. Unwon and open →
+    // r351: a chapter may be NAMED with its own article ("THE WORLD RALLY")
+    // and the templates below supply one — "THE THE WORLD RALLY FINALE".
+    // One name, no stutter.
+    const cn = c.name.replace(/^THE /, '');
+    // 0 — CP3: the garage rung, FIRST. A tier entered with only last tier's
+    // machines runs a stepped-up grid on every round; nothing below on this
+    // ladder is winnable until the showroom fixes it, so the signpost leads
+    // with the machine.
+    const tier = this.tierOf(k);
+    if (tier.idx > this.ownedTier() && !this.unlockAll) {
+      const entry = CAR_CATALOG
+        .filter((cc) => this.carTierOf(cc.price) === tier.idx)
+        .sort((a2, b2) => a2.price - b2.price)[0];
+      if (entry) return `THE ${tier.name} GARAGE AWAITS — ${entry.name}, ${entry.price.toLocaleString()} CR`;
+    }
+    // 1 — CP2: the finale is the destination the stars buy. Unwon and open →
     // go win it; unwon and shut → the stars name their purpose.
     const fin = this.finaleOf(k);
     if (fin && !this.career.trophies?.[k]) {
       if (this.isFinaleOpen(k) || this.career.finished[fin.id]) {
-        return `WIN THE ${c.name} FINALE — ${fin.name}`;
+        return `WIN THE ${cn} FINALE — ${fin.name}`;
       }
       const short = Math.max(0, this.chapterNeed(k) - this.chapterStars(k));
-      if (short > 0) return `${short}★ OPENS THE ${c.name} FINALE`;
+      if (short > 0) return `${short}★ OPENS THE ${cn} FINALE`;
     }
     // 1 — the gate: stars still owed toward the next chapter
     if (next && !this.isChapterOpen(k + 1)) {
@@ -3592,9 +3637,9 @@ class Game {
       const meAt = table.findIndex(([n]) => n === 'YOU');
       const leader = table[0]?.[0];
       if (left > 0 && meAt !== 0 && leader && leader !== 'YOU') {
-        return `TAKE THE ${c.name} TITLE — ${leader} LEADS, ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
+        return `TAKE THE ${cn} TITLE — ${leader} LEADS, ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
       }
-      if (left > 0) return `DEFEND THE ${c.name} TITLE — ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
+      if (left > 0) return `DEFEND THE ${cn} TITLE — ${left} ROUND${left > 1 ? 'S' : ''} LEFT`;
     }
     // 3 — move on: the door is open
     if (next) return `CHAPTER ${next.n} IS OPEN — ${next.name}`;
@@ -4146,6 +4191,9 @@ class Game {
         <div class="cc-top">
           <span class="cc-n">${open ? c.n : '🔒'}</span>
           <span class="cc-name">${c.name}</span>
+          <span style="margin-left:auto;font-size:10px;font-weight:800;letter-spacing:1px;
+            padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.3);
+            opacity:.85">${this.tierOf(c._k).name}</span>
         </div>
         <div class="cc-blurb">${c.blurb}</div>
         <div class="cc-foot">
@@ -6448,7 +6496,27 @@ class Game {
     const head = document.getElementById('garage-shop-head');
     if (head) head.textContent = `RATED FOR ${this.level.name}`;
     const icons = this._carIcons();
+    // CP3 (r351): the catalog reads as a LADDER — a tier band header above
+    // each price band, naming the chapters that band is built for. The
+    // player's own current career tier is marked. Menu element only.
+    let lastBand = -1;
+    const tiers = window.__DRIVING?.career?.tiers ?? [];
+    const hereTier = this.tierOf(this.currentChapter()).idx;
     for (const car of CAR_CATALOG) {
+      const band = this.carTierOf(car.price);
+      if (band !== lastBand && tiers[band]) {
+        lastBand = band;
+        const t = tiers[band];
+        const from = band === 0 ? 1 : (tiers[band - 1].toChapter + 2);
+        const hd = document.createElement('div');
+        hd.style.cssText = 'grid-column:1/-1;width:100%;margin:8px 0 2px;'
+          + 'padding:4px 10px;font-weight:800;letter-spacing:1.5px;font-size:12px;'
+          + `border-left:3px solid ${band === hereTier ? 'var(--yellow,#e8b83a)' : 'rgba(255,255,255,.25)'};`
+          + `opacity:${band <= hereTier ? 1 : 0.6}`;
+        hd.textContent = `${t.name} MACHINES · CHAPTERS ${from}–${t.toChapter + 1}`
+          + (band === hereTier ? '  ◂ YOUR TIER' : '');
+        shop.appendChild(hd);
+      }
       // OPEN ALL lends you the whole catalogue without BUYING it: `owned` is
       // read here and nothing is written to `cars.owned`, so switching the
       // setting back leaves the garage exactly as it was — the cars you
@@ -7561,6 +7629,15 @@ class Game {
    *  for the same reason the kit lean exempts them — no grid to lose to. */
   rosterProg() {
     if (this.freeRoam || this.missionMode) return 0;
+    // CP3 (r351): TIER-ANCHORED for career races. The smooth per-world creep
+    // let the player's kit drift along with the grid and no moment ever said
+    // "buy the next machine". The ramp now STEPS at tier boundaries — the
+    // whole of CLUB runs one grid speed, PRO another — so entering a tier
+    // with last tier's car is a wall the showroom fixes, which is the plan's
+    // "the step IS the buy-a-car moment". Off-roster worlds (editor scenes)
+    // keep the old smooth ramp; free play stays exempt above.
+    const k = this.chapterOf(this.level?.id);
+    if (k >= 0) return this.tierOf(k).ramp;
     const n = LEVELS.length;
     return n > 1 ? THREE.MathUtils.clamp((this.levelIndex ?? 0) / (n - 1), 0, 1) : 0;
   }
