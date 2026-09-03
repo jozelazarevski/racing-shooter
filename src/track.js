@@ -9013,11 +9013,23 @@ export class Track {
     //
     // Refuse the station. There is always another straight to put a tunnel
     // in; there is no way to put a roof on this one.
+    // r343 (owner race log: kicker-landing stageViolations, 41 worlds): the
+    // guard is DIRECTIONAL and covers the LANDING FAN. §7.3 clears a
+    // kicker's landing zone across the full speed range, and the fan runs
+    // DOWNSTREAM of the hump by the fastest car's flight — the symmetric
+    // reach+len reservation proved 8-20 samples short, and every one of the
+    // roster's kicker-landing violations was a bore wall collider in a fan
+    // (dbg-kickerfan: 100% src boreWall, lat 11.1 = HW-0.5). 150 m covers
+    // nitroCeil×1.9 for any tune; upstream the bore only needs to end clear
+    // of the hump itself.
+    const fanS = Math.round(150 / this.segLen);
     for (const cr of (this.crests ?? [])) {
       const ci = typeof cr === 'number' ? cr : (cr.i ?? cr.index);
       if (ci == null) continue;
       const len = (typeof cr === 'object' && cr.len) ? cr.len : 22;
-      if (this._circDist(i, ci) < reach + len) return 0;
+      const dDown = (i - ci + N) % N;          // bore centre past the crest start
+      if (dDown < len + fanS + reach) return 0;    // inside the hump or its fan
+      if ((N - dDown) < reach + 4) return 0;       // bore overruns into the crest from behind
     }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
@@ -10408,6 +10420,22 @@ export class Track {
       this._slope[i] =
         (this.center[(i + 2) % N].y - this.center[(i - 2 + N) % N].y) / (4 * this.segLen);
     }
+  }
+
+  /** r343 — does sample gi sit inside a crest hump-or-landing-fan window,
+   *  with the point (x, z) inside the fan's lateral band (half + 6, the
+   *  validator's own §7.3 margin)? For builders whose colliders can stand
+   *  near ANOTHER leg of the lap than the one they were built along. */
+  _inCrestFanLat(gi, x, z) {
+    const c = this.center[gi];
+    if (Math.hypot(x - c.x, z - c.z) > (this.widthAt?.(gi) ?? 9) + 6) return false;
+    const fanS = Math.round(150 / this.segLen);
+    for (const cr of (this.crests ?? [])) {
+      const ci = cr.index ?? cr.i ?? cr;
+      const len = cr.len ?? 22;
+      if (((gi - ci + N) % N) < len + fanS) return true;
+    }
+    return false;
   }
 
   /** OUTBACK RED DIRT: dry creek crossings — the region's signature terrain
@@ -16688,8 +16716,16 @@ export class Track {
         // road is five times normal width, so a fixed 11.6 u bore is inside
         // its own carriageway for the whole length of the tunnel.
         if (!this._clearsRoad(wx, wz, 1.4, 0.2)) continue;
+        // r343: ...and a wall whose collider stands in ANOTHER leg's kicker
+        // landing fan yields it (mesh stays — the same rule as the
+        // carriageway drop above). One record on COTE D AZUR: a bore wall
+        // 10.5 u off a different stretch of road, inside a crest's fan.
+        const gi2 = this.nearestIndex ? this.nearestIndex({ x: wx, z: wz }, null) : i;
+        const own = this._circDist(gi2, Math.round((s0 + e0) / 2) % N) <= (e0 - s0) / 2 + 8;
+        if (!own && this._inCrestFanLat(gi2, wx, wz)) continue;
         this.solids.push({
           x: wx, z: wz, r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
+          src: 'boreWall',
         });
       }
     }
@@ -18132,7 +18168,12 @@ export class Track {
       /** p0 = spur mouth, (ux,uz) = along the spur, (px,pz) = across it. */
       place: (p0, ux, uz, px, pz, len, roadY, tan) => {
         const rot = Math.atan2(ux, uz);
-        const gy = (x, z) => this.terrainHeight(x, z);
+        // r343: SEAT ON THE GROUND THE PLAYER SEES (_seatY, the r286
+        // convention), not the analytic curve. Surfaced when the FALKEN
+        // RIDGE bore re-sited and its ridge's steep foot ran under this
+        // spur's fence line: five posts seated on the analytic curve
+        // floated 0.8-1.3 u over the drawn mesh chord.
+        const gy = (x, z) => (this._seatY ? this._seatY(x, z) : this.terrainHeight(x, z));
         // --- cattle grid: five bars laid across the mouth ---
         for (let k = 0; k < 5; k++) {
           const f = 2.0 + k * 0.85;
@@ -24311,7 +24352,7 @@ export class Track {
           wing.castShadow = true;
           g.add(wing);
         }
-        this.solids.push({ x: hx, z: hz, r: hw + 1.5, y: bedY + 1, mat: 'stone' });
+        this.solids.push({ x: hx, z: hz, r: hw + 1.5, y: bedY + 1, mat: 'stone', src: 'culvertHeadwall' });
       }
       // Parapet on the road above the culvert — the giveaway from the car.
       //
@@ -24381,7 +24422,7 @@ export class Track {
         // 497 across the roster). The stonework is dressing over a culvert —
         // one round collider on the wall line stops you at the parapet
         // without the segment's geometry fighting the bend.
-        this.solids.push({ x: px, z: pz, r: 1.4, y: deck + 0.5, mat: 'stone' });
+        this.solids.push({ x: px, z: pz, r: 1.4, y: deck + 0.5, mat: 'stone', src: 'culvertParapet' });
       }
     }
     this.group.add(g);
