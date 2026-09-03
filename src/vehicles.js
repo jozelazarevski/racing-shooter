@@ -2674,6 +2674,24 @@ export class Car {
         const align = Math.atan2(vl, Math.max(3, Math.abs(vf)));
         dTheta += THREE.MathUtils.clamp(DRIVING.csAssistGain * align * 2.0, -1.4, 1.4) * dt;
       }
+      // r341 (owner: "Drift is spinning the car way too much"): THE CEILING.
+      // Every source above keeps adding yaw while the over-budget lag pins
+      // the velocity vector, so with the handbrake down slip is the raw
+      // INTEGRAL of yaw — a 0.8 s flick at any speed ran to ~89° of slip
+      // (driftspin.mjs), a spin-out dressed as a drift. Approaching
+      // driftBetaMax the DEEPENING share of the yaw is diverted from the
+      // slip angle into the velocity vector: nose and velocity rotate
+      // together, the turn keeps its full rate (test-drift's >90° promise),
+      // and the angle parks under the 65° spin line. Yaw away from the
+      // slide (counter-steer) is never touched, and without the handbrake
+      // nothing here runs — the earned spin stays earnable.
+      if (inputs.drift && Math.abs(vl) > 0.01) {
+        const intoDir = -Math.sign(vl);
+        const into = dTheta * intoDir;
+        const maxInto = Math.max(0, (DRIVING.driftBetaMax ?? 1.0) - beta)
+          * (DRIVING.driftBetaEase ?? 6) * dt;
+        if (into > maxInto) this._driftCarry = (into - maxInto) * intoDir;
+      }
     }
     // DRIVING AID: a gentle nudge back toward the road's direction when the
     // player isn't actively steering. It never fights your input and never
@@ -2735,9 +2753,15 @@ export class Car {
     if (this.game.__gripProbe && this === this.game.player) {
       Object.assign(this.game.__gripProbe, { over, lag, dTheta, vf: +vf.toFixed(1), vl: +vl.toFixed(1) });
     }
-    if (lag > 0) {
-      const nvf = vf + vl * dTheta * lag;
-      vl -= vf * dTheta * lag;
+    // r341: the drift ceiling's diverted yaw rotates the velocity WITH the
+    // nose — subtracted from the lag angle, because the lag angle is exactly
+    // the share of this frame's turn the velocity does not follow.
+    const carry = this._driftCarry ?? 0;
+    this._driftCarry = 0;
+    if (lag > 0 || carry !== 0) {
+      const lagAng = dTheta * lag - carry;
+      const nvf = vf + vl * lagAng;
+      vl -= vf * lagAng;
       vf = nvf;
       // total speed can't inflate past ~top speed while sideways
       const vmax = topSpeed * 1.08;

@@ -25,6 +25,8 @@
   "driftScrubCap": 2.1,
   "driftReward": 0.5,
   "driftYawAssist": 0.85,
+  "driftBetaMax": 1.0,
+  "driftBetaEase": 6,
   "yawRMin": 4.0,
   "yawCapLo": 1.45,
   "yawCapHi": 1.15,
