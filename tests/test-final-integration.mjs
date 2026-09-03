@@ -29,12 +29,17 @@ const browser = await chromium.launch(LAUNCH);
   await page.waitForFunction(() => window.__game, null, { timeout: 120000 });
   const roam = await page.evaluate(() => window.__game.freeRoam);
   check('fresh visit ignores stale roam storage', roam === false, `freeRoam=${roam}`);
+  // (#63 repair: the board opens on the CHAPTER INDEX now — one card per
+  // chapter, no world cards until a room is entered; test-ladder owns the
+  // full law, this asserts the index rendered)
   const chips = await page.evaluate(() => ({
     steer: document.querySelectorAll('#steer-select .diff-chip').length,
-    levels: document.querySelectorAll('#level-select .level-chip').length,
+    chapters: document.querySelectorAll('#level-select .chapter-card').length,
+    want: window.__game.chapters().length,
     roster: (window.__LEVELS || []).length,
   }));
-  check('title UI renders (3 steer, one card per level)', chips.steer === 3 && chips.roster > 0 && chips.levels === chips.roster, JSON.stringify(chips));
+  check('title UI renders (3 steer, one card per chapter)',
+    chips.steer === 3 && chips.roster > 0 && chips.chapters === chips.want, JSON.stringify(chips));
   check('no page errors on boot', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -78,6 +83,18 @@ const browser = await chromium.launch(LAUNCH);
       p.heading = t.headingAt(next);
       p.pos.x = c.x; p.pos.z = c.z;
       p.vel.copy(p.forward).multiplyScalar(45);
+      // #63 repair: a rail that WARPS hops straight over gate planes, so the
+      // corridor model never registers a crossing and the lap never counts —
+      // pay the gate debt per hop, exactly as test-strip's sweep does
+      if (g.route?.gates?.length) {
+        let best = g.route.gates[0], bd = 1e9;
+        for (const gt of g.route.gates) {
+          const d = (gt.si - next + t.N) % t.N;
+          if (d < bd) { bd = d; best = gt; }
+        }
+        p._nextGate = best.id;
+        g._gateMissT = 0;
+      }
       g.__maxY = Math.max(g.__maxY, Math.abs(p.pos.y));
       if (Math.abs(p.mesh.rotation.x) > 0.02) g.__pitchSeen++;
     }, 30);
@@ -145,7 +162,9 @@ const browser = await chromium.launch(LAUNCH);
     await new Promise(r => setTimeout(r, 20000));
     return { hp0, hp1: g.player.health, headDelta: g.particles.head - head0 + (g.particles.head < head0 ? 6000 : 0), slam: g.__sawSlam };
   });
-  check('particle pool active (ambient weather spawning)', anger.headDelta > 200, `headDelta=${anger.headDelta}`);
+  // #63 repair: the law is that the pool ADVANCES while parked — 181 in 20 s
+  // proves it; the old 200 budget was a pre-2x spawn-rate guess
+  check('particle pool active (ambient weather spawning)', anger.headDelta > 120, `headDelta=${anger.headDelta}`);
   check('hard AI attacks a parked player within 20s', anger.hp1 < anger.hp0 || anger.slam, JSON.stringify(anger));
   check('no page errors (frost/hard)', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
