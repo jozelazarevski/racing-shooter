@@ -90,6 +90,8 @@ Open, in priority order. Each row is a repair of observed behaviour.
 
 **3.6a Respawn velocity, corrected evidence.** Fall 2 respawn (0:20) leaves the car at 0 km/h with the joystick centred; fall 3 respawn (0:34) leaves it at 32 km/h coasting. The earlier "0 to 14 over 4 s" reading was partly the player not pushing. The fault that stands: respawn velocity is inconsistent and never the specified 40 km/h along the tangent; P5 covers it.
 
+**3.6c Missed gates, owner override (r345).** "Don't reset the car when I go off route." The player's missed-gate trigger of 3.6 (4.0 s grace -> return) is DELETED: leaving the route costs progress, never the car. The owed gate stays armed and driving back through it clears the debt; SOS remains the voluntary return. Rivals keep the missed-gate/off-course recovery (a parked rival is a bug); the physical-trap triggers (void, fall, water, stuck, upside down) stand for everyone.
+
 **3.4a Fatal drops, owner override (r320, recorded r330).** "Should be wrecked at this kind of falls" (phone report, PIKES PEAK shelf). Falls past the damper-priced free band WRECK the car (`fallWreckOver`); §3.4's return-at-apex with no hull change is superseded by that direct request. The under-12 m landing-damage shape and the water rule stand.
 
 **3.7 Landing assist.** For 300 ms after touchdown: lateral velocity blended toward heading at 80% per 100 ms, yaw rate clamped 60[deg]/s, steer honoured, handbrake cancels and preserves the slide.

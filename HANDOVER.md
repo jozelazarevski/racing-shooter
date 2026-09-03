@@ -4161,6 +4161,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r345 — OFF THE ROUTE IS A CHOICE, NOT A CRIME (owner: "Don't reset the car when I go off route")
+
+§3.6c OWNER OVERRIDE, recorded in CLAUDE.md beside 3.4a/3.6b: the
+player's missed-gate auto-return (4 s grace -> returnToGate 'missed')
+is DELETED — the whole block in _stepRoute, not a flag. Leaving the
+route now costs PROGRESS, never the car: the owed gate stays armed,
+driving back through it clears the debt (Route.step re-arms on the
+approach side), position falls on its own, and the SOS button remains
+the voluntary way back. What stands: every physical-trap rescue (void,
+fatal fall/water, stuck-with-throttle, upside down) for everyone, and
+the rivals' own §5 recovery — a parked rival is a bug, a wandering
+player is a choice.
+
+patch13's R9 is RESTATED to the new law and 15/15: 10 s parked past an
+owed gate, zero returns, no frame teleports the car (the first cut
+asserted "doesn't move" and measured 49.9 u of honest downhill roll —
+rolling is physics), and the debt clears by driving. Note for probe
+authors: test-strip's T1 gate-debt payment predates this and is now
+belt-and-braces, harmless.
+
+Also in this deploy: CAREER_PATH.md v1.0 (the owner's "I still miss a
+career progression path" planned as CP1-CP5 — signpost, chapter
+finales with trophies, the machine ladder with a measured economy, the
+nemesis thread, and a career-sim acceptance gate; tasks filed).
+
 ## r344 — THE METERS LEARN WHAT THEY MEASURE, AND THE DRESSING YIELDS
 
 Four small repairs riding one deploy, every one evidence-first:

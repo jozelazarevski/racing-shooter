@@ -10812,11 +10812,10 @@ class Game {
     this.route = new Route(this.track, this.level?.id);
   }
 
-  /** CORRIDOR steps 1+4 — the route observes every car, and since r301 it
-   *  also OWNS the miss: a player who leaves the next gate behind gets the
-   *  arrow for missedGateGraceS (a near-miss stays recoverable by driving),
-   *  then returnToGate. Laps are still counted by the checkpoint mask —
-   *  the return makes cut laps physically rare instead of scolded. */
+  /** CORRIDOR steps 1+4 — the route observes every car. The player's
+   *  missed-gate return is GONE (§3.6c owner override, r345): a missed
+   *  gate is a debt paid by driving back, not a teleport. Rivals keep
+   *  their §5 recovery; the physical-trap rescues keep theirs. */
   _stepRoute() {
     if (!this.route || this.freeRoam || this.missionMode) return;
     // CORRIDOR §6: the obstacle ration runs ONCE per build, on the first
@@ -10908,33 +10907,16 @@ class Game {
         this._pressurePickedLap = plLap;
       }
     }
-    // §4.4 the missed-gate grace: the next gate sitting BEHIND the car
-    // (forward route-distance past half a lap) means it was left behind
-    const pl = this.player, N = this.track.center.length;
-    const gate = this.route.gates[pl._nextGate ?? 0];
-    const dt = 1 / 60;
-    if (pl.alive && this.state === 'race' && gate) {
-      const ahead = (gate.si - pl.trackIndex + N) % N;
-      const overshot = ahead > N * 0.5;
-      // §3.2's own word is UNCORRECTED. A player driving back toward the
-      // gate — reversing to it, or turned around and heading for it — is
-      // correcting, and yanking them mid-manoeuvre read as "I can't drive
-      // backwards" (r304 report; with §3.5's silence there was nothing on
-      // screen to say why the snap happened). While their velocity closes
-      // on the gate at better than walking pace the grace HOLDS: it does
-      // not accrue and does not reset, so stopping again resumes the clock.
-      const toGx = gate.x - pl.pos.x, toGz = gate.z - pl.pos.z;
-      const dist = Math.hypot(toGx, toGz) || 1;
-      const closing = (pl.vel.x * toGx + pl.vel.z * toGz) / dist;
-      const correcting = closing > 2;
-      if (!overshot) this._gateMissT = 0;
-      else if (!correcting) this._gateMissT = (this._gateMissT ?? 0) + dt;
-      const RT = window.__DRIVING?.route ?? {};
-      if (this._gateMissT > (RT.missedGateGraceS ?? 4)) {
-        this._gateMissT = 0;
-        this.returnToGate(pl, gate.id, 'missed');
-      }
-    } else this._gateMissT = 0;
+    // §3.6c OWNER OVERRIDE (r345): "Don't reset the car when I go off
+    // route." The missed-gate auto-return (the 4 s grace, then
+    // returnToGate 'missed') is DELETED for the player — leaving the
+    // route costs progress, never the car: the owed gate stays armed,
+    // driving back through it clears the debt (Route.step re-arms on the
+    // approach side), position falls on its own, and the SOS button is
+    // the voluntary way back. The rescues that guard PHYSICAL traps —
+    // void, fatal fall/water, stuck-with-throttle, upside down — stand,
+    // and rivals keep their own §5 recovery: a parked rival is a bug, a
+    // wandering player is a choice.
   }
 
   /** r316 THE RALLY COPILOT (owner request): "tell the driver to slow down,
