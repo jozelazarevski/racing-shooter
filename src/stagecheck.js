@@ -139,7 +139,15 @@ export function runStageValidator(game) {
     const rel = (gi - from + N) % N;
     if (rel > span) return false;
     const c = t.center[gi];
-    return Math.hypot(p.x - c.x, p.z - c.z) <= half(gi) + 6;
+    if (Math.hypot(p.x - c.x, p.z - c.z) > half(gi) + 6) return false;
+    // r343b: the PHYSICS' own vertical window. A solid without `h` is only
+    // solid within ±6 u of its own y (vehicles.js keeps that window on
+    // purpose — "for a knee-high rock under a flyover that window is the
+    // point"), so a record 12 u under the road deck (CLIFF KNOT gi548,
+    // y −1 vs road 10.9) can never touch a landing car and is not a
+    // violation. Tall things (`h`) are solid over their whole span.
+    if (p.y !== undefined && p.h === undefined && Math.abs(p.y - c.y) > 6) return false;
+    return true;
   };
   for (const cr of t.crests ?? []) {
     const from = (cr.index + Math.round(cr.len * 0.5)) % N;
