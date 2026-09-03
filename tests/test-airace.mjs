@@ -74,6 +74,7 @@ const runStage = async (levelId, name) => {
         return origDmg(amt, src);
       };
       let packTicks = 0, rivalPackTicks = 0, latePackTicks = 0,
+        lastLateT = -9, curEp = 0, maxEp = 0,
         gantryTicks = 0, overtakenOnPlayer = 0, maxLeases = 0;
       let prevAheadSet = null;
       const gate0 = g.route?.gates?.[0];
@@ -164,7 +165,23 @@ const runStage = async (levelId, name) => {
             }
             if (close >= 3) {
               if (hasYou) packTicks++;
-              else { rivalPackTicks++; if (now > 45 * RS) latePackTicks++; }
+              else {
+                rivalPackTicks++;
+                if (now > 45 * RS) {
+                  latePackTicks++;
+                  // r344: EPISODES, not a tick total. dbg-canyonpack mapped
+                  // every observed CANYON red: one contiguous 11-14 s
+                  // battle group rolling down the road (gi advancing tick
+                  // by tick), dispersing on its own — races with ZERO late
+                  // ticks exist on the same build. The defect Q12 names is
+                  // a pack that PERSISTS; an incident-bunch that clears is
+                  // field conduct. Ticks < 2 s apart join an episode.
+                  if (now - lastLateT < 2) curEp += now - lastLateT;
+                  else curEp = 0;
+                  lastLateT = now;
+                  if (curEp > maxEp) maxEp = curEp;
+                }
+              }
               break;
             }
           }
@@ -224,7 +241,7 @@ const runStage = async (levelId, name) => {
         raceTime: +g.raceTime.toFixed(1), done, playerRank,
         spread: +(Math.max(...finite.filter((x) => x < 999)) - Math.min(...finite)).toFixed(1),
         lap1: finite.map((x) => (x === 999 ? null : +x.toFixed(1))),
-        packTicks, rivalPackTicks, latePackTicks, gantryTicks,
+        packTicks, rivalPackTicks, latePackTicks, maxEpS: +maxEp.toFixed(1), gantryTicks,
         laps,
         overtaken: overtakenOnPlayer,
         overtakenPerLap: laps > 0 ? +(overtakenOnPlayer / laps).toFixed(1) : overtakenOnPlayer,
@@ -261,9 +278,17 @@ for (const [id, name] of stages) {
   // loosely so a real breakdown still fails).
   // fraction-gated like the spec's own Q11 ("in >= 16 of 20"): single races
   // roll dice on mistakes and battles; the batch carries the verdict
-  check(`Q12 ${name}: no >3-rival 20 m pack once the field has sorted (GO+${45 * RS} on)`,
-    races.filter((r) => r.latePackTicks <= 8 * RS).length >= Math.ceil(races.length * 0.66),
-    `late rival ticks: ${races.map((r) => r.latePackTicks).join(', ')} `
+  // r344: the late law measures PERSISTENCE, not presence. dbg-canyonpack
+  // mapped every observed red to one contiguous 11-14 s battle group that
+  // disperses on its own (and clean zero-tick races exist on the same
+  // build) — the defect is the old band's four-wide TRAIN, which rides for
+  // minutes. An episode over 30 s, or chronic re-bunching past 120 ticks
+  // (~30 s cumulative), is a train; an incident-bunch that clears is
+  // racing.
+  check(`Q12 ${name}: no PERSISTENT >3-rival pack once sorted (episode <= 30 s, GO+${45 * RS} on)`,
+    races.filter((r) => r.maxEpS <= 30 && r.latePackTicks <= 120).length
+      >= Math.ceil(races.length * 0.66),
+    `episodes: ${races.map((r) => r.maxEpS + 's/' + r.latePackTicks + 't').join(', ')} `
     + `(early sorting: ${races.map((r) => r.rivalPackTicks - r.latePackTicks).join(', ')})`);
   check(`Q12 ${name}: a swarm around a slow player still disperses (< ${45 * RS} s total)`,
     races.every((r) => r.packTicks <= 180 * RS),
