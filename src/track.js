@@ -9067,8 +9067,30 @@ export class Track {
       const half = Math.min(bestFit, lenS >> 1);
       if (best - half < 0 || best + half >= N) break;    // no wrap runs
       const s0 = best - half, e0 = best + half;
+      // r350 (owner: "All Tunels needs to be under a mountain otherwise
+      // makes no sense"). Measured on every tunnel world: flank peaks of
+      // 29-45 u ONLY at the bore's mid, 5-30 u at the quarter points, and
+      // ground at ROAD LEVEL 25 u outside every portal — because the
+      // along-bore ease started AND ended at the portals, and an ~80 u bore
+      // is barely longer than two 48 u ramps. The mountain was a lens that
+      // swelled mid-bore and died at the mouths: a pipe on a mound.
+      //
+      // So the RIDGE LINE now runs ~60 u past each portal along the road
+      // (the TUBE stays s0..e0). The ease reaches full height at the real
+      // mouth, the whole bore lies under thick rock, and each approach
+      // becomes a road cutting into the face — the corridor carve in
+      // _tunnelRidge holds the roadway itself open along the entire line.
+      // The extension is terrain only (no solids), and it stays out of the
+      // grid clear zone.
+      const extS2 = Math.round(60 / this.segLen);
+      let rs = Math.max(0, s0 - extS2), re = Math.min(N - 1, e0 + extS2);
+      // ...trimmed to the grid clear zone, not dropped: an all-or-nothing
+      // clamp left SUMMIT CLIMB's upstream quarter under 18 u of skin
+      // because its bore starts ~90 samples from the line.
+      while (rs < s0 && this._circDist(rs, 0) < 80) rs++;
+      while (re > e0 && this._circDist(re, 0) < 80) re--;
       const pts = [];
-      for (let j = s0; j <= e0; j += 3) {
+      for (let j = rs; j <= re; j += 3) {
         pts.push([this.center[j].x, this.center[j].z, this.center[j].y]);
       }
       // `ridge` 13 built a berm, not a mountain — see `_tunnelRidge`. 62 puts
