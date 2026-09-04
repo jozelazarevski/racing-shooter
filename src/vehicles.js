@@ -1820,6 +1820,13 @@ export class Car {
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
+    // r358 (iterate round): a placement is a fresh start for the §3.6 wedge
+    // meter too. It was the one timer placeAt did NOT reset, so a rescue
+    // landing near the SAME index inherited a hot timer and could re-fire
+    // on a car that had just started moving honestly (killspos P3: one
+    // ghost rescue 0.1 s into a 2 m/s crawl seated where the car was
+    // pinned before).
+    this._wedgeT = 0; this._wedgeIdx = null;
     // Lap checkpoint state matches where we spawned. A respawn keeps whatever
     // far-checkpoint credit the car had already earned (keepCP); a fresh place
     // must earn it. The grid sits just BEFORE the line at ~0.99N, so the window
@@ -6019,13 +6026,27 @@ export class PlayerCar extends Car {
         // is stuck — however far the bodywork scrubbed. Deliberate
         // reversing is |signed| progress and never trips it; roam is
         // untouched (controlsLive is race-only).
-        if (this._wedgeIdx == null) this._wedgeIdx = this.trackIndex;
+        // r358 (iterate round): FRACTIONAL progress, not whole samples. The
+        // index-step meter could only see multiples of segLen, and r340
+        // doubled segLen to 4-5.3 u — so "1 m of advance per 2.5 s"
+        // silently became "one SAMPLE per 2.5 s", a ~5x raise of the
+        // honest-crawl floor, and a 2 m/s crawl could be rescued between
+        // sample crossings (killspos P3 measured it: 1 rescue in 6 s).
+        // Project the car onto its segment's tangent for the sub-sample
+        // part; the sideways creep still shows zero along and still trips.
         const Nw = g.track.center.length;
-        let dIdx = (this.trackIndex - this._wedgeIdx + Nw) % Nw;
-        if (dIdx > Nw / 2) dIdx -= Nw;
         const segL = g.track.segLen ?? 4;
+        const cW = g.track.center[this.trackIndex];
+        const tW = g.track.tan[this.trackIndex];
+        const fracW = tW
+          ? ((this.pos.x - cW.x) * tW.x + (this.pos.z - cW.z) * tW.z) / segL : 0;
+        const alongW = this.trackIndex + Math.max(-0.5, Math.min(0.5, fracW));
+        if (this._wedgeIdx == null) this._wedgeIdx = alongW;
+        let dIdx = alongW - this._wedgeIdx;
+        if (dIdx > Nw / 2) dIdx -= Nw;
+        if (dIdx < -Nw / 2) dIdx += Nw;
         if (Math.abs(dIdx) * segL >= 1) {
-          this._wedgeIdx = this.trackIndex;
+          this._wedgeIdx = alongW;
           this._wedgeT = 0;
         } else {
           this._wedgeT = (this._wedgeT ?? 0) + dt;

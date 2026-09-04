@@ -72,14 +72,29 @@ export class Route {
     if (ROUTE_SCALE >= 2) {
       const doubled = [];
       for (let r2 = 0; r2 < ROUTE_SCALE; r2++) {
-        for (let i = 0; i < kinds.length; i++) {
-          let k = kinds[i];
-          if (k === 'street' && i === 0 && doubled.length >= 3
-              && doubled.slice(-3).every((q) => q === 'street')) k = 'trail';
-          doubled.push(k);
-        }
+        for (let i = 0; i < kinds.length; i++) doubled.push(kinds[i]);
       }
       kinds = doubled;
+    }
+    // r358 (iterate round): §7.1 PACING, CIRCULARLY. The old seam guard
+    // converted only a copy's FIRST gate behind exactly three street, so a
+    // 2+2 split slipped through (IL BUDELLO measured a street run of 4 —
+    // and the loop's own wrap seam has the same hole, repeat or not). Walk
+    // the loop from a non-street anchor and break every over-long run
+    // wherever it lands: a 4th consecutive street or a 3rd consecutive
+    // open becomes trail.
+    {
+      const M = kinds.length;
+      const anchor = kinds.findIndex((k) => k !== 'street');
+      if (anchor >= 0) {
+        let runS = 0, runO = 0;
+        for (let j = 1; j <= M; j++) {
+          const idx = (anchor + j) % M;
+          runS = kinds[idx] === 'street' ? runS + 1 : 0;
+          runO = kinds[idx] === 'open' ? runO + 1 : 0;
+          if (runS > 3 || runO > 2) { kinds[idx] = 'trail'; runS = 0; runO = 0; }
+        }
+      }
     }
     const N = track.center.length;
     this.gates = kinds.map((kind, i) => {
