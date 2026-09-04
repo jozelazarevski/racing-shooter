@@ -4161,6 +4161,95 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r359 — THE ECONOMY LEARNS TO BIND (owner: "Iterate the careerpath")
+
+This closes the loop the owner opened at r342 — "I need to be forced
+to buy upgrades" — which CP3 answered on the DIFFICULTY side (rivals
+ramp by tier) but never on the MONEY side: CS2 measured the career
+~8.8x solvent, so the forcing function had no teeth. This round
+measured where the money comes from and made the tier boundaries ask
+a real question.
+
+THE MEASUREMENT (staged 78-round podium-most career, score 4000,
+P1/P2/P3 rotation, itemized from the results card's own #cb-rows):
+
+    firstClear   93,600   31%   <- the single largest stream
+    raceScore    84,900   28%
+    podium + the rest        ~41%
+    TOTAL       ~300,000 over the whole career
+
+A THIRD of all career income was the one-time conquest windfall — you
+were paid most for showing up somewhere new, not for racing well. And
+the sim itself was lying: the staged loop never zeroed
+`contractCredits` between races (real races do, via resetRace at
+main.js:10467), so every staged race RE-PAID the previous race's
+contract pot. Measured: race 5 paid race 4's 2,400 CR again. CS2's
+8.8x margin was inflated by compounding; the honest pre-tuning figure
+was 4.8x.
+
+THE TUNING, one number: `firstClearCr` 1200 -> 600, and it moved out
+of main.js into driving.json's career block (main.js reads it through
+`FIRST_CLEAR_CR()` — a literal in .ts is a bug, per the standing
+rule). Career income lands at ~253k; a full-kit car costs ~166k
+(upgradeCost 600 + lvl^2*500, seven lines), which makes maxing one
+machine deliberately a career-and-a-half — the top of the kit ladder
+is the late-game sink, ON PURPOSE, recorded as such in test-economy's
+budget law (<= 156 races = two careers).
+
+THE LAWS GREW TEETH:
+- careersim CS2 is now KIT-HONEST: at every tier boundary the sim
+  spends entry price + four performance lines to the tier's level,
+  not entry alone. CS2b bounds the margin in [1.2, 4.5]. Measured at
+  the three boundaries: 3.5x / 3.2x / 2.3x — solvent, tightening as
+  you climb, never trivial.
+- test-economy reads firstClearCr from driving.json (the source of
+  truth moved, the suite followed); the conquest law took its honest
+  form — the bonus STACKS with the podium bonus, so the law is
+  `firstClear >= podium[2]`, a meaningful premium over repeating an
+  old world — and the suite is 12/12 for the FIRST TIME ON RECORD
+  (the max-a-car law had been red on pristine bases since the 2x
+  era).
+
+Gates: careersim CS1-CS5 + CS2b green, career, progression,
+hudfreeze, economy 12/12.
+
+## r358 — THE WEDGE METER GETS FRACTIONS (iterate round; shipped in the r359 deploy)
+
+Full 40-suite battery on r357: 38 green, two reds, both real, both
+fixed:
+
+1. **killspos P3 (wedge law).** The r311 stuck meter measured
+   forward progress in WHOLE TRACK SAMPLES (`trackIndex` steps), and
+   r340 doubled segLen to 4-5.3 u — so "1 m of advance per 2.5 s"
+   silently became "one sample per 2.5 s", a ~5x raise of the
+   honest-crawl floor; a 2 m/s creep could be rescued between sample
+   crossings (measured: 1 spurious rescue in 6 s). Fix: project the
+   car onto its segment's tangent for the sub-sample fraction
+   (clamped +-0.5), judge the metre on that; and `placeAt` now
+   resets `_wedgeT`/`_wedgeIdx` so a fresh placement never inherits
+   a stale anchor. killspos 7/7.
+
+2. **route (pacing seam).** The §7.1 pacing pass was one gate deep
+   at the layout seam: a lap ending 2-street meeting a lap starting
+   2-street produced a run of 4 (IL BUDELLO). Replaced with a
+   CIRCULAR pass anchored at the first non-street gate — 4th
+   consecutive street or 3rd consecutive open becomes trail,
+   wrap-around included. The suite's stale exact-count EXPECT became
+   a multiple-of-lap law. route 21/21. Attribution note: CANYON
+   RUN's gate kinds are byte-identical before/after (measured,
+   dbg-routekinds), so this pass touched only the worlds that
+   actually carried seam runs.
+
+Long-stream attribution: test-final-integration's one red was a
+`page.click` 30 s timeout while THREE headless Chromiums shared the
+box (it was 98/98 solo at r355) — re-run solo before this deploy;
+the solo verdict gates the merge. airace Q15
+(one 1-frame gantry tick in one of three races, twice) is the #54
+dice class: deterministically NOT r358 — the route pass left CANYON
+RUN identical and the wedge meter is player-only (vehicles.js
+`trying = this === g.player`), so there is no code path from either
+change to rival gate behaviour.
+
 ## r357 — THE DEBT THAT PAID ITSELF (#31 closed by measurement; the board is clear)
 
 Task #31 — the feature-aware corridor re-author, scoped in r299
