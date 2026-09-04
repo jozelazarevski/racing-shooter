@@ -4161,6 +4161,45 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r361 — THE ORPHAN PARAPET (owner photo, RED CENTRE RUN: "Fix")
+
+The photo showed a candy-striped object lying mid-road and a scaffold
+tower at the left kerb. Long forensic chase (lap contact sheets, chase
+renders, screen-ray unprojection, a scene bbox census): the tower is
+LEGAL — a trackside billboard's back frame 17 u out, reading close
+because that stretch runs on the flyover embankment; every rail and
+pier on the world measured clear of every carriageway (0 hits in a
+census against railBlocked's own bounds).
+
+The striped object was REAL: `river-crossings`' culvert PARAPET — a
+19 u cap-grey bar — floating 0.5-1.5 u over the verge, in the
+player's eyeline beside the racing line. Two defects stacked:
+
+1. Seated at `deck + 0.45` — the ROAD's height — wherever it landed.
+   The crossing point is accepted up to 16 u off the centreline, so
+   the bar lands on the verge, where the ground owes the deck
+   nothing. The same one-sample promise as ever, in its purest form:
+   seated for ONE height, spanning ground that moves.
+2. Built even where `_clearsRoad` had refused BOTH headwalls — no
+   culvert exists there at all, so the "parapet" was a lone grey bar
+   standing in an open field.
+
+Fix: a parapet walks the ground under both ends and its middle,
+builds only where that ground holds within a step of itself and of
+the deck, seats ON it — and never builds without at least one
+headwall standing (a culvert with no parapet reads thin; a parapet
+with no culvert is litter). Verified: RED CENTRE RUN builds zero
+orphan bars and the beam is gone from the render.
+
+A river verge-cap (water surface clamped to hug the ground beside
+carriageways) was tried for the same symptom and REVERTED: the beam
+was never the water, and the cap broke PINE VALLEY's never-runs-
+uphill law (3 rises). The floating-ribbon allowance near roads
+(PASS 2b, up to a channel depth) stands as designed.
+
+Gates: boot, nature, nothing-floats, containment, corridor2/3,
+droplip, pickupsurface, tunnels, lap-count.
+
 ## r360 — THE DRIFT ANGLE FOLLOWS THE STICK (owner: "Drift can be improved")
 
 Measured first (tools-scratch/dbg-drift.mjs, flat open world, stock

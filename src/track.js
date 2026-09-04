@@ -24036,24 +24036,6 @@ export class Track {
       // ...and never a slab standing proud of the land it runs through
       const cap = hi + R.depth;
       if (surf[s] > cap) surf[s] = cap;
-      // r361 (owner photo, RED CENTRE RUN): BESIDE A ROAD THE CAP IS THE
-      // VERGE, NOT THE CHANNEL. `hi + R.depth` allows the surface a full
-      // channel depth above the centre-column ground, which is invisible out
-      // in a carved valley — the banks stand higher — but where the river
-      // RUNS ALONGSIDE a carriageway the carve is faded to protect the
-      // roadbed, the banks are road-grade, and that allowance built a pale
-      // ribbon standing 0.9 u proud of the verge in the player's eyeline
-      // (measured at i460-505; the photo's "striped object on the road").
-      // The culvert rule only covers crossings; this covers the run-beside:
-      // within a road's reach the surface hugs the ground it covers. Fords
-      // keep their deck rule — the crossing wash is exempt.
-      const cnR = this.center[niR];
-      const dRoad = Math.hypot(f.x - cnR.x, f.z - cnR.z);
-      const wR = this.widthAt ? this.widthAt(niR) : 9;
-      if (dRoad < wR + 26 && fordDist(f.x, f.z) > 24) {
-        const vergeCap = hi + 0.3;
-        if (surf[s] > vergeCap) surf[s] = vergeCap;
-      }
     }
 
     // PASS 2c — MONOTONE, AND THIS ONE WINS.
