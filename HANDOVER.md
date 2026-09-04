@@ -4242,13 +4242,16 @@ fixed:
 
 Long-stream attribution: test-final-integration's one red was a
 `page.click` 30 s timeout while THREE headless Chromiums shared the
-box (it was 98/98 solo at r355) — re-run solo before this deploy;
-the solo verdict gates the merge. airace Q15
+box (it was 98/98 solo at r355) — re-run solo: 98/98. airace Q15
 (one 1-frame gantry tick in one of three races, twice) is the #54
 dice class: deterministically NOT r358 — the route pass left CANYON
 RUN identical and the wedge meter is player-only (vehicles.js
 `trying = this === g.player`), so there is no code path from either
-change to rival gate behaviour.
+change to rival gate behaviour. Corroborated by a baseline roll on a
+pristine r357 worktree: THERE airace failed Q11 (spread) and §5.6
+(collisions) while Q15 rolled clean — at RACES=3 the CANYON laws flap
+on DIFFERENT laws per roll, on both builds. That is #54's verdict
+holding, not a regression.
 
 ## r357 — THE DEBT THAT PAID ITSELF (#31 closed by measurement; the board is clear)
 
