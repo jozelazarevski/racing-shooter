@@ -100,16 +100,23 @@ const eco = await p.evaluate(() => {
   for (let k = 0; k < ch.length; k++) {
     const tier = g.tierOf(k);
     if (tier.idx > lastTier) {
-      // the boundary: can the bank take the entry car + 2 kit levels?
-      const KIT_ALLOWANCE = 4000;              // two mid-ladder part levels
+      // r359: the KIT-HONEST need. The flat 4,000 allowance ignored the
+      // real ladder — upgradeCost(lvl) = 600 + lvl²·500, so kitting the
+      // new car's four performance lines (engine/tires/handling/nitro) to
+      // the tier's expected level costs 6.8k at CLUB (lvl 2), 17.2k at
+      // PRO (lvl 3), 37.6k at WORKS (lvl 4). The boundary asks for the
+      // car AND that kit, and the sim SPENDS both — the next boundary is
+      // measured on what an equipped player actually carries forward.
+      const upCost = (lvl) => 600 + lvl * lvl * 500;
+      let kitNeed = 0;
+      for (let line = 0; line < 4; line++) {
+        for (let l2 = 0; l2 <= tier.idx; l2++) kitNeed += upCost(l2);
+      }
       const entry = tier.carMin;
       boundary.push({ tier: tier.name, bank: g.garage.credits,
-        need: entry + KIT_ALLOWANCE, ok: g.garage.credits >= entry + KIT_ALLOWANCE });
-      // ...and the sim BUYS the car, so the next boundary is measured on
-      // what is left (kit spend stays in the bank: parts also come from
-      // quest rewards the sim conservatively ignores)
-      g.garage.credits -= entry;
-      spends.push(entry);
+        need: entry + kitNeed, ok: g.garage.credits >= entry + kitNeed });
+      g.garage.credits -= entry + kitNeed;
+      spends.push(entry + kitNeed);
       lastTier = tier.idx;
     }
     for (const lv of ch[k].levels) {
@@ -127,6 +134,11 @@ const eco = await p.evaluate(() => {
         g.startScore = 0; g.score = 4000;      // a modest, quiet race
         g.deaths = 1;                          // no clean-run bonus (conservative)
         g.contracts = [];
+        // r359: resetRace zeroes the pot between real races — the staged
+        // loop must too, or every race re-pays the whole accumulated pot
+        // (measured: race 5 paid race 4's 2,400 CR again; CS2's 8.8x was
+        // inflated by the compounding)
+        g.contractCredits = 0;
         g.finishRace();
       } catch (e) { raceErrs++; }
     }
@@ -136,13 +148,18 @@ const eco = await p.evaluate(() => {
 });
 console.log('  boundaries:', JSON.stringify(eco.boundary));
 console.log(`  ${eco.races} rounds staged, ${eco.raceErrs} errored, final bank ${eco.bank.toLocaleString()} CR`);
-check('CS2  every tier boundary is solvent (entry car + kit allowance), buying along the way',
+check('CS2  every tier boundary is solvent (entry car + tier kit), buying and kitting along the way',
   eco.boundary.length === 3 && eco.boundary.every((b) => b.ok) && eco.raceErrs === 0,
   eco.boundary.map((b) => `${b.tier}: ${b.bank.toLocaleString()}/${b.need.toLocaleString()}`).join('  '));
-// Measured margin on the first run: ~8.8× at the CLUB boundary — the economy
-// never BINDS a podium-most player. That is a finding for the balance pass
-// CAREER_PATH.md §5 explicitly deferred ("rewards do not scale by tier"),
-// not a red: CS2 is a floor, and the floor holds.
+// r359: ...AND THE CEILING. The r353 run read "8.8x solvent" — half of
+// that was the staged loop re-paying the contract pot every race (real
+// races reset it; the sim now does too), and the rest was a need model
+// with no kit in it. With honest books and a kit-honest need, the margin
+// law is two-sided: never insolvent (above), never so rich the garage
+// stops being a question. Band chosen from the measured runs.
+check('CS2b the garage asks a real question (boundary margin 1.2-4.5x)',
+  eco.boundary.every((b) => b.bank >= b.need * 1.2 && b.bank <= b.need * 4.5),
+  eco.boundary.map((b) => `${b.tier}: ${(b.bank / b.need).toFixed(1)}x`).join('  '));
 
 await p.close();
 

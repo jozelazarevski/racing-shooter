@@ -308,6 +308,10 @@ export const DRIVING = {
   // and the signpost's garage rung.
   career: {
     finaleMul: 2,
+    // r359: the once-per-world conquest bonus (was a 1200 literal in
+    // main.js — 31% of a podium-most career's income; halved so the tier
+    // boundaries ask a real question).
+    firstClearCr: 600,
     // CP4 (r352) THE NEMESIS THREAD: one grid slot per chapter, the driver
     // that chapter belongs to. Deterministic, all seven feature, and the
     // racers hold the hard end — R. VOSS (slot 0, the rabbit) owns WORKS.
