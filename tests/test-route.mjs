@@ -116,8 +116,21 @@ for (const [lvl, counts] of Object.entries(EXPECT)) {
 
   const got = { street: 0, trail: 0, open: 0 };
   for (const k of r.kinds) got[k]++;
-  check(`[${lvl}] §13 layout counts match the table`,
-    got.street === counts.street && got.trail === counts.trail && got.open === counts.open,
+  // r358 (iterate round): the table is PER LAP and r340 repeats the layout
+  // ROUTE_SCALE times — the old exact-match law had been red since the
+  // doubling (measured counts were exactly 2x the table on all three
+  // worlds; the suite just had not been run). The law now: total gates are
+  // an integer multiple of the lap, and the mix matches that multiple with
+  // §7.1's pacing conversions allowed in ONE direction only (street/open
+  // may become trail at over-long runs, never the reverse).
+  const lapTotal = counts.street + counts.trail + counts.open;
+  const mult = Math.round(r.kinds.length / lapTotal);
+  check(`[${lvl}] §13 layout counts match the table at x${mult}`,
+    mult >= 1 && r.kinds.length === mult * lapTotal
+    && got.street <= mult * counts.street
+    && got.open <= mult * counts.open
+    && got.trail >= mult * counts.trail
+    && got.street + got.trail + got.open === mult * lapTotal,
     JSON.stringify(got));
   check(`[${lvl}] §4.2 pacing: ≤3 consecutive street, ≤2 consecutive open`,
     r.pacing.worstStreet <= 3 && r.pacing.worstOpen <= 2, JSON.stringify(r.pacing));

@@ -484,7 +484,12 @@ const plankMat = (col) => {
 
 const CREDIT_RATE = 1 / 5;                 // score -> credits
 const PODIUM_CR = [650, 400, 220];         // 1st / 2nd / 3rd
-const FIRST_CLEAR_CR = 1200;               // once per world, on your first podium
+// r359 (owner: "Iterate the careerpath"): the conquest windfall was the
+// career's single biggest income stream — 1200 x 78 worlds = 93,600 CR,
+// 31% of a podium-most career's 300k — and the tier boundaries measured
+// 4.8-6.2x solvent with it. Halved, and moved to the driving.json career
+// block per the constants rule; the celebration stays, the flood does not.
+const FIRST_CLEAR_CR = () => window.__DRIVING?.career?.firstClearCr ?? 600;
 const CLEAN_RUN_CR = 350;                  // finished without wrecking
 const SWEEP_CR = 600;                      // all three contracts in one race
 // Upgrades escalate QUADRATICALLY: 800 / 1,600 / 4,000 / 8,000 / 13,600 —
@@ -10883,7 +10888,7 @@ class Game {
     const prev = this.career.finished[this.level.id];
     const diffMult = { easy: 0.7, normal: 1.0, hard: 1.5 }[this.difficulty.id] ?? 1;
     const podium = rank <= 3 ? PODIUM_CR[rank - 1] : 0;
-    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? FIRST_CLEAR_CR : 0;
+    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? FIRST_CLEAR_CR() : 0;
     const raceScore = Math.max(0, this.score - (this.startScore ?? 0));
     // finish-line contracts resolve now (UNTOUCHABLE / PACIFIST / HERDSMAN /
     // PODIUM ON HARD), then the whole contract pot rides into `earned`
@@ -10922,7 +10927,7 @@ class Game {
       + finaleCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
-    if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
+    if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR()} CR`, 'good');
     if (diffMult !== 1) this.hud.feed(`${this.difficulty.id.toUpperCase()} PAYS ×${diffMult} CREDITS`, 'info');
     // itemized credits breakdown on the results screen
     {
