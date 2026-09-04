@@ -2700,7 +2700,19 @@ export class Car {
       if (inputs.drift && this === this.game.player && Math.abs(vl) > 0.01) {
         const intoDir = -Math.sign(vl);
         const into = dTheta * intoDir;
-        const maxInto = Math.max(0, (DRIVING.driftBetaMax ?? 1.0) - beta)
+        // r360 (owner: "Drift can be improved"): THE ANGLE FOLLOWS THE
+        // STICK. The r341 ceiling was FLAT, so every held drift parked at
+        // ~57° whatever the steer — measured (dbg-drift): full lock and a
+        // 0.35 stick both settle at 53°; depth was a dead input. The
+        // ceiling is now the steer-scaled TARGET: full lock keeps the
+        // r341 maximum bit-identically, an eased stick shallows the slide
+        // toward driftBetaSteerFloor of it (the scrub burns the excess vl
+        // once the deepening share closes), and the carried turn below is
+        // untouched — easing the stick shallows the CAR, not the corner.
+        const sFloor = DRIVING.driftBetaSteerFloor ?? 0.35;
+        const betaTarget = (DRIVING.driftBetaMax ?? 1.0)
+          * (sFloor + (1 - sFloor) * Math.min(1, Math.abs(steer)));
+        const maxInto = Math.max(0, betaTarget - beta)
           * (DRIVING.driftBetaEase ?? 6) * dt;
         if (into > maxInto) {
           // ...and the carried turn OBEYS THE TYRE: an unbounded carry let

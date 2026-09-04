@@ -27,6 +27,7 @@
   "driftYawAssist": 0.85,
   "driftBetaMax": 1.0,
   "driftBetaEase": 6,
+  "driftBetaSteerFloor": 0.35,
   "driftCarryCap": 1.0,
   "yawRMin": 4.0,
   "yawCapLo": 1.45,

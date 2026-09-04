@@ -4161,6 +4161,37 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r360 — THE DRIFT ANGLE FOLLOWS THE STICK (owner: "Drift can be improved")
+
+Measured first (tools-scratch/dbg-drift.mjs, flat open world, stock
+car): the drift core was already healthy — 40° of slip inside 0.5 s
+of the pull (FT3), a 2 s held drift at 120 km/h comes out at 121
+still turning 150°, direction flips chain in 0.5 s, release +
+counter-steer settles in 0.37 s. The horror numbers on CANYON RUN
+(120 -> 24 km/h) were the canyon WALLS, not the law.
+
+The real defect: THE DRIFT HAD DIRECTION BUT NO DEPTH. The r341
+anti-spin ceiling was flat, so once the handbrake was down the slip
+angle parked at ~53° whatever the stick did — full lock and a 0.35
+stick measured IDENTICAL settled angles. Easing the stick, which
+every drift model reads as "shallow the slide", was a dead input.
+
+The fix is one line of law: the ceiling is now the steer-scaled
+target `driftBetaMax × (driftBetaSteerFloor + (1-floor)·|steer|)`.
+Measured after: full lock 53° at 80°/s (bit-identical to r341 — the
+anti-spin promise and test-drift's laws hold by construction), 0.6
+stick settles 39°, 0.35 stick 30° — and the shallower drifts carry
+MORE speed out (102 vs 93 km/h), so depth is now a real trade the
+thumb makes mid-corner. Player-only, like the ceiling it amends.
+New constant `driftBetaSteerFloor: 0.35` in driving.json.
+
+Also this round (#68, the "Iterate" on r359): the full 40-suite
+battery + airace + final-integration (98/98) came back GREEN with
+nothing to fix — progression's one near-miss (2.6% vs a 3% floor)
+re-rolled 7/7, the known dice. First fully-clean iterate round on
+record. r360 gates: drift, killspos, patch02, patch13, machines,
+shortcut, containment, lap-count, slopegrip, camera — all green.
+
 ## r359 — THE ECONOMY LEARNS TO BIND (owner: "Iterate the careerpath")
 
 This closes the loop the owner opened at r342 — "I need to be forced
