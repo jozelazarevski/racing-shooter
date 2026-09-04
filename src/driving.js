@@ -97,6 +97,10 @@ export const DRIVING = {
   // controlled arc, not free rotation.
   driftBetaMax: 1.0,         // rad (~57°): held-drift slip ceiling, under the spin line
   driftBetaEase: 6,          // 1/s: rate the remaining room closes at (τ ≈ 0.17 s)
+  // r360 ("Drift can be improved"): the ceiling reads the STICK — the held
+  // angle targets driftBetaMax × (floor + (1-floor)·|steer|), so full lock
+  // is exactly the r341 ceiling and a light stick holds a shallow slide.
+  driftBetaSteerFloor: 0.35, // share of driftBetaMax a zero-steer held drift settles at
   driftCarryCap: 1.0,        // × budget: lateral the carried turn may spend — over yawCapLo (1.45,
                              // the flat-out grip arc), under the scrub's 2.1: the drift out-turns
                              // grip without the 7 g donut
