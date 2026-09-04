@@ -4161,6 +4161,44 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r362 — THE TREES ATE THE TOWN (owner photo, CAPO VELA: "The maps aren't matching")
+
+The photo: a Riviera world opening on a bare sand corridor with its
+town on the horizon. Rendered start frames of all six RIVIERA worlds:
+five of six looked identical — empty scrub where the references
+promise "houses running the length of the front". The data said the
+towns EXISTED (ALBAROSA 723 buildings, PORTO GRANDE 1012) — as
+distant back-rank islands 100-300 u off the road, with the street
+wall missing entirely.
+
+The mechanism, proven by its own counterexample: the tree scatter
+runs BEFORE `_buildOldTown`, plants down to 14-15 u, and `put()`
+refuses any terrace block within its diagonal + 1.4 of a TRUNK — and
+ONE refusal resets the whole terrace run (`if (!placed) run = 0`).
+Measured on ALBAROSA: 77 olives in the 9-30 u street band; the
+terrace never got a run going. IL VICOLO is the counterexample that
+proves it: treeCount 26, and its street wall builds perfectly.
+
+Fix, one law in three scatter gates (olive path: loose + grove-grid +
+cypress lines; default stand for frontage worlds on other themes): ON
+A FRONTAGE WORLD THE STREET BAND BELONGS TO THE STREET — no tree
+inside F.lateral + 7 + depth/2 + 1.6. Measured after: band buildings
+ALBAROSA 0 -> 33, PORTO MOLO -> 39, CAPO VELA -> 105, PORTO GRANDE
+-> 75; band trees 77 -> ~0; total tree counts barely move (347 of
+380 — the scatter re-rolls outside the band). Plus CAPO VELA's
+hutZone now reaches the grid ([0.1,0.5] -> [0.0,0.5]) — its own
+design note says the start is "out of the town at sea level" and the
+town zone began 10% up the lap.
+
+Interpretation note: "the maps aren't matching" was read as the same
+ask as the theme's own recorded r244-era report ("make sure it's
+matching my reference") — the worlds not matching their reference
+look. An AskUserQuestion offering other readings was declined, so
+this round fixes the one mismatch that was measurable and visible in
+the photo itself. If the owner meant something else (route shapes
+repeating across worlds, or menu/world disagreement), that work is
+still open.
+
 ## r361 — THE ORPHAN PARAPET (owner photo, RED CENTRE RUN: "Fix")
 
 The photo showed a candy-striped object lying mid-road and a scaffold
