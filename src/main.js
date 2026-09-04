@@ -6831,12 +6831,18 @@ class Game {
   _resetCareer(id) {
     const keys = wipeProfileData(id);
     if (id !== this.profile.id) { this._renderProfiles(); return keys; }
-    this.career = { finished: {}, rungs: {} };
+    // r363 ("All I 0"): the stamp the sync merge honours — without it the
+    // next pullMerge handed the whole career back from the cloud row.
+    this.career = { finished: {}, rungs: {}, resetAt: Date.now() };
     this.garage = { credits: 0, upgrades: {} };
     this.cars = { owned: [STARTER_CAR], selected: STARTER_CAR };
     saveJSON(this._pkey('career'), this.career);
     saveJSON(this._pkey('garage'), this.garage);
     saveJSON(this._pkey('cars'), this.cars);
+    // ...and the cloud row is reset NOW, not on the next settle timer: the
+    // whole point of the stamp is that no copy of the old career outlives
+    // the button press.
+    this.sync?.pushNow?.();
     // back to the stock starter machine, live
     const starter = CAR_CATALOG.find((c) => c.key === STARTER_CAR) ?? CAR_CATALOG[0];
     this.swapPlayerCar(starter);
@@ -10518,19 +10524,38 @@ class Game {
     this.player.missiles = this.player.maxMissiles;
     this.player.mines = this.player.maxMines;
     this.player.sos = this.player.maxSos;
-    const slot = this.track.gridSlot(0);
-    this.player.placeAt(slot.index, slot.lateral);
-
-    this.enemies.forEach((e, i) => {
-      e.lap = 1;
-      e.finished = false;
-      e.health = e.maxHealth;
-      e.alive = true;
-      e.mesh.visible = true;
-      e.boostTimer = 0;
-      e._launchHold = e._launchReaction ?? 0;   // §5.5: a restart re-arms the lights
-      const s = this.track.gridSlot(i + 1);
-      e.placeAt(s.index, s.lateral);
+    // r363 (owner: "I should not be starting 1st always"): REVERSE
+    // CHAMPIONSHIP GRID. Slot 0 (pole) was the player's by construction,
+    // every race, forever. The grid now forms from the chapter's live
+    // season standings, REVERSED — the title leader starts at the back and
+    // fights through, the strugglers get the front row, which is the
+    // arcade convention precisely because it manufactures overtaking.
+    // Ties (a fresh season, race one) put the player behind the rival they
+    // tie with, so a new chapter always opens with a charge through the
+    // field rather than a lights-to-flag pole run.
+    const gridK = this.chapterOf(this.level?.id) ?? 0;
+    const gridPts = Object.fromEntries(this.seasonTable(gridK));
+    const field = [this.player, ...this.enemies];
+    // the season table keys DRIVER names (`e.driverName ?? e.name`, the
+    // same key finishRace writes) — `e.name` alone is the CAR
+    const ranked = field
+      .map((c, i) => ({ c, p: gridPts[c === this.player ? 'YOU' : (c.driverName ?? c.name)] ?? 0, i }))
+      .sort((a, b) => (b.p - a.p)
+        || ((b.c === this.player ? 1 : 0) - (a.c === this.player ? 1 : 0))
+        || (a.i - b.i));
+    ranked.forEach((r, pos) => {
+      const s = this.track.gridSlot(field.length - 1 - pos);
+      if (r.c !== this.player) {
+        const e = r.c;
+        e.lap = 1;
+        e.finished = false;
+        e.health = e.maxHealth;
+        e.alive = true;
+        e.mesh.visible = true;
+        e.boostTimer = 0;
+        e._launchHold = e._launchReaction ?? 0; // §5.5: a restart re-arms the lights
+      }
+      r.c.placeAt(s.index, s.lateral);
     });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; }
     this.track.setLights('red');

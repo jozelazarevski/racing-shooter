@@ -114,6 +114,20 @@ function mergeMax(a, b, newerIsB) {
 export function mergeSnapshots(a, b) {
   if (!a) return b;
   if (!b) return a;
+  // r363 (owner: "I want to delete all progress when I reset career. All
+  // I 0"): RESET BEATS RESURRECTION. The symmetric union above never
+  // deletes — which is right for two live careers and wrong for exactly
+  // one case: the player pressed RESET CAREER, and the next pullMerge
+  // handed their whole career straight back from the cloud row. A reset
+  // stamps `career.resetAt`; any snapshot OLDER than the newest stamp is
+  // pre-reset history and contributes nothing. A device that raced after
+  // the reset is newer than the stamp and merges normally.
+  const ra = Math.max(a.keys?.career?.resetAt ?? 0, b.keys?.career?.resetAt ?? 0);
+  if (ra) {
+    const blank = (s) => ({ ...s, keys: { career: { finished: {}, rungs: {}, resetAt: ra } } });
+    if ((a.when ?? 0) < ra) a = blank(a);
+    if ((b.when ?? 0) < ra) b = blank(b);
+  }
   const newerIsB = (b.when ?? 0) >= (a.when ?? 0);
   const newer = newerIsB ? b : a;
   const keys = {};

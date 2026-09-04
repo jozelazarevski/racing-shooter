@@ -4161,6 +4161,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r363 — RESET MEANS RESET, AND POLE IS EARNED (two owner asks; ships with r362)
+
+**"I want to delete all progress when I reset career. All I 0."**
+The reset itself was already clean — wipe by prefix, in-memory
+career/garage/cars re-zeroed, audit found every surface at 0. The
+leak was the SYNC ENGINE: boot runs `pullMerge()` 1.5 s in, and
+`mergeSnapshots` is a symmetric union that deliberately never
+deletes ("the failure mode of last-write-wins is a career quietly
+deleted by an old phone") — so the cloud row handed the whole career
+straight back after every reset. Fix: RESET BEATS RESURRECTION. A
+reset stamps `career.resetAt` and pushes the empty snapshot to the
+cloud immediately; the merge discards the progression of any
+snapshot OLDER than the newest stamp. Unit-proven symmetric: old
+career + reset = zero both ways; a device that raced AFTER the reset
+merges its new progress normally.
+
+**"I should not be starting 1st always."**
+Slot 0 (pole) was the player's by construction in resetRace. The
+grid now forms from the chapter's live season standings REVERSED —
+the title leader starts at the back, the strugglers get the front
+row, ties (fresh season) put the player behind the rival they tie
+with. Measured: fresh career -> player starts on the back row;
+leading the season by 99 pts -> back row; bottom of the table ->
+pole row. Pole is now something the season does to you, not a
+default.
+
 ## r362 — THE TREES ATE THE TOWN (owner photo, CAPO VELA: "The maps aren't matching")
 
 The photo: a Riviera world opening on a bare sand corridor with its
