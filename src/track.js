@@ -24019,7 +24019,8 @@ export class Track {
       // let the embankment swallow the ribbon, and it re-emerges on the far
       // side — a culvert, which is what a real road over a real stream has.
       _clearV.set(f.x, 0, f.z);
-      const deckC = this.center[this.nearestIndex(_clearV)].y + 0.05;
+      const niR = this.nearestIndex(_clearV);
+      const deckC = this.center[niR].y + 0.05;
       // ...and a planned ford whose deck is far above the water is a BRIDGE,
       // which for the water is the same as no ford at all
       const culvert = f.df < 24
@@ -24035,6 +24036,24 @@ export class Track {
       // ...and never a slab standing proud of the land it runs through
       const cap = hi + R.depth;
       if (surf[s] > cap) surf[s] = cap;
+      // r361 (owner photo, RED CENTRE RUN): BESIDE A ROAD THE CAP IS THE
+      // VERGE, NOT THE CHANNEL. `hi + R.depth` allows the surface a full
+      // channel depth above the centre-column ground, which is invisible out
+      // in a carved valley — the banks stand higher — but where the river
+      // RUNS ALONGSIDE a carriageway the carve is faded to protect the
+      // roadbed, the banks are road-grade, and that allowance built a pale
+      // ribbon standing 0.9 u proud of the verge in the player's eyeline
+      // (measured at i460-505; the photo's "striped object on the road").
+      // The culvert rule only covers crossings; this covers the run-beside:
+      // within a road's reach the surface hugs the ground it covers. Fords
+      // keep their deck rule — the crossing wash is exempt.
+      const cnR = this.center[niR];
+      const dRoad = Math.hypot(f.x - cnR.x, f.z - cnR.z);
+      const wR = this.widthAt ? this.widthAt(niR) : 9;
+      if (dRoad < wR + 26 && fordDist(f.x, f.z) > 24) {
+        const vergeCap = hi + 0.3;
+        if (surf[s] > vergeCap) surf[s] = vergeCap;
+      }
     }
 
     // PASS 2c — MONOTONE, AND THIS ONE WINS.
@@ -24427,6 +24446,7 @@ export class Track {
       // CULVERT: a headwall each side of the embankment with an arch mouth,
       // wing walls splaying into the bank, and a parapet on the road above.
       const bedY = this.terrainHeight(c.p.x, c.p.z) - 0.4;
+      let headwalls = 0;
       for (const sg of [1, -1]) {
         const off = ROAD_HALF + 3.5;
         const hx = c.p.x + Math.sin(roadYaw) * sg * off;
@@ -24482,6 +24502,7 @@ export class Track {
           g.add(wing);
         }
         this.solids.push({ x: hx, z: hz, r: hw + 1.5, y: bedY + 1, mat: 'stone', src: 'culvertHeadwall' });
+        headwalls++;
       }
       // Parapet on the road above the culvert — the giveaway from the car.
       //
@@ -24507,6 +24528,12 @@ export class Track {
       // roadside wall on these levels uses — a segment running ALONG the
       // road, with the same bite as its neighbours instead of a special case.
       const parLen = hw * 2 + 9;
+      // r361: A PARAPET WITHOUT ITS CULVERT IS LITTER. Where _clearsRoad
+      // refused both headwalls there is no masonry crossing to dress — a
+      // lone 19 u cap-grey bar standing in open ground beside the road is
+      // the "plank lying on the road" in the owner's RED CENTRE RUN photo,
+      // seated or not. No headwall, no parapet.
+      if (!headwalls) continue;
       for (const sg of [1, -1]) {
         // ON THE WALL LINE, not the road edge. ROAD_HALF + 1.1 is 10.1, and a
         // segment collider bites hw + 1.7 = 1.95, so a parapet there stops a
@@ -24539,8 +24566,27 @@ export class Track {
         // parapet is dressing that reads slightly thin; one with a parapet
         // in the road is a wall you hit at racing speed.
         if (!this._clearsRoad(px, pz, 1.4, 0.4)) continue;
+        // r361 (owner photo, RED CENTRE RUN): A PARAPET STANDS ON ITS
+        // GROUND, ALL OF IT. The bar was seated at `deck + 0.45` — the
+        // ROAD's height — wherever it landed, and with `c.p` accepted up to
+        // 16 u off the centreline it lands on the verge, where the ground
+        // owes the deck nothing. Measured: a 19 u cap-grey slab hovering
+        // 0.5-1.5 u over the sand beside the carriageway, in the player's
+        // eyeline, reading as a plank lying on the road. Same one-sample
+        // promise as ever: seated for ONE height, spanning ground that
+        // moves. So walk both ends and the middle; if the ground under the
+        // bar stays within a step of itself AND of the deck, seat the bar
+        // on the ground; otherwise there is no embankment here to dress
+        // and the parapet is not built (the accepted thin-culvert cost).
+        const pe = [];
+        for (const t2 of [-0.5, 0, 0.5]) {
+          pe.push(this.terrainHeight(px + Math.sin(roadYaw) * t2 * parLen,
+            pz + Math.cos(roadYaw) * t2 * parLen));
+        }
+        const gLo = Math.min(...pe), gHi = Math.max(...pe);
+        if (gHi - gLo > 0.8 || Math.abs(gHi - deck) > 1.2) continue;
         const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, parLen), cap);
-        par.position.set(px, deck + 0.45, pz);
+        par.position.set(px, gHi + 0.45, pz);
         par.rotation.y = roadYaw;
         par.castShadow = true;
         g.add(par);
