@@ -8,12 +8,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 p.on('pageerror', (e) => console.log('PAGEERR', String(e).slice(0, 120)));
-await p.goto(`${BASE}/?level=1&go=1&fresh=1`, { waitUntil: 'load', timeout: 300000 });
-await p.waitForFunction(() => window.__game?.player && window.__game.track,
-  undefined, { timeout: 300000 });
-
 for (const shape of ['back', 'pole']) {
   for (let rr = 0; rr < RACES; rr++) {
+    // a finished race parks the game on the results screen and resetRace
+    // does not fully re-arm from there — a fresh load per race is the
+    // honest restart
+    await p.goto(`${BASE}/?level=1&go=1&fresh=1&r=${shape}${rr}`, { waitUntil: 'load', timeout: 300000 });
+    await p.waitForFunction(() => window.__game?.player && window.__game.track,
+      undefined, { timeout: 300000 });
     const res = await p.evaluate(async (shape2) => {
       const g = window.__game, t = g.track, N = t.center.length;
       const su = t.segLen ?? 4;
