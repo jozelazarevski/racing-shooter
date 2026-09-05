@@ -184,29 +184,44 @@ const r = await p.evaluate(() => {
   c.checkLap(Math.floor(N * 0.9));                // grid-behind-the-line crossing
   out.p210 = { missed: !!c._missedCP, wraps: c._wraps };
 
-  // P2.6 — canyon-rim auto-return is FREE. The net lives in update(), and the
-  // detector re-checks the geometry every frame, so the state has to be REAL:
-  // park the car grounded 20 u above the tracked road (terrain pinned flat at
-  // rim height for the one frame), one frame from the 2 s trigger.
+  // P2.6 INVERTED (r364, owner: "Don't reset me when I am off-road"). The
+  // canyon-rim auto-return this gate used to demand is DELETED: a car parked
+  // grounded 20 u above the tracked road is a driver exploring, and the game
+  // leaves it alone. Same staged perch as before, three seconds of frames —
+  // the law is now that NOTHING moves the car and no rescue fires.
   const sosBefore = c.sos ?? 0;
   const idx6 = 120, ci6 = t.center[idx6];
   const rimY = ci6.y + 20;
   // step() re-glues a grounded car to whichever ground it resolves under the
-  // recomputed segment, which collapses any staged rim perch before the net
-  // (which runs after step, in update) ever sees it. Stub step for the one
-  // frame: the net is the thing under test, not the tyre.
+  // recomputed segment, which collapses any staged rim perch before update()
+  // (where the rescue nets live) ever sees it. Stub step for the whole hold:
+  // the net (or its absence) is the thing under test, not the tyre.
   const stepReal = c.step;
   c.step = () => {};
   c.alive = true; c.airborne = false; c.vy = 0;
   c.pos.set(ci6.x + 40, rimY + 0.3, ci6.z); c.y = c.pos.y;
   c.trackIndex = idx6; c.vel.set(0, 0, 0);
-  c._cliffT = 2.0; c._wedgeT = 0; c._lostT = 0; c.unstuckCool = 5;
+  c._wedgeT = 0; c._lostT = 0; c.unstuckCool = 5;
   g.freeRoam = false; g.state = 'race';
+  const perchX = c.pos.x, perchZ = c.pos.z;
+  for (let k = 0; k < 180; k++) {
+    // the staged perch ignores the real terrain (step is stubbed), so the
+    // legitimate under-terrain net could read it as buried — that net is not
+    // the law here, the deleted cliff-top net is
+    c._lostT = 0;
+    c.update(1 / 60, { throttle: 0, brake: 0, steer: 0, drift: false, fire: false,
+      justPressed: () => false, justReleased: () => false });
+  }
+  const heldPerch = c.y > rimY - 6
+    && Math.hypot(c.pos.x - perchX, c.pos.z - perchZ) < 1;
+  // the VOLUNTARY way down still works and still leaves a telemetry trail
+  // (P2.0 reads the `unstuck` event this press produces): the UNSTUCK button
+  // is the only rescue off high ground now, and it is the player's to call
+  c._unstuckReq = true; c.unstuckCool = 0;
   c.update(1 / 60, { throttle: 0, brake: 0, steer: 0, drift: false, fire: false,
     justPressed: () => false, justReleased: () => false });
   c.step = stepReal;
-  out.p26 = { cliffT: +(c._cliffT ?? 0).toFixed(1), sos: c.sos ?? 0, sosBefore,
-    backDown: c.y < rimY - 6 };
+  out.p26 = { sos: c.sos ?? 0, sosBefore, held: heldPerch, alive: c.alive };
 
   // P2.17 — the camera floor: wherever a frame ends, the eye sits above the
   // terrain by the declared clearance (tunnels and bridge decks obey their
@@ -264,9 +279,9 @@ check('P2.7b the handbrake cancels the landing assist', r.p27b.landT === 0,
 check('P2.0  the flight recorder was running the whole time',
   r.p20.count > 0 && r.p20.hasDamage && r.p20.hasUnstuck,
   `${r.p20.count} events, damage=${r.p20.hasDamage}, unstuck=${r.p20.hasUnstuck}`);
-check('P2.6  the canyon rim rescue is free and brings the car down',
-  r.p26.cliffT === 0 && r.p26.sos === r.p26.sosBefore && r.p26.backDown,
-  `cliffT ${r.p26.cliffT}, SOS ${r.p26.sosBefore} -> ${r.p26.sos}, backDown=${r.p26.backDown}`);
+check('P2.6  the canyon rim is LEGAL ground — 3 s parked there moves nothing (r364)',
+  r.p26.held && r.p26.alive && r.p26.sos === r.p26.sosBefore,
+  `held=${r.p26.held}, alive=${r.p26.alive}, SOS ${r.p26.sosBefore} -> ${r.p26.sos}`);
 // The escape torque hands off at wallEscapeMinAngleDeg (45°) by design — past
 // that the driver's own steering owns the exit. The gate is reaching the
 // hand-off from a square 90° park, with a couple of degrees of slack.

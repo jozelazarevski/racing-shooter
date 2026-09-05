@@ -197,6 +197,11 @@ const lapWith = async (carKey, ups) => {
     for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; await f(); }
     const c = g.player;
     c.invuln = 9999;                     // the wall is pace, not weapons
+    // r364: races are ONE lap, so the first car over the line ends the race
+    // and freezes raceTime — every later lap-1 stamp then reads the winner's
+    // time and bot-vs-grid collapses to 1.000×. The quantity here is per-LAP
+    // pace, so the sim races a lap count nobody reaches.
+    g.lapsTotal = 99;
     let botLap = null;
     const rivalLap = new Array(g.enemies.length).fill(null);
     const CAP = 300 * 60;

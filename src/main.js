@@ -37,7 +37,11 @@ import { glowTexture, contactShadowTexture } from './textures.js';
 // exactly ONE number, and everything else is derived from it.
 const ENEMY_COUNT = 7;
 const FIELD = ENEMY_COUNT + 1;          // cars on the grid, player included
-const LAPS = 3;
+// r364, owner override: "I don't need 3 laps. Race is one lap only." One
+// flying lap is the race everywhere; a world that declares `laps:` keeps its
+// own number (FALKEN RIDGE already races 1). Everything lap-shaped — the
+// clean-lap ladder, SURE-FOOTED, the final-lap time — is sized to this below.
+const LAPS = 1;
 
 // THREE HULLS AND THE RACE IS OVER. Asked for as "if I get destroyed 3 times
 // it is game over, I need to restart the track."
@@ -584,8 +588,9 @@ const TRACK_FEATS = [
     desc: 'break 190 km/h on this circuit',
     check: (g, ct) => (ct.topKph ?? 0) >= 190 },
   { id: 'surefoot', label: 'SURE-FOOTED', icon: '🛞', need: { key: 'tires', lvl: 2 }, pay: 400,
-    desc: 'take two laps without a scratch',
-    check: (g, ct) => ct.cleanLaps >= 2 },
+    // r364: races are one lap, so "two laps" could never complete again
+    desc: 'take the lap without a scratch',
+    check: (g, ct) => ct.cleanLaps >= 1 },
   { id: 'boostrun', label: 'BOOST RUN', icon: '⚡', need: { key: 'nitro', lvl: 2 }, pay: 380,
     desc: 'hold the boost for 6 seconds in one race',
     check: (g, ct) => (ct.boostHeld ?? 0) >= 6 },
@@ -694,10 +699,17 @@ const QUESTS = [
 ];
 
 const CONTRACT_POOL = [
-  { id: 'cleanlap', label: 'CLEAN LAP', desc: (n) => `${n} lap${n > 1 ? 's' : ''} without hull damage`,
+  // r364: races are one lap, so a ladder counting clean LAPS dead-ended at
+  // rung 1 for ever. The upper rungs now climb by PLACEMENT with the lap
+  // still clean — same three prices, same resolve point (the lap boundary,
+  // where live rank at the finish crossing IS the final place).
+  { id: 'cleanlap', label: 'CLEAN LAP',
+    desc: (n) => n >= 3 ? 'win with zero hull damage'
+      : n === 2 ? 'clean lap, finish top 3' : 'the lap without hull damage',
     lap: true, rungs: [{ need: 1, pay: 100 }, { need: 2, pay: 220 }, { need: 3, pay: 400, hard: true }],
-    check: (g, ct, rank, need) => ct.cleanLaps >= need,
-    prog: (ct, need) => `${Math.min(ct.cleanLaps, need)}/${need}` },
+    check: (g, ct, rank, need) => ct.cleanLaps >= 1
+      && (need < 2 || rank <= (need >= 3 ? 1 : 3)),
+    prog: (ct) => `${Math.min(ct.cleanLaps ?? 0, 1)}/1` },
   { id: 'untouch', label: 'UNTOUCHABLE', desc: () => 'finish without wrecking',
     atFinish: true, rungs: [{ pay: 120 }, { pay: 260 }, { pay: 420, hard: true }],
     check: (g) => g.deaths === 0 },
@@ -729,7 +741,8 @@ const CONTRACT_POOL = [
   { id: 'pacifist', label: 'PACIFIST', desc: (n) => `top ${n} with zero weapon fire`,
     atFinish: true, rungs: [{ need: 3, pay: 130 }, { need: 2, pay: 280 }, { need: 1, pay: 450, hard: true }],
     check: (g, ct, rank, need) => rank <= need && !ct.weaponFired },
-  { id: 'start', label: 'FLAWLESS START', desc: () => 'lead at the end of lap 1',
+  // r364: one-lap races — the end of lap 1 IS the flag, so say so
+  { id: 'start', label: 'FLAWLESS START', desc: () => 'lead the field across the line',
     lap: true, rungs: [{ pay: 80 }, { pay: 180 }, { pay: 350, hard: true }] },
   { id: 'herd', label: 'HERDSMAN', desc: () => 'never hit livestock',
     gate: (g) => (g.herds?.length ?? 0) > 0, atFinish: true,
@@ -10724,16 +10737,18 @@ class Game {
     // contracts that resolve at lap boundaries (lap p.lap-1 just completed) —
     // BEFORE the finish branch so a clean final lap still counts
     this._lapContracts(p.lap - 1);
-    if (p.lap > this.lapsTotal) { this.finishRace(); return; }
+    // the lap time is stamped BEFORE the finish branch — the old order
+    // returned into finishRace first, so the FINAL lap of every race went
+    // unrecorded, and in a one-lap race (r364) that was every lap: no best
+    // lap on the results, no lap record, and the PACE NOTE job dead again
     const lapTime = this.raceTime - p.lapStart;
     p.lapStart = this.raceTime;
-    if (p.lap >= 2) {
-      // announce only a lap that BEAT one, not the first timed lap of the
-      // race — lap 2's time is always "the best so far" and saying so is noise
-      const beat = Number.isFinite(p.bestLap) && lapTime < p.bestLap;
-      if (lapTime < p.bestLap) p.bestLap = lapTime;
-      if (beat) this.hud.feed(`★ BEST LAP — ${fmtTime(lapTime)}`, 'good');
-    }
+    // announce only a lap that BEAT one, not the first timed lap of the
+    // race — lap 2's time is always "the best so far" and saying so is noise
+    const beat = Number.isFinite(p.bestLap) && lapTime < p.bestLap;
+    if (!Number.isFinite(p.bestLap) || lapTime < p.bestLap) p.bestLap = lapTime;
+    if (p.lap > this.lapsTotal) { this.finishRace(); return; }
+    if (beat) this.hud.feed(`★ BEST LAP — ${fmtTime(lapTime)}`, 'good');
     this.score += 500;
     this.audio.lap();
     if (p.lap === this.lapsTotal) {

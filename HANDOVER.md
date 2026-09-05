@@ -4171,6 +4171,57 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r364 — HIGH GROUND IS LEGAL, AND THE RACE IS ONE LAP (two owner asks)
+
+Owner, verbatim: "1. Don't reset me when I am off-road. 2. I don't need 3
+laps. Race is one lap only."
+
+**1. The cliff-top auto-return is deleted (CLAUDE.md 3.6d).** Root cause of
+"reset me when I am off-road" was NOT the stray/route rule (r345 already
+deleted that) but the PATCH_02 §3.4 cliff-top net in `vehicles.js`: player
+grounded 12 u above the tracked road, within 70 u XZ, with no road at own
+height within ±90 samples, for 2 s → free auto-return. Drive up any hill
+beside the road and two seconds later the game took the car. Deleted for the
+player, along with its `_cliffT` state, the `offmesh` telemetry pair and the
+dead `offmeshAutoReturnS` constant (driving.js + driving.json). The physical
+traps stand: under-terrain, wedge-under-throttle, bog-wreck, upside down,
+fatal falls. UNSTUCK is the only way off legal high ground and it is the
+player's to press. test-patch02 P2.6 is INVERTED: it stages the same rim
+perch the old gate staged and now demands 3 s of nothing happening, then
+proves the voluntary UNSTUCK still comes down (which also keeps P2.0's
+`unstuck` telemetry event alive).
+
+**2. One lap (CLAUDE.md 6.1b).** `LAPS` 3 → 1 in main.js; a world's own
+`laps:` declaration still wins (FALKEN RIDGE already raced 1). The sweep of
+lap-shaped content that came with it:
+
+- **The final lap's time was never recorded — on any lap count.**
+  `onPlayerLap` returned into `finishRace()` before the best-lap write, so a
+  3-lap race stamped laps 1-2 and dropped lap 3; a 1-lap race would have
+  stamped nothing, killing the results best-lap row, the lap record and the
+  PACE NOTE job. The stamp now lands before the finish branch.
+- **CLEAN LAP contract ladder** counted clean laps (1/2/3) — rungs 2-3
+  impossible in one lap. Now climbs by placement with the lap still clean:
+  clean lap / clean + top 3 / clean + win. Same prices, same resolve point
+  (live rank at the finish crossing IS the final place — everyone who beat
+  you is already over the line).
+- **SURE-FOOTED feat** "two laps without a scratch" → one clean lap.
+- **FLAWLESS START** copy "lead at the end of lap 1" → "lead the field
+  across the line" (mechanism unchanged; with one lap they are the same).
+- **test-lap-count** rebuilt: default 1, and the suite injects a synthetic
+  `laps: 2` onto one world mid-loop so the model-follows-world law still
+  discriminates instead of comparing a constant to itself.
+- **Avalanche chase worlds** release the wall when the FINAL lap starts —
+  which is now the whole race. Left as designed: the chase is the event.
+- **Economy note, recorded not retuned:** a race now pays roughly a third
+  of the old lap bonuses and passes a third as many pickups. If the career
+  starts feeling starved the knobs are the contract pays and
+  `career.firstClearCr`, but that is a measurement round, not a guess.
+
+Robot baseline fixture (tests/fixtures/robot-baseline-r363.json) stores
+per-LAP times, so it survives the change unread; per-RACE income measurements
+from r359/r363 are now stale by design.
+
 ## r363 — RESET MEANS RESET, AND POLE IS EARNED (two owner asks; ships with r362)
 
 **"I want to delete all progress when I reset career. All I 0."**
