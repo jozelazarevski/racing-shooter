@@ -156,6 +156,8 @@ No convergence, catch-up or slow-down toward any car within 10 s of a lap bounda
 
 **6.5a Hull regen, recorded, not changed.** Regen is +3 hull/s starting 4 s after the last damage, cap 124 on this car. A -23 rock heals in 8 s; damage only matters in bursts. Left as shipped under the repair-only rule; flagged for a later balance pass.
 
+**6.5b Hull regen balance pass, closed by measurement (r363).** Three instrumented expert races (PINE VALLEY, CANYON RUN, FROST PEAK): damage intake 331/546/413 hull per race, regen healed back only 184/271/205 (~50%), minimum hull 0/0/29, three wrecks across the three races. The single-rock example of 6.5a is true but the aggregate is not: rival fire dominates intake and hull genuinely threatens, and the kit lock already prices hull on under-prepared cars (stock BRAWLER races PINE at 79 of 96). Regen stays as shipped; the "later balance pass" flag is retired.
+
 **6.6 Kills affect position.** A destroyed rival respawns at its last gate after a 4.0 s hold, so the shooter gains the places earned.
 
 **6.7 Town performance.** 60 fps on the reference phone, p95 frame time < 18 ms, no auto-quality step: pedestrians pooled and distance-culled (<= 24), building LOD at 60 m, 2 shadow cascades on street worlds.
