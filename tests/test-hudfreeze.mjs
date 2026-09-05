@@ -44,6 +44,14 @@ const boxes = await p.evaluate((IDS2) => {
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
   for (let k = 0; k < 30; k++) g.frame();     // HUD settles
+  // r363: the reverse-championship grid starts the player mid-pack, so the
+  // auto-width race-info box renders '7TH' where the recording-E reference
+  // shows '1ST' — 3.4 px of glyphs, not geometry. The law protects LAYOUT,
+  // so the snapshot is taken in the reference STATE: player ahead, position
+  // display settled to 1ST, exactly as the frozen recording had it.
+  g.player._wraps = 5;
+  g.enemies.forEach((e) => { e._wraps = 0; e.trackIndex = 0; });
+  for (let k = 0; k < 140; k++) g.frame();    // posDisplay hysteresis: 2 Hz + 1.0 s
   const out = {};
   for (const id of IDS2) {
     const e = document.getElementById(id);
