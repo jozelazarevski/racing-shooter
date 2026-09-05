@@ -4313,6 +4313,11 @@ const THEMES = {
       stoneA: 'rgba(198,180,148,0.6)', stoneB: 'rgba(76,60,40,0.7)',
       // the fringe is the leaf line along the verge, not grass
       fringe: [150, 100, 44], fringeVar: [44, 34, 20],
+      // r365b (owner asset board): the wood is paved with warm flagstone
+      // setts and strewn with fallen leaves — the board's hero surface
+      cobbles: { stones: ['#9a938a', '#8a8078', '#a29a8e', '#7c746a', '#ada396', '#8f867c'],
+        mortar: 'rgba(50,42,34,0.8)' },
+      leaves: { count: 150 },
     },
     hillColor: 0x6a5a30, peakColor: 0x8a7a52,
     // A THICK WOOD, asked for directly. 950 over a 10.4-52 belt is a wood you
@@ -4346,6 +4351,7 @@ const THEMES = {
     elev: { amp: 10, ph: [0.7, 2.1, 2.6] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'alpine',
+    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
     vizZoneSpec: { count: 2, kind: 'fogbank' },          // morning mist in the hollows
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xd8863a },        // the wood is shedding
@@ -4379,6 +4385,8 @@ const THEMES = {
       rut: 'rgba(86,70,46,0.5)', rutCore: 'rgba(62,50,32,0.45)', tread: 'rgba(36,28,16,0.45)',
       stoneA: 'rgba(216,202,168,0.65)', stoneB: 'rgba(98,82,56,0.7)',
       fringe: [156, 128, 60], fringeVar: [40, 34, 22],
+      // r365b: orchard leaf and chaff blown across the lane
+      leaves: { count: 80, colors: ['#d8a838', '#c8862a', '#e0c050', '#b06a24'] },
     },
     hillColor: 0x6e5f2e, peakColor: 0x8f8058,
     treeCount: 780, trunkColor: 0x6b4a28,
@@ -4398,6 +4406,7 @@ const THEMES = {
     elev: { amp: 7, ph: [1.3, 2.0, 0.5] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'hedgerow',
+    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
     crossroads: 2,
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xc8a044 },        // chaff and orchard leaf
@@ -4429,6 +4438,8 @@ const THEMES = {
       rut: 'rgba(56,50,42,0.55)', rutCore: 'rgba(38,34,28,0.5)', tread: 'rgba(24,20,16,0.5)',
       stoneA: 'rgba(196,192,182,0.6)', stoneB: 'rgba(70,66,58,0.7)',
       fringe: [128, 92, 46], fringeVar: [36, 28, 18],
+      // r365b: sparse wind-blown bracken litter on the moor road
+      leaves: { count: 40, colors: ['#b06a2a', '#986030', '#c08838'] },
     },
     hillColor: 0x5a4a34, peakColor: 0x807868,
     // NOT thickened with the wood: this is a bracken moor and its whole point
@@ -4450,6 +4461,7 @@ const THEMES = {
     elev: { amp: 13, ph: [1.8, 0.9, 2.4] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'alpine',
+    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
     vizZoneSpec: { count: 3, kind: 'fogbank' },          // the mist that names it
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xa06838 },        // bracken litter on the wind
@@ -6148,9 +6160,9 @@ const FLORA_MIX = {
   // the colours are set. Birch, oak and larch each take a different tint shift
   // in `_buildTrees`, so one amber `foliage` band comes out as pale gold,
   // deep russet and red — a wood, not three thousand orange copies.
-  autumnwood: [['oak', 0.34], ['birch', 0.30], ['larch', 0.24], ['pineA', 0.12]],
+  autumnwood: [['maple', 0.26], ['oak', 0.20], ['birch', 0.26], ['larch', 0.20], ['pineA', 0.08]],
   // orchard country: standards in the fields, a few conifers in the shelter belts
-  harvestvale: [['oak', 0.42], ['birch', 0.28], ['larch', 0.16], ['pineA', 0.14]],
+  harvestvale: [['oak', 0.36], ['maple', 0.12], ['birch', 0.28], ['larch', 0.12], ['pineA', 0.12]],
   // the moor is nearly treeless, and what stands there is bare or wind-bitten
   mistfell: [['birchBare', 0.44], ['birch', 0.24], ['larch', 0.20], ['pineA', 0.12]],
   // Amazon: emergents over a closed mid-storey over tree ferns. Weighted so the
@@ -16182,9 +16194,92 @@ export class Track {
   _buildAutumnDressing() {
     const theme = this.level?.theme;
     this._buildRookFlights();
+    this._buildLeafPiles();        // r365b: board element C, every autumn world
+    this._buildBoulderClusters();  // r365b: board element D, every autumn world
     if (theme === 'autumnwood') { this._buildToadstools(); this._buildLeafDrifts(); }
     if (theme === 'harvestvale') this._buildHarvestFields();
     if (theme === 'mistfell') this._buildMoorStones();
+  }
+
+  /** Board element C — LOOSE LEAF PILES: flat scattered leaves in patches
+   *  right at the road edge, individually oversized (a life-size leaf is
+   *  invisible at driving speed) and laid in loose stacks. Visual only:
+   *  leaves are not a wall. */
+  _buildLeafPiles() {
+    const PATCH = 30, PER = 16;
+    // a pointed leaf quad: plane scaled long, tinted per instance
+    const G = new THREE.PlaneGeometry(0.42, 0.3);
+    G.rotateX(-Math.PI / 2);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, side: THREE.DoubleSide }),
+      PATCH * PER);
+    const cols = [0xd8952e, 0xc46a1e, 0xb8462a, 0xe0b83c, 0xa85a20];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < PATCH; c++) {
+      const spot = this._autumnSpot(0.2, 2.6);
+      if (!spot) continue;
+      for (let k = 0; k < PER; k++) {
+        const x = spot.x + (Math.random() - 0.5) * 2.2;
+        const z = spot.z + (Math.random() - 0.5) * 2.2;
+        const sc = 0.7 + Math.random() * 0.8;
+        // flat on the ground with a random spin and the faintest tilt, in a
+        // shallow stack so a pile reads as depth rather than one decal
+        eu.set((Math.random() - 0.5) * 0.22, Math.random() * Math.PI * 2,
+          (Math.random() - 0.5) * 0.22);
+        q.setFromEuler(eu);
+        pos.set(x, this.terrainHeight(x, z) + 0.03 + Math.random() * 0.07, z);
+        scl.set(sc, 1, sc);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        im.setColorAt(n, col.setHex(cols[(Math.random() * cols.length) | 0]));
+        n++;
+      }
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Board element D — LOW-POLY ROCK FORMATIONS: clustered boulders in twos
+   *  to fours, warm grey-brown, every one a collider. */
+  _buildBoulderClusters() {
+    const CL = 9;
+    const G = new THREE.DodecahedronGeometry(0.9, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      CL * 4);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < CL; c++) {
+      const spot = this._autumnSpot(2.5, 18);
+      if (!spot) continue;
+      const many = 2 + ((Math.random() * 3) | 0);
+      let ox = 0, oz = 0;
+      for (let k = 0; k < many; k++) {
+        const x = spot.x + ox, z = spot.z + oz;
+        const sc = k === 0 ? 1.3 + Math.random() * 1.1 : 0.7 + Math.random() * 0.9;
+        const y = this.terrainHeight(x, z);
+        eu.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
+        q.setFromEuler(eu);
+        pos.set(x, y + 0.55 * sc, z);
+        scl.set(sc, sc * (0.72 + Math.random() * 0.2), sc);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        const tone = 0.82 + Math.random() * 0.3;
+        im.setColorAt(n, col.setRGB(0.545 * tone, 0.506 * tone, 0.467 * tone));
+        n++;
+        this.solids.push({ x, z, r: 0.85 * sc, y: y + 0.5 * sc, mat: 'stone' });
+        // walk the next boulder off the last one's shoulder
+        const a2 = Math.random() * Math.PI * 2;
+        ox += Math.cos(a2) * (1.1 + sc * 0.8);
+        oz += Math.sin(a2) * (1.1 + sc * 0.8);
+      }
+      this._addShadow(spot.x, spot.z, 2.2, spot.y);
+    }
+    im.count = n;
+    this.group.add(im);
   }
 
   /** A spot pad0..pad1 u BEYOND the local road edge — for dressing that
@@ -21554,6 +21649,12 @@ export class Track {
         kind: 'birch', rFac: 0.55, solidAt: null, tint: 'bare', tiers: 3 },
       oak: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
         kind: 'oak', rFac: 1.15, solidAt: 1.35, tint: 'oak', tiers: 2 },
+      // r365b (owner asset board): the RED tree. Same dome silhouette as the
+      // oak — a maple's is — but its tint case ignores the theme's amber band
+      // and commits to deep red, which is the one colour the board leads with
+      // and the one the amber band could never roll.
+      maple: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
+        kind: 'oak', rFac: 1.1, solidAt: 1.35, tint: 'maple', tiers: 2 },
     };
     const mix = T.floraMix
       || FLORA_MIX[this.level && this.level.theme]
@@ -21699,6 +21800,11 @@ export class Track {
           case 'birch':   // light airy crown
             color.setHSL(F.h + 0.02 + Math.random() * F.hVar, F.s * 0.8,
               Math.min(0.62, F.l + 0.16 + Math.random() * F.lVar)); break;
+          case 'maple': { // committed RED, hue wrapping through 0
+            const hh = (0.975 + Math.random() * 0.065) % 1;
+            color.setHSL(hh, 0.72 + Math.random() * 0.12, 0.34 + Math.random() * 0.1);
+            break;
+          }
           case 'oak':     // deep saturated dome
             color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
               Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar)); break;

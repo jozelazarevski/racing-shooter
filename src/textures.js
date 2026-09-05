@@ -697,6 +697,49 @@ export function roadTexture(palette = {}) {
         }
       }
     }
+    // r365b (owner asset board): FALLEN LEAVES ON THE ROAD. Painted, not
+    // built — same trick as the tram rails. Drawn over the surface (and over
+    // the setts) but under the verge fringe, denser toward the edges where
+    // traffic would sweep them. Each leaf is a pointed oval with a stem and
+    // a soft shadow: at road scale that is exactly what a maple leaf reads
+    // as, and an ellipse alone reads as a pebble.
+    if (P.leaves) {
+      const L = { colors: ['#d8952e', '#c46a1e', '#b8462a', '#e0b83c', '#a85a20'],
+        count: 110, ...(P.leaves === true ? {} : P.leaves) };
+      const K2 = w / 512;
+      const leaf = (x, y, sz, rot, fill) => {
+        g.save();
+        g.translate(x, y);
+        g.rotate(rot);
+        g.fillStyle = 'rgba(40,24,10,0.28)';
+        g.beginPath();
+        g.ellipse(1.2 * K2, 1.2 * K2, sz * 0.66, sz * 1.02, 0, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = fill;
+        g.beginPath();
+        g.moveTo(0, -sz);
+        g.quadraticCurveTo(sz * 0.62, -sz * 0.25, 0, sz);
+        g.quadraticCurveTo(-sz * 0.62, -sz * 0.25, 0, -sz);
+        g.fill();
+        g.strokeStyle = 'rgba(70,36,12,0.55)';
+        g.lineWidth = 1 * K2;
+        g.beginPath();
+        g.moveTo(0, sz * 0.55);
+        g.lineTo(0, sz * 1.3);
+        g.stroke();
+        g.restore();
+      };
+      for (let i = 0; i < L.count; i++) {
+        // 55% spread anywhere, 45% banked toward the two road edges
+        const edge = Math.random() < 0.45;
+        const x = edge
+          ? (Math.random() < 0.5 ? Math.random() * 0.2 : 0.8 + Math.random() * 0.2) * w
+          : Math.random() * w;
+        leaf(x, Math.random() * h, (3.4 + Math.random() * 3.4) * K2,
+          Math.random() * Math.PI * 2,
+          L.colors[(Math.random() * L.colors.length) | 0]);
+      }
+    }
     // irregular grassy fringe creeping in from both edges
     for (const [x0, dir] of [[0, 1], [w, -1]]) {
       // compacted wear band just inside the fringe — the verge reads driven-on

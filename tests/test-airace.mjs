@@ -56,6 +56,13 @@ const runStage = async (levelId, name) => {
       g.resetRace(); g.startRace?.();
       g.telemetry?.clear();
       for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
+      // r364: races are ONE lap, and the robot is quick — it finished inside
+      // the measurement window, raceTime froze at its flag, and every
+      // overtake event after that logged the SAME timestamp: Q13's setup
+      // lookup (t <= commit.t - 0.25) then matches nothing (21-62 "orphan"
+      // commits) and Q15's lap-boundary window jams open. These are per-LAP
+      // racecraft laws, so the suite races a lap count nobody reaches.
+      g.lapsTotal = 99;
       const su = Math.max(0.5, Math.hypot(t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
       const cars = [g.player, ...g.enemies];
       const lap1T = new Array(cars.length).fill(null);
