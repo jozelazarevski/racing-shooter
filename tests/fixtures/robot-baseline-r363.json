@@ -5,38 +5,64 @@
  "note": "robot reference, not a human lap — see HANDOVER item 1",
  "worlds": {
   "PINE VALLEY": {
-   "world": "PINE VALLEY",
-   "raceS": 0,
-   "laps": [],
-   "bestLapS": null,
-   "rank": 8,
-   "finished": false
+   "raceS": 284.3,
+   "laps": [
+    104.4,
+    90.8,
+    89.0
+   ],
+   "bestLapS": 89.0,
+   "rank": 6
   },
   "CANYON RUN": {
-   "world": "CANYON RUN",
    "raceS": 323.7,
    "laps": [
     113.2,
     108.2,
-    102.3,
-    0
+    102.3
    ],
-   "bestLapS": 0,
-   "rank": 3,
-   "finished": true
+   "bestLapS": 102.3,
+   "rank": 3
   },
   "FROST PEAK": {
-   "world": "FROST PEAK",
    "raceS": 460.4,
    "laps": [
     166.4,
     142.3,
-    151.7,
-    0
+    151.7
    ],
-   "bestLapS": 0,
-   "rank": 8,
-   "finished": true
+   "bestLapS": 142.3,
+   "rank": 8
+  },
+  "RED CENTRE RUN": {
+   "raceS": 385.5,
+   "laps": [
+    136.7,
+    123.7,
+    125.1
+   ],
+   "bestLapS": 123.7,
+   "rank": 1
+  },
+  "CAPO VELA": {
+   "raceS": 377.7,
+   "laps": [
+    133.9,
+    122.1,
+    121.7
+   ],
+   "bestLapS": 121.7,
+   "rank": 7
+  },
+  "THE DUNE SERPENT": {
+   "raceS": 249.8,
+   "laps": [
+    90.0,
+    80.8,
+    79.1
+   ],
+   "bestLapS": 79.1,
+   "rank": 8
   }
  }
 }

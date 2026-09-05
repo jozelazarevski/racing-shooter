@@ -33,6 +33,16 @@ there is no baseline to tune difficulty against. Measure that first; tuning
 before you have it is guessing. Rivals circulate 0.5-0.9 laps/30 s and never
 wreck (8/8 alive, every run).
 
+PARTIAL ANSWER (r363): a calibrated ROBOT baseline now exists —
+`tests/fixtures/robot-baseline-r363.json`, the airace expert stand-in at
+skill 0.94 racing full 3-lap races on one world per template. Best laps:
+PINE VALLEY 89.0 s, CANYON RUN 102.3 s, FROST PEAK 142.3 s, RED CENTRE RUN
+123.7 s, CAPO VELA 121.7 s, THE DUNE SERPENT 79.1 s (every world shows
+lap-over-lap improvement as the line settles, so lap 1 times carry launch
+and traffic). Robot finish ranks on those runs spread P1-P8, which is the
+field working. This is NOT the human number — it is a stable, reproducible
+anchor to measure drift against until the owner clocks a real lap.
+
 The theory that used to stand in for this measurement — "road furniture is the
 difficulty curve" — was killed in r199 and must not be rebuilt. The instance it
 named was a measurement artifact (see MEASUREMENT DISCIPLINE). What really does
