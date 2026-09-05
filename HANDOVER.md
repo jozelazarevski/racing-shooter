@@ -4213,6 +4213,37 @@ solid registered in `solids`):**
 beyond the LOCAL road edge, `_distToTrack`-checked against the whole lap
 (the lesson of the r361 parapet and every placement bug before it).
 
+**r365b — the owner's asset board** ("Implement the design elements
+comprehensively", a five-part reference sheet) landed on top of the pass:
+
+- **A foliage**: new `maple` species — oak silhouette, a tint case that
+  ignores the theme's amber band and commits to deep red (hue wrapping
+  through 0). Weighted into the autumnwood (0.26) and harvestvale (0.12)
+  mixes.
+- **B cobblestone paths**: autumnwood roads are warm flagstone setts
+  (roadTexture `cobbles`), and roadTexture grew a painted `leaves` pass —
+  pointed-oval leaves with stems and shadows, edge-biased, same
+  costs-nothing trick as the tram rails. Dense on the wood path, moderate
+  chaff on the harvest lane, sparse bracken litter on the moor road.
+- **C loose leaf piles**: 30 flat instanced leaf patches per autumn world
+  at the road edge, shallow-stacked so a pile has depth.
+- **D rock formations**: nine boulder clusters per autumn world, boulders
+  walking off each other's shoulders, all colliders.
+- **E barriers**: `edgeRailColor: 0x4a3a2c` on all three themes — dark
+  timber post-and-rail.
+
+The chase-view A/B that gated the palette change: same framing on BRACKEN
+MOOR, old palette renders the moor beside the road as pure black, new
+palette as legible bracken with patch variation. The phone's live shot had
+looked fine because the LEAF SPECKLES in the ground texture resolve up
+close; from altitude (and at distance through the mip chain) the squared
+base dominated. The fix serves both views.
+
+Also in this change-set: test-airace races an unfinishable lap count — the
+one-lap race froze raceTime at the robot's flag mid-measurement, orphaning
+Q13's commits (21-62 per race) and jamming Q15's lap-boundary window open.
+Same class of fix as careersim CS3.
+
 Gates: nature / treeclear / droplip re-run on the enriched worlds, plus
 stagerules S4 (kicker fans) and nothing-floats for the new scatter. Ships
 with r364.
