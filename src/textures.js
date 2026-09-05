@@ -103,7 +103,7 @@ export function contactShadowTexture() {
 /** Vertical atmospheric-perspective gradient for horizon hill/peak cones:
  *  full color at the summit fading to a paler fog-mixed tone at the base
  *  (canvas bottom = v0 = cone base). Track.js computes both hex stops. */
-export function horizonTexture(topHex, baseHex) {
+export function horizonTexture(topHex, baseHex, bands = null) {
   const t = make(16, 128, (g, w, h) => {
     const grd = g.createLinearGradient(0, 0, 0, h);
     grd.addColorStop(0, topHex);
@@ -111,6 +111,23 @@ export function horizonTexture(topHex, baseHex) {
     grd.addColorStop(1, baseHex);
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
+    // r366 (owner mountain board, PEAK VARIATIONS): horizontal bands painted
+    // over the gradient — a snowline, an ember throat, strata courses. Each
+    // band runs {at..to} of the height (0 = summit) with soft edges, so a
+    // form wearing this map carries the feature at every scale for free.
+    if (bands) {
+      for (const bd of bands) {
+        const y0 = bd.at * h, y1 = bd.to * h;
+        const soft = Math.min(6, (y1 - y0) * 0.4);
+        const bg = g.createLinearGradient(0, y0 - soft, 0, y1 + soft);
+        bg.addColorStop(0, bd.color + '00');
+        bg.addColorStop(0.25, bd.color + 'ff');
+        bg.addColorStop(0.75, bd.color + 'ff');
+        bg.addColorStop(1, bd.color + '00');
+        g.fillStyle = bg;
+        g.fillRect(0, y0 - soft, w, (y1 - y0) + soft * 2);
+      }
+    }
     noiseOverlay(g, w, h, 0.06);
   });
   t.wrapS = THREE.RepeatWrapping;

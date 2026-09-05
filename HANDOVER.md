@@ -4171,6 +4171,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r366 — MOUNTAIN VARIATIONS (owner asset board: peaks, scree, trails, strata)
+
+The third board in the series ("GAME WORLD ASSETS: MOUNTAIN VARIATIONS",
+legend A-E). Disposition against the engine:
+
+- **E PEAK VARIATIONS** — `horizonTexture` grew horizontal BANDS painted
+  over the altitude gradient, and `_buildHorizon` dresses each theme's
+  skyline by a `PEAK_STYLE` map: a snowline on the winter and high-alpine
+  ranges (snow/glacial/sheetice/avalanche/alpine/furka/tremola/pass), an
+  ember throat on the volcano, strata courses on canyon country
+  (canyon/ravine). Bands ride the same fog math as the rock under them.
+- **C COMPOSITE RANGES** — two new skyline sets join the six ("glaciated"
+  horn-off-one-crest, "broken tableland"), rotating per world id as before.
+- **A SCREE FORMATIONS** — `_buildScreeFans`: twelve fans of small broken
+  stone per mountain-family world, banked just off the verge and stretched
+  DOWNHILL along the sampled terrain gradient (dense at the head — the
+  shape of real scree, not a circle of pebbles). Visual only, ankle-high.
+- **B TRAILS & PASSES** — every tunnel bore gets a PORTAL FRAME: dark
+  timber posts and a lintel seated ABOVE the flared crown, so no new
+  geometry enters the driving or camera envelope; the two posts register
+  solids (Law of Solidity). The board's stepped trails/passes are the goat
+  peaks' carved routes, already shipped.
+- **D STRATA & ROCK FACES** — already largely in the engine: the hoodoos
+  carry per-drum strata tints and the mesa horizon exists; the new strata
+  peak bands extend the look to the standard horizon rings.
+
+The sheet before this one (the BRACKEN MOOR design-system poster) resolved
+to: HUD/typography/vehicles = the game's own frozen elements, world assets
+= r365b, plus one refinement — two-tone edge rails (weathered steel beam on
+dark timber posts) behind a new `edgeRailPostColor` theme knob; every
+non-autumn world's rails are bit-identical to before.
+
+Gates: the r365 chain (boot/nature/stagerules green pre-r366; traffic/
+airace/final-integration land on the full code), then a follow-up pass of
+boot + tunnels + nature + nothing-floats for the portal/scree/peak changes.
+Ships as one deploy with r364 and r365.
+
 ## r365 — THE AUTUMN CHAPTER GETS ITS SEASON BACK (owner: "Autumn scenes need serious enrichment")
 
 Measured first: chase-camera frames of all five AUTUMN worlds (68-72) against

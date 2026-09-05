@@ -6220,6 +6220,18 @@ const FLORA_MIX = {
   farmland: [['oak', 0.54], ['birch', 0.46]],
 };
 
+// r366 (owner mountain board): which summit character a theme's horizon
+// wears (PEAK VARIATIONS: snow / volcanic / mesa-strata), and which themes
+// bank scree fans beside their roads. A theme can override via T.peakStyle.
+const PEAK_STYLE = {
+  alpine: 'snow', snow: 'snow', glacial: 'snow', sheetice: 'snow',
+  avalanche: 'snow', furka: 'snow', tremola: 'snow', pass: 'snow',
+  volcano: 'ember',
+  canyon: 'strata', ravine: 'strata',
+};
+const SCREE_THEMES = new Set(['alpine', 'pass', 'tremola', 'furka',
+  'canyon', 'ravine', 'volcano', 'avalanche']);
+
 // How many decorative side-road junctions each RURAL world gets (city, ice
 // and cliff-walled worlds get none). A theme can override via T.crossroads.
 const THEME_CROSSROADS = {
@@ -11695,6 +11707,7 @@ export class Track {
     this._buildHuts(m4);
     this._buildTrackside(m4);
     if (this.T.season === 'AUTUMN') this._buildAutumnDressing();   // r365
+    if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
     // "remove the spectators stand from all races". `_buildGrandstand` was
@@ -16208,6 +16221,52 @@ export class Track {
 
   /** THE WINDMILL - the estate landmark from the player's vineyard art:
    *  tapered stone tower, conical cap, four lattice sails, on open ground. */
+  /** r366 (owner mountain board A): SCREE FANS — spills of small broken
+   *  stone banked just off the verge, elongated downhill the way scree
+   *  actually runs. Instanced, ankle-high, visual only; the boulders that
+   *  can stop a car already live in their own builders. */
+  _buildScreeFans() {
+    const FANS = 12, PER = 14;
+    const G = new THREE.DodecahedronGeometry(0.26, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      FANS * PER);
+    const base = new THREE.Color(this.T.terrainScree ?? '#8a8478');
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let f = 0; f < FANS; f++) {
+      const spot = this._autumnSpot(1.0, 6.5);
+      if (!spot) continue;
+      // the fan runs DOWNHILL from its head: sample the gradient and stretch
+      // the scatter along it, which is the difference between scree and a
+      // circle of pebbles
+      const E = 2.5;
+      const gx = this.terrainHeight(spot.x + E, spot.z) - this.terrainHeight(spot.x - E, spot.z);
+      const gz = this.terrainHeight(spot.x, spot.z + E) - this.terrainHeight(spot.x, spot.z - E);
+      const gl = Math.hypot(gx, gz) || 1;
+      const dx = -gx / gl, dz = -gz / gl;           // downhill
+      for (let k = 0; k < PER; k++) {
+        const along = Math.random() * Math.random() * 7;   // dense at the head
+        const across = (Math.random() - 0.5) * (1.2 + along * 0.5);
+        const x = spot.x + dx * along - dz * across;
+        const z = spot.z + dz * along + dx * across;
+        const sc = 0.5 + Math.random() * 1.0;
+        eu.set(Math.random() * 0.6, Math.random() * Math.PI * 2, Math.random() * 0.6);
+        q.setFromEuler(eu);
+        pos.set(x, this.terrainHeight(x, z) + 0.08 * sc, z);
+        scl.set(sc, sc * 0.7, sc);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        const tone = 0.78 + Math.random() * 0.38;
+        im.setColorAt(n, col.copy(base).multiplyScalar(tone));
+        n++;
+      }
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
   /* ---- r365 · AUTUMN DRESSING ------------------------------------------
    * Owner: "Autumn scenes need serious enrichment." The palette fix (sqrt
    * albedo, see the theme notes) makes the season LEGIBLE; these builders
@@ -17187,6 +17246,44 @@ export class Track {
     bore.name = 'tunnel';
     bore.castShadow = bore.receiveShadow = true;
     this.group.add(bore);
+    // r366 (owner mountain board B): a bore gets a PORTAL FRAME — timber
+    // posts and a lintel over each mouth, which is what turns a hole in a
+    // hillside into a built thing. The lintel sits ABOVE the flared crown,
+    // so nothing driving (or filming) through the bore meets new geometry;
+    // the frame hugs walls the car already cannot pass, so no new solids.
+    if (!this._portalTimberMat) {
+      this._portalTimberMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.95 });
+    }
+    for (const jEnd of [s0 - STEP, e0 + STEP]) {
+      const i = ((jEnd % N) + N) % N;
+      const y = this.groundHeightAt(i, 0);
+      const gp = new THREE.Group();
+      const postH = (APEX + 0.9) * 1.16;
+      for (const sd of [-1, 1]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.55, postH, 0.55), this._portalTimberMat);
+        post.position.set(sd * (HW * 1.16 + 0.35), postH / 2, 0);
+        post.castShadow = true;
+        gp.add(post);
+      }
+      const lin = new THREE.Mesh(
+        new THREE.BoxGeometry(HW * 2 * 1.16 + 1.6, 0.6, 0.8), this._portalTimberMat);
+      lin.position.set(0, postH - 0.3, 0);
+      lin.castShadow = true;
+      gp.add(lin);
+      const hd = this.headingAt(i);
+      gp.position.set(this.center[i].x, y, this.center[i].z);
+      gp.rotation.y = hd;
+      this.group.add(gp);
+      // the posts are drawn mass a car can reach at the mouth: solid
+      for (const sd of [-1, 1]) {
+        const lx = sd * (HW * 1.16 + 0.35);
+        this.solids.push({
+          x: this.center[i].x + lx * Math.cos(hd),
+          z: this.center[i].z - lx * Math.sin(hd),
+          r: 0.55, y: y + 1.2, mat: 'wood',
+        });
+      }
+    }
     // lamp strip under the crown + wall solids every few metres
     const span = Math.floor((e0 - s0) / STEP);
     const lampGeo = new THREE.BoxGeometry(2.6, 0.26, 0.5);
@@ -20870,7 +20967,7 @@ export class Track {
   /** Atmospheric-perspective gradient map for a horizon ring: the silhouette
    *  color fades toward the fog color at the base (and desaturates for far
    *  rings) so stacked ridgelines read with real depth. */
-  _horizonGrad(hex, baseMix, topMix, desat = 0) {
+  _horizonGrad(hex, baseMix, topMix, desat = 0, bands = null) {
     const fogC = new THREE.Color(this.T.fogColor);
     const c = new THREE.Color(hex);
     if (desat) {
@@ -20880,7 +20977,13 @@ export class Track {
     }
     const top = c.clone().lerp(fogC, topMix);
     const base = c.clone().lerp(fogC, baseMix);
-    return horizonTexture('#' + top.getHexString(), '#' + base.getHexString());
+    // r366: bands ride the same fog math as the body, so a snowline on the
+    // far ring hazes out exactly as far as the rock it sits on
+    const bands2 = bands && bands.map((bd) => ({
+      at: bd.at, to: bd.to,
+      color: '#' + new THREE.Color(bd.color).lerp(fogC, topMix * 0.8).getHexString(),
+    }));
+    return horizonTexture('#' + top.getHexString(), '#' + base.getHexString(), bands2);
   }
 
   /** THE SKYLINE FORM LIBRARY.
@@ -20968,6 +21071,9 @@ export class Track {
       ['dome', 'ridge', 'mesa'],          // downs
       ['ridge', 'dome', 'pyramid'],       // classic range
       ['dome', 'ridge', 'dome'],          // rolling highland
+      // r366 (owner mountain board, COMPOSITE RANGES): two more characters
+      ['horn', 'ridge', 'dome'],          // glaciated — horns off one crest
+      ['ridge', 'mesa', 'spire'],         // broken tableland
     ];
     const set = T.range || SETS[((this.level && this.level.id) || 0) % SETS.length];
     const base = -8 - (T.hillDrop || 0);      // sit on the (possibly sunk) field
@@ -20992,12 +21098,28 @@ export class Track {
       }
       return per;
     };
+    // r366 (owner mountain board, PEAK VARIATIONS): what a summit wears is a
+    // per-theme character — a snowline on the winter and high-alpine ranges,
+    // an ember throat on the volcano, strata courses on canyon country. The
+    // bands live in the gradient map, so every form and every scale carries
+    // them for free.
+    const style = T.peakStyle ?? PEAK_STYLE[this.level && this.level.theme];
+    const bandsFor = style === 'snow' ? [{ at: 0, to: 0.24, color: '#f2f7fb' }]
+      : style === 'ember' ? [
+        { at: 0, to: 0.045, color: '#2a2422' },
+        { at: 0.045, to: 0.10, color: '#d85a20' },
+        { at: 0.10, to: 0.18, color: '#3a322e' }]
+      : style === 'strata' ? [
+        { at: 0.30, to: 0.36, color: '#a06844' },
+        { at: 0.44, to: 0.50, color: '#cf9a5e' },
+        { at: 0.58, to: 0.66, color: '#96603c' }]
+      : null;
     const near = layer(set, new THREE.MeshStandardMaterial({
-      map: this._horizonGrad(T.hillColor, 0.52, 0.10), flatShading: true, roughness: 1,
+      map: this._horizonGrad(T.hillColor, 0.52, 0.10, 0, bandsFor), flatShading: true, roughness: 1,
     }), 64);
     const far = layer(set, new THREE.MeshStandardMaterial({
       // far ring: paler base + slight desaturation so distance reads
-      map: this._horizonGrad(T.peakColor, 0.68, 0.26, 0.3), flatShading: true, roughness: 1,
+      map: this._horizonGrad(T.peakColor, 0.68, 0.26, 0.3, bandsFor), flatShading: true, roughness: 1,
     }), 64);
     // RANGES, NOT A PICKET FENCE. Cones spaced evenly round the compass gave
     // every world the same regular saw-tooth. Massifs are clumped into a few
