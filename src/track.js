@@ -4289,11 +4289,19 @@ const THEMES = {
     skyTop: '#4f7fae', skyHorizon: '#f0dcb8', sunGlow: 0xffd07a,
     sunAz: 2.1, sunEl: 0.34,                 // low and raking — see the note above
     cloudCount: 7, cloudOpacity: 0.82, cloudTint: 0xffeed8,
-    terrainLow: '#6a6234', terrainHigh: '#9a7c40', terrainDirt: '#7a5c34',
-    terrainScree: '#8a7a58', hutGlow: 0.62,
+    // r365 (owner: "Autumn scenes need serious enrichment"): THE GROUND IS A
+    // PRODUCT, NOT A COLOUR — the outback note applies here too. These themes
+    // wrote the full-strength palette into BOTH the vertex tint and the
+    // ground texture, and the product squared the pigment: the copper wood
+    // rendered as near-black maroon soup with only the road carrying light
+    // (measured against PINE VALLEY with the same probe). Square roots now,
+    // so the albedo that reaches the screen is the palette that was designed:
+    // sqrt(#7d6236) = #b29e75, etc.
+    terrainLow: '#b29e75', terrainHigh: '#c6b280', terrainDirt: '#b09973',
+    terrainScree: '#bcb096', hutGlow: 0.62,
     skirtColor: '#6a5436',
     ground: {
-      base: '#7d6236',                                  // leaf mould
+      base: '#b29e75',                                  // leaf mould (sqrt form)
       bandLight: 'rgba(226,178,96,0.10)', bandDark: 'rgba(62,42,22,0.09)',
       patchA: 'rgba(186,104,42,0.26)',                  // drifts of fallen maple
       patchB: 'rgba(140,124,58,0.22)',                  // still-green hollows
@@ -4316,7 +4324,10 @@ const THEMES = {
     // belt is deliberately NOT pushed further out, because a wood you cannot
     // reach the edge of is what "thick" means here.
     treeCount: 1650, trunkColor: 0x5a4028,
-    foliageLow: 0x9a4a1c, foliageTop: 0xd8922c,
+    // r365: sqrt form (same product bug as the ground — the material colour
+    // multiplies the per-instance tint, and full pigment in both squared the
+    // copper into near-black maroon)
+    foliageLow: 0xc68954, foliageTop: 0xebc16a,
     // amber centre, wide hue band: 0.055 -> 0.125 is rust through to gold, and
     // the species shifts push birch past that and larch back under it
     foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
@@ -4325,7 +4336,7 @@ const THEMES = {
     tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
     // undergrowth to match — bare trunks over clean ground is a plantation,
     // and the thing being asked for is a wood
-    bushCount: 760, bushColor: 0x8a4a22,
+    bushCount: 760, bushColor: 0xbc895d,        // r365: sqrt form
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
     rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
@@ -4351,11 +4362,13 @@ const THEMES = {
     cloudCount: 9, cloudOpacity: 0.86, cloudTint: 0xfff0dc,
     // the high ground was reading as DUNE at #c4a860 under a warm key — this
     // is cut stubble on a hillside, and stubble is duller than sand
-    terrainLow: '#7e7038', terrainHigh: '#a89050', terrainDirt: '#8a6c40',
-    terrainScree: '#9a8858', hutGlow: 0.5,
+    // r365: sqrt form — see the autumnwood note. The stubble gold was being
+    // squared into black umber; a harvest world should read GOLD.
+    terrainLow: '#c7bc8d', terrainHigh: '#cfc08f', terrainDirt: '#bca680',
+    terrainScree: '#c6ba96', hutGlow: 0.5,
     skirtColor: '#9a8450',
     ground: {
-      base: '#9c8a4e',                                  // cut stubble
+      base: '#c7bc8d',                                  // cut stubble (sqrt form)
       bandLight: 'rgba(240,220,150,0.10)', bandDark: 'rgba(110,92,44,0.08)',
       patchA: 'rgba(206,160,70,0.28)',                  // ploughed strips
       patchB: 'rgba(132,120,58,0.20)',                  // aftermath grass
@@ -4369,12 +4382,12 @@ const THEMES = {
     },
     hillColor: 0x6e5f2e, peakColor: 0x8f8058,
     treeCount: 780, trunkColor: 0x6b4a28,
-    foliageLow: 0xa8641c, foliageTop: 0xe0b040,
+    foliageLow: 0xcfa054, foliageTop: 0xefd480,      // r365: sqrt form
     foliage: { h: 0.075, hVar: 0.055, s: 0.68, sVar: 0.14, l: 0.42, lVar: 0.12 },
     treeSnowCap: false,
     treeBelt: [40, 140],
     tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e6cc84' },
-    bushCount: 180, bushColor: 0x7a5a26,
+    bushCount: 180, bushColor: 0xb09762,        // r365: sqrt form
     bush: { h: 0.08, hVar: 0.05, s: 0.5, sVar: 0.1, l: 0.32, lVar: 0.1 },
     rockCount: 80, pebbleCount: 150, rockColor: 0x9a9080, rockSnowCap: false,
     flowerCount: 150, flowerColors: ['#c8402c', '#e8c040', '#e0d8c0'],
@@ -4399,11 +4412,13 @@ const THEMES = {
     skyTop: '#63788c', skyHorizon: '#d4cec4', sunGlow: 0xe8d4b0,
     sunAz: 1.5, sunEl: 0.42,
     cloudCount: 12, cloudOpacity: 0.92, cloudTint: 0xe4e0d8,
-    terrainLow: '#6a5232', terrainHigh: '#8a7a5e', terrainDirt: '#6e5838',
-    terrainScree: '#8a8880', hutGlow: 0.7,
+    // r365: sqrt form — see the autumnwood note. Bleak is a MOOD, black is a
+    // rendering bug; the tight fog and grey light keep the mood.
+    terrainLow: '#a49171', terrainHigh: '#bcb09b', terrainDirt: '#a79678',
+    terrainScree: '#bcbab5', hutGlow: 0.7,
     skirtColor: '#5e4c32',
     ground: {
-      base: '#7a5c34',                                  // dead bracken
+      base: '#b09973',                                  // dead bracken (sqrt form)
       bandLight: 'rgba(200,160,96,0.08)', bandDark: 'rgba(56,44,28,0.10)',
       patchA: 'rgba(150,96,44,0.26)',                    // bracken stands
       patchB: 'rgba(104,104,86,0.24)',                   // wet peat and stone
@@ -4420,12 +4435,12 @@ const THEMES = {
     // is that you can see across it. The leaf fall below carries the season
     // here instead.
     treeCount: 260, trunkColor: 0x4a3826,                // barely wooded
-    foliageLow: 0x8a4a1c, foliageTop: 0xc07c28,
+    foliageLow: 0xbc8954, foliageTop: 0xddb265,      // r365: sqrt form
     foliage: { h: 0.045, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.34, lVar: 0.1 },
     treeSnowCap: false,
     treeBelt: [12, 60],
     tuftCount: 1700, grass: { bladeA: '#8a6a32', bladeB: '#b09052' },
-    bushCount: 520, bushColor: 0x6a4620,                 // the bracken itself
+    bushCount: 520, bushColor: 0xa4865a,                 // the bracken itself (r365: sqrt form)
     bush: { h: 0.05, hVar: 0.04, s: 0.55, sVar: 0.1, l: 0.26, lVar: 0.08 },
     rockCount: 420, pebbleCount: 340, rockColor: 0x8a8880, rockSnowCap: false,
     flowerCount: 40, flowerColors: ['#a8446a', '#c8b8a0'],   // last of the heather
@@ -5045,8 +5060,14 @@ const PROP_SPECS = {
   // OUTBACK: 44-gallon drums at the siding, station fodder, freight crates.
   // No 'rock' — a gibber plain has no boulders worth stacking beside a road.
   outback: [['barrel', 20], ['hay', 14], ['crate', 14], ['cone', 10]],
+  // r365 AUTUMN: the season gets its own roadside kit instead of the generic
+  // forest fallback. Pumpkins by the verge are the one prop that says autumn
+  // from a moving car; the moor kit is stone country and stays austere.
+  autumnwood: [['hay', 16], ['crate', 14], ['pumpkin', 12], ['cone', 8]],
+  harvestvale: [['pumpkin', 22], ['hay', 16], ['crate', 12], ['cone', 8]],
+  mistfell: [['rock', 12], ['crate', 12], ['hay', 8], ['cone', 10]],
 };
-const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
+const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40, pumpkin: 35 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
 const PROP_PICKUPS = ['health', 'missile', 'nitro', 'mine'];
 // theme tints for the barrel drum texture
@@ -6277,9 +6298,16 @@ function propAssets() {
   barrel.translate(0, 0.75, 0);
   const rock = new THREE.DodecahedronGeometry(0.7, 0);
   rock.translate(0, 0.32, 0);
+  // r365: a fat ribbed gourd — squashed sphere; the ribs come from low
+  // segment count, which at prop size reads exactly like a pumpkin
+  const pumpkin = new THREE.SphereGeometry(0.52, 9, 7);
+  pumpkin.scale(1, 0.72, 1);
+  pumpkin.translate(0, 0.38, 0);
+  const pumpkinStem = new THREE.CylinderGeometry(0.05, 0.08, 0.22, 5);
+  pumpkinStem.translate(0, 0.82, 0);
   PROP_ASSETS = {
     geo: {
-      hay, crate, cone, coneBase, barrel, rock,
+      hay, crate, cone, coneBase, barrel, rock, pumpkin, pumpkinStem,
       ballBody: new THREE.SphereGeometry(0.8, 12, 9),
       ballHead: new THREE.SphereGeometry(0.52, 12, 9),
       eye: new THREE.SphereGeometry(0.07, 6, 5),
@@ -6298,6 +6326,8 @@ function propAssets() {
       coneBase: new THREE.MeshStandardMaterial({ color: 0xd85f10, roughness: 0.9 }),
       barrelCap: new THREE.MeshStandardMaterial({ color: 0x3a2c1a, roughness: 0.95 }),
       snow: new THREE.MeshStandardMaterial({ color: 0xf4f8fc, roughness: 0.85 }),
+      pumpkin: new THREE.MeshStandardMaterial({ color: 0xe07818, roughness: 0.7, flatShading: true }),
+      pumpkinStem: new THREE.MeshStandardMaterial({ color: 0x6a6a2a, roughness: 0.95 }),
       coal: new THREE.MeshStandardMaterial({ color: 0x201c18, roughness: 0.8 }),
       carrot: new THREE.MeshStandardMaterial({ color: 0xe8641e, roughness: 0.8 }),
       rock: new THREE.MeshStandardMaterial({ color: 0xb5744a, flatShading: true, roughness: 1 }),
@@ -6673,7 +6703,7 @@ export class Track {
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
 
-    this.animated = { flags: [], clouds: [], whales: [], cloudBank: null };
+    this.animated = { flags: [], clouds: [], whales: [], rooks: [], cloudBank: null };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
     this.obstacles = [];
@@ -11411,6 +11441,14 @@ export class Track {
         }
         return { mesh: g, r: 1.4 };
       }
+      case 'pumpkin': {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(A.geo.pumpkin, A.mat.pumpkin);
+        body.castShadow = true;
+        g.add(body);
+        g.add(new THREE.Mesh(A.geo.pumpkinStem, A.mat.pumpkinStem));
+        return { mesh: g, r: 0.8 };
+      }
       case 'penguin': {
         // little voxel penguin waddling near the road (glacial)
         const g = new THREE.Group();
@@ -11638,6 +11676,7 @@ export class Track {
     this._buildGroundCover(m4);
     this._buildHuts(m4);
     this._buildTrackside(m4);
+    if (this.T.season === 'AUTUMN') this._buildAutumnDressing();   // r365
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
     // "remove the spectators stand from all races". `_buildGrandstand` was
@@ -16129,6 +16168,304 @@ export class Track {
 
   /** THE WINDMILL - the estate landmark from the player's vineyard art:
    *  tapered stone tower, conical cap, four lattice sails, on open ground. */
+  /* ---- r365 · AUTUMN DRESSING ------------------------------------------
+   * Owner: "Autumn scenes need serious enrichment." The palette fix (sqrt
+   * albedo, see the theme notes) makes the season LEGIBLE; these builders
+   * make it FURNISHED. Everything here is instanced or tiny, everything sits
+   * outside the 4 u band (§7.3), and everything solid registers a collider
+   * (the Law of Solidity). Per theme:
+   *   autumnwood  — toadstool clusters on the wood floor, leaf drifts along
+   *                 the verges
+   *   harvestvale — pumpkin patches, corn stooks in field rows, scarecrows
+   *   mistfell    — cairns by the road, a standing-stone circle on the moor
+   * and every autumn world flies two rook flocks (animated in update()). */
+  _buildAutumnDressing() {
+    const theme = this.level?.theme;
+    this._buildRookFlights();
+    if (theme === 'autumnwood') { this._buildToadstools(); this._buildLeafDrifts(); }
+    if (theme === 'harvestvale') this._buildHarvestFields();
+    if (theme === 'mistfell') this._buildMoorStones();
+  }
+
+  /** A spot pad0..pad1 u BEYOND the local road edge — for dressing that
+   *  belongs near the road without ever being on it. Terrain-seated. */
+  _autumnSpot(pad0, pad1) {
+    for (let t = 0; t < 30; t++) {
+      const i = (Math.random() * N) | 0;
+      if (this._circDist(i, 0) < 40) continue;
+      if (this._nearGorge(i, 40)) continue;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const w = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+      const lat = side * (w + pad0 + Math.random() * (pad1 - pad0));
+      const p = this.pointAt(i, lat);
+      if (this._distToTrack(p.x, p.z) < w + pad0 - 0.4) continue;
+      if (this._underwater && this._underwater(p.x, p.z)) continue;
+      return { x: p.x, z: p.z, y: this.terrainHeight(p.x, p.z), i };
+    }
+    return null;
+  }
+
+  /** Two rook flocks in slow circles over the course. A V of eleven dark
+   *  birds — from the road they are movement in an otherwise still sky,
+   *  which is most of what "alive" means at this art scale. */
+  _buildRookFlights() {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x28211c, side: THREE.DoubleSide });
+    const wingG = new THREE.PlaneGeometry(0.92, 0.26);
+    for (let f = 0; f < 2; f++) {
+      const flock = new THREE.Group();
+      for (let b = 0; b < 11; b++) {
+        const bird = new THREE.Group();
+        for (const sd of [-1, 1]) {
+          const w = new THREE.Mesh(wingG, mat);
+          w.position.x = sd * 0.42;
+          w.rotation.set(-0.35, sd * 0.4, sd * 0.28);
+          bird.add(w);
+        }
+        const k = Math.ceil(b / 2), sd = b % 2 ? -1 : 1;
+        bird.position.set(sd * k * 1.8, -k * 0.14, -k * 2.2);
+        flock.add(bird);
+      }
+      const ci = this.center[(Math.random() * N) | 0];
+      this.group.add(flock);
+      this.animated.rooks.push({
+        g: flock, cx: ci.x, cz: ci.z,
+        r: 130 + Math.random() * 130,
+        h: 38 + Math.random() * 22,
+        a: Math.random() * Math.PI * 2,
+        dir: Math.random() < 0.5 ? -1 : 1,
+        y: null,
+      });
+    }
+  }
+
+  /** Toadstool clusters on the wood floor — red and amber caps in fives,
+   *  scattered through the tree belt. Ankle-high and visual only. */
+  _buildToadstools() {
+    const CL = 18, PER = 5;
+    const stemG = new THREE.CylinderGeometry(0.055, 0.085, 0.3, 6);
+    stemG.translate(0, 0.15, 0);
+    const capG = new THREE.SphereGeometry(0.2, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.58);
+    capG.scale(1, 0.78, 1);
+    capG.translate(0, 0.27, 0);
+    const stems = new THREE.InstancedMesh(stemG,
+      new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.9 }), CL * PER);
+    const caps = new THREE.InstancedMesh(capG,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, flatShading: true }), CL * PER);
+    const capCols = [0xc23c1e, 0xd85a20, 0xb0722a, 0xc8963c];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < CL; c++) {
+      const spot = this._autumnSpot(1.2, 16);
+      if (!spot) continue;
+      for (let k = 0; k < PER; k++) {
+        const x = spot.x + (Math.random() - 0.5) * 2.8;
+        const z = spot.z + (Math.random() - 0.5) * 2.8;
+        const sc = 0.7 + Math.random() * 0.9;
+        eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+        pos.set(x, this.terrainHeight(x, z), z); scl.set(sc, sc, sc);
+        m.compose(pos, q, scl);
+        stems.setMatrixAt(n, m); caps.setMatrixAt(n, m);
+        caps.setColorAt(n, col.setHex(capCols[(Math.random() * capCols.length) | 0]));
+        n++;
+      }
+    }
+    stems.count = caps.count = n;
+    this.group.add(stems, caps);
+  }
+
+  /** Leaf drifts along the verges: low gold-to-rust mounds where the wind
+   *  would actually bank them. Shin-high, off the carriageway, drive-through
+   *  by nature — a drift of leaves is not a wall. */
+  _buildLeafDrifts() {
+    const COUNT = 70;
+    const G = new THREE.ConeGeometry(1.5, 0.34, 9);
+    G.translate(0, 0.13, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), COUNT);
+    const cols = [0xd8963a, 0xc06a24, 0xb8842c, 0xe0aa48];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(0.8, 3.4);
+      if (!spot) continue;
+      const sc = 0.6 + Math.random() * 1.0;
+      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+      pos.set(spot.x, spot.y, spot.z); scl.set(sc * (0.8 + Math.random() * 0.6), sc, sc);
+      m.compose(pos, q, scl);
+      im.setMatrixAt(n, m);
+      im.setColorAt(n, col.setHex(cols[(Math.random() * cols.length) | 0]));
+      n++;
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Harvest country, furnished: pumpkin patches on the field strips, corn
+   *  stooks standing in rows, and a few scarecrows minding it all. The
+   *  scarecrows are the one solid here (a pole is a pole). */
+  _buildHarvestFields() {
+    const A = propAssets();
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    // pumpkin patches — five, each a couple dozen gourds on a loose spread
+    {
+      const PATCH = 5, PER = 22;
+      const im = new THREE.InstancedMesh(A.geo.pumpkin,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, flatShading: true }),
+        PATCH * PER);
+      const cols = [0xe07818, 0xd8892a, 0xc86a14, 0xe8952e];
+      let n = 0;
+      for (let c = 0; c < PATCH; c++) {
+        const spot = this._trackSidePos(16, 55);
+        if (!spot) continue;
+        for (let k = 0; k < PER; k++) {
+          const x = spot.x + (Math.random() - 0.5) * 16;
+          const z = spot.z + (Math.random() - 0.5) * 16;
+          if (this._distToTrack(x, z) < 13) continue;
+          const sc = 0.6 + Math.random() * 0.9;
+          eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+          pos.set(x, this.terrainHeight(x, z), z); scl.set(sc, sc, sc);
+          m.compose(pos, q, scl);
+          im.setMatrixAt(n, m);
+          im.setColorAt(n, col.setHex(cols[(Math.random() * cols.length) | 0]));
+          n++;
+        }
+      }
+      im.count = n;
+      this.group.add(im);
+    }
+    // corn stooks — sheaf cones standing in field rows, the way a cut field
+    // actually holds them
+    {
+      const ROWS = 6, PER = 8;
+      const G = new THREE.ConeGeometry(0.72, 1.5, 7);
+      G.translate(0, 0.72, 0);
+      const im = new THREE.InstancedMesh(G,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+        ROWS * PER);
+      const cols = [0xd8b862, 0xe0c470, 0xc8a850];
+      let n = 0;
+      for (let rIdx = 0; rIdx < ROWS; rIdx++) {
+        const spot = this._trackSidePos(15, 48);
+        if (!spot) continue;
+        const dir = Math.random() * Math.PI * 2;
+        const dx = Math.cos(dir) * 4.4, dz = Math.sin(dir) * 4.4;
+        for (let k = 0; k < PER; k++) {
+          const x = spot.x + dx * k, z = spot.z + dz * k;
+          if (this._distToTrack(x, z) < 12) continue;
+          if (this._underwater && this._underwater(x, z)) continue;
+          const sc = 0.85 + Math.random() * 0.35;
+          eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+          pos.set(x, this.terrainHeight(x, z), z); scl.set(sc, sc, sc);
+          m.compose(pos, q, scl);
+          im.setMatrixAt(n, m);
+          im.setColorAt(n, col.setHex(cols[(Math.random() * cols.length) | 0]));
+          n++;
+        }
+      }
+      im.count = n;
+      this.group.add(im);
+    }
+    // scarecrows — five, out in the fields
+    {
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 });
+      const coatMat = new THREE.MeshStandardMaterial({ color: 0x7a4a30, roughness: 1, flatShading: true });
+      const strawMat = new THREE.MeshStandardMaterial({ color: 0xd8b862, roughness: 1 });
+      for (let k = 0; k < 5; k++) {
+        const spot = this._trackSidePos(14, 44);
+        if (!spot) continue;
+        const y = this.terrainHeight(spot.x, spot.z);
+        const g = new THREE.Group();
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.5, 5), poleMat);
+        pole.position.y = 0.75;
+        const arms = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.07), poleMat);
+        arms.position.y = 1.14;
+        const coat = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.8, 6), coatMat);
+        coat.position.y = 0.85;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 5), strawMat);
+        head.position.y = 1.4;
+        pole.castShadow = coat.castShadow = true;
+        g.add(pole, arms, coat, head);
+        g.position.set(spot.x, y, spot.z);
+        g.rotation.y = Math.random() * Math.PI * 2;
+        this.group.add(g);
+        this._addShadow(spot.x, spot.z, 0.7, y);
+        this.solids.push({ x: spot.x, z: spot.z, r: 0.35, y: y + 0.7, mat: 'wood' });
+      }
+    }
+  }
+
+  /** The moor's furniture is stone: waymark cairns close by the road, and a
+   *  ring of standing stones out in the bracken — the one landmark on a world
+   *  whose point is that there is almost nothing to steer by. All solid. */
+  _buildMoorStones() {
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: 0x8a8880, roughness: 1, flatShading: true, vertexColors: false,
+    });
+    const G = new THREE.DodecahedronGeometry(0.55, 0);
+    // cairns — twelve, stacked threes, close enough to read as waymarks
+    {
+      const im = new THREE.InstancedMesh(G, rockMat, 12 * 3);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+      const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+      let n = 0;
+      for (let c = 0; c < 12; c++) {
+        const spot = this._autumnSpot(1.6, 7);
+        if (!spot) continue;
+        let yTop = spot.y;
+        for (const sc of [1.0, 0.72, 0.46]) {
+          eu.set(Math.random() * 0.3, Math.random() * Math.PI * 2, Math.random() * 0.3);
+          q.setFromEuler(eu);
+          pos.set(spot.x + (Math.random() - 0.5) * 0.14, yTop + 0.28 * sc,
+            spot.z + (Math.random() - 0.5) * 0.14);
+          scl.set(sc, sc * 0.78, sc);
+          m.compose(pos, q, scl);
+          im.setMatrixAt(n, m);
+          n++;
+          yTop += 0.42 * sc;
+        }
+        this._addShadow(spot.x, spot.z, 0.75, spot.y);
+        this.solids.push({ x: spot.x, z: spot.z, r: 0.55, y: spot.y + 0.5, mat: 'stone' });
+      }
+      im.count = n;
+      this.group.add(im);
+    }
+    // the stone circle — five uprights on a ring, plus three lone outliers
+    // walking away from it. Darkest tone on the world (§7.9: obstacles read
+    // dark) and every one a collider.
+    {
+      const standMat = new THREE.MeshStandardMaterial({
+        color: 0x46423c, roughness: 1, flatShading: true,
+      });
+      const put = (x, z, s) => {
+        const y = this.terrainHeight(x, z);
+        const st = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.34 * s, 0.5 * s, 2.7 * s, 5), standMat);
+        st.position.set(x, y + 1.3 * s, z);
+        st.rotation.y = Math.random() * Math.PI * 2;
+        st.rotation.z = (Math.random() - 0.5) * 0.1;
+        st.castShadow = true;
+        this.group.add(st);
+        this._addShadow(x, z, 0.9 * s, y);
+        this.solids.push({ x, z, r: 0.7 * s, y: y + 1.2 * s, mat: 'stone' });
+      };
+      const ring = this._trackSidePos(24, 60);
+      if (ring) {
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2;
+          put(ring.x + Math.cos(a) * 6.5, ring.z + Math.sin(a) * 6.5,
+            0.9 + Math.random() * 0.3);
+        }
+      }
+      for (let k = 0; k < 3; k++) {
+        const spot = this._trackSidePos(14, 44);
+        if (spot) put(spot.x, spot.z, 0.8 + Math.random() * 0.35);
+      }
+    }
+  }
+
   _buildWindmill() {
     let spot = null;
     for (let tries = 0; tries < 40 && !spot; tries++) {
@@ -24924,6 +25261,19 @@ export class Track {
       // nose up on the way out, down on the way back — the shape of a breach
       w.g.rotation.x = Math.cos(u * Math.PI) * 0.85;
       w.g.rotation.z = Math.sin(u * Math.PI * 2) * 0.18;
+    }
+    // r365: rook flocks — a slow circle over the course, holding a height
+    // above the terrain under them, with a lazy banked wobble
+    for (const rk of this.animated.rooks ?? []) {
+      rk.a += (11 / rk.r) * rk.dir * dt;
+      const x = rk.cx + Math.cos(rk.a) * rk.r;
+      const z = rk.cz + Math.sin(rk.a) * rk.r;
+      const want = this.terrainHeight(x, z) + rk.h;
+      rk.y = rk.y === null ? want
+        : rk.y + Math.max(-9 * dt, Math.min(9 * dt, want - rk.y));
+      rk.g.position.set(x, rk.y, z);
+      rk.g.rotation.y = Math.atan2(-Math.sin(rk.a) * rk.dir, Math.cos(rk.a) * rk.dir);
+      rk.g.rotation.z = Math.sin(time * 0.6 + rk.a * 3) * 0.1;
     }
   }
 

@@ -4171,6 +4171,52 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r365 — THE AUTUMN CHAPTER GETS ITS SEASON BACK (owner: "Autumn scenes need serious enrichment")
+
+Measured first: chase-camera frames of all five AUTUMN worlds (68-72) against
+PINE VALLEY with the same probe. The verdict was not "sparse" — it was
+ILLEGIBLE. The copper wood rendered as near-black maroon soup with only the
+road carrying light; HARVEST RUN's "open, gold" stubble read as black umber.
+
+**Root cause: the squared-pigment bug, again.** The outback theme documents
+it ("THE GROUND IS A PRODUCT, NOT A COLOUR"): the terrain material multiplies
+the ground texture by the per-vertex tint, so a palette written at full
+strength into BOTH renders as its own square. The three autumn themes did
+exactly that — ground.base #7d6236 × terrainLow #6a6234 ≈ #342610. All three
+now carry sqrt-form values (terrainLow/High/Dirt/Scree + ground.base), so the
+albedo that reaches the screen is the palette that was designed. The same
+product bug applied to the canopy (material colour × per-instance tint):
+foliageLow/Top and bushColor are sqrt-form now too. Before/after frames:
+night-and-day — the wood is amber, the harvest is gold, the moor is bracken
+over grey stone.
+
+**Then the furnishing (all instanced, all outside the 4 u band, everything
+solid registered in `solids`):**
+
+- **Autumn prop kits** (PROP_SPECS): the themes fell back to the generic
+  forest kit. New `pumpkin` prop type (squashed 9-segment sphere + stem,
+  smashable, 35 pts) — autumnwood and harvestvale scatter them by the verge;
+  mistfell gets a stone-country kit instead (no pumpkins on a moor).
+- **autumnwood**: 18 toadstool clusters (red/amber caps, ankle-high, visual)
+  through the tree belt; ~70 leaf drifts banked along the verges (shin-high
+  gold-to-rust mounds, drive-through by nature).
+- **harvestvale**: five pumpkin patches (22 gourds each) on the field strips,
+  six rows of corn stooks, five scarecrows (pole solids, 14-44 u out).
+- **mistfell**: twelve waymark cairns close by the road (stacked stones,
+  solid), a five-stone standing circle plus three outliers on the moor —
+  darkest tone on the world per §7.9, every one a collider.
+- **Rook flights** (all three themes): two flocks of eleven dark birds in a
+  slow banked circle over the course, holding height above the terrain
+  under them — driven from `Track.update()` beside the whales.
+
+`_autumnSpot(pad0, pad1)` is the shared placement helper: a spot pad0..pad1 u
+beyond the LOCAL road edge, `_distToTrack`-checked against the whole lap
+(the lesson of the r361 parapet and every placement bug before it).
+
+Gates: nature / treeclear / droplip re-run on the enriched worlds, plus
+stagerules S4 (kicker fans) and nothing-floats for the new scatter. Ships
+with r364.
+
 ## r364 — HIGH GROUND IS LEGAL, AND THE RACE IS ONE LAP (two owner asks)
 
 Owner, verbatim: "1. Don't reset me when I am off-road. 2. I don't need 3
