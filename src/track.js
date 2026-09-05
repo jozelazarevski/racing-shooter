@@ -4370,10 +4370,11 @@ const THEMES = {
     // and the thing being asked for is a wood
     bushCount: 760, bushColor: 0xbc895d,        // r365: sqrt form
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
+    bush2: { h: 0.27, hVar: 0.05, s: 0.55, sVar: 0.1, l: 0.36, lVar: 0.1, frac: 0.35 },   // r366c: still-green undergrowth
     rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
     hutRoof: 0x5a3020, hayColor: 0xc8a860,
-    hutCount: 9, hutZone: [0.9, 0.1], hayCount: 10,
+    hutCount: 9, hutZone: [0.9, 0.1], hayCount: 10, hayStyle: 'rect',
     splinter: [0x5a4028, 0xd8a860],
     elev: { amp: 10, ph: [0.7, 2.1, 2.6] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
@@ -4426,10 +4427,12 @@ const THEMES = {
     tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e6cc84' },
     bushCount: 180, bushColor: 0xb09762,        // r365: sqrt form
     bush: { h: 0.08, hVar: 0.05, s: 0.5, sVar: 0.1, l: 0.32, lVar: 0.1 },
+    bush2: { h: 0.27, hVar: 0.05, s: 0.55, sVar: 0.1, l: 0.38, lVar: 0.1, frac: 0.4 },    // r366c: hedgerow green
     rockCount: 80, pebbleCount: 150, rockColor: 0x9a9080, rockSnowCap: false,
     flowerCount: 150, flowerColors: ['#c8402c', '#e8c040', '#e0d8c0'],
     hutRoof: 0x8a4630, hayColor: 0xe8c874,
     hutCount: 16, hutZone: [0.8, 0.2], hayCount: 52,     // the harvest is IN
+    hayStyle: 'rect',                                    // r366c: stacked working bales
     splinter: [0x8a5a32, 0xe0d4a8],
     windmill: true,
     elev: { amp: 7, ph: [1.3, 2.0, 0.5] },
@@ -6193,9 +6196,9 @@ const FLORA_MIX = {
   // the colours are set. Birch, oak and larch each take a different tint shift
   // in `_buildTrees`, so one amber `foliage` band comes out as pale gold,
   // deep russet and red — a wood, not three thousand orange copies.
-  autumnwood: [['maple', 0.26], ['oak', 0.20], ['birch', 0.26], ['larch', 0.20], ['pineA', 0.08]],
+  autumnwood: [['maple', 0.24], ['oak', 0.18], ['birch', 0.22], ['poplar', 0.10], ['larch', 0.18], ['pineA', 0.08]],
   // orchard country: standards in the fields, a few conifers in the shelter belts
-  harvestvale: [['oak', 0.36], ['maple', 0.12], ['birch', 0.28], ['larch', 0.12], ['pineA', 0.12]],
+  harvestvale: [['oak', 0.32], ['maple', 0.12], ['birch', 0.22], ['poplar', 0.12], ['larch', 0.10], ['pineA', 0.12]],
   // the moor is nearly treeless, and what stands there is bare or wind-bitten
   mistfell: [['birchBare', 0.44], ['birch', 0.24], ['larch', 0.20], ['pineA', 0.12]],
   // Amazon: emergents over a closed mid-storey over tree ferns. Weighted so the
@@ -21766,6 +21769,17 @@ export class Track {
     birchCrown.translate(0, 4.7, 0);
     const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
     birchTop.translate(0.15, 6.1, -0.1);
+    // r366c (owner deconstruction board): the POPLAR CLUSTER — a pale slim
+    // trunk carrying three separate round crowns at stepped heights, which is
+    // the silhouette the board draws between the maples
+    const popTallTrunk = new THREE.CylinderGeometry(0.16, 0.24, 5.2, 6);
+    popTallTrunk.translate(0, 2.6, 0);
+    const popLow = new THREE.SphereGeometry(1.3, 7, 5);
+    popLow.translate(0.2, 3.3, 0.1);
+    const popMid = new THREE.SphereGeometry(1.0, 7, 5);
+    popMid.translate(-0.25, 4.7, -0.1);
+    const popTop = new THREE.SphereGeometry(0.72, 6, 4);
+    popTop.translate(0.05, 5.9, 0);
     const bareBranch = (rz, tx, ty2, tz) => {
       const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
       bg.rotateZ(rz);
@@ -21832,6 +21846,10 @@ export class Track {
       // and the one the amber band could never roll.
       maple: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
         kind: 'oak', rFac: 1.1, solidAt: 1.35, tint: 'maple', tiers: 2 },
+      // r366c: yellow-green poplar cluster, the deconstruction board's third tree
+      poplar: { parts: mkParts([popTallTrunk, birchBark],
+        [[popLow, lowMat], [popMid, lowMat], [popTop, topMat]], null),
+        kind: 'birch', rFac: 0.62, solidAt: null, tint: 'poplar', tiers: 3 },
     };
     const mix = T.floraMix
       || FLORA_MIX[this.level && this.level.theme]
@@ -21977,6 +21995,10 @@ export class Track {
           case 'birch':   // light airy crown
             color.setHSL(F.h + 0.02 + Math.random() * F.hVar, F.s * 0.8,
               Math.min(0.62, F.l + 0.16 + Math.random() * F.lVar)); break;
+          case 'poplar': // yellow-green, brighter than everything around it
+            color.setHSL(0.135 + Math.random() * 0.05, 0.58 + Math.random() * 0.1,
+              0.44 + Math.random() * 0.1);
+            break;
           case 'maple': { // committed RED, hue wrapping through 0
             const hh = (0.975 + Math.random() * 0.065) % 1;
             color.setHSL(hh, 0.72 + Math.random() * 0.12, 0.34 + Math.random() * 0.1);
@@ -21998,7 +22020,7 @@ export class Track {
               F.l + Math.random() * F.lVar);
         }
         // trunk: two wood tones, or near-white bark for the birches
-        if (spec.tint === 'birch' || spec.tint === 'bare') {
+        if (spec.tint === 'birch' || spec.tint === 'bare' || spec.tint === 'poplar') {
           const bt = 0.92 + Math.random() * 0.14;
           parts[0].setColorAt(k, new THREE.Color(bt, bt, bt * 0.97));
         } else {
@@ -23392,10 +23414,14 @@ export class Track {
       m4.makeScale(s, s, s);
       m4.setPosition(p.x, by, p.z);
       bushes.setMatrixAt(bk, m4);
+      // r366c (owner deconstruction board): a second bush band where a theme
+      // declares one — the autumn verges carry GREEN bushes among the
+      // red-orange, and a single hue band can never roll both
+      const B2 = (T.bush2 && Math.random() < (T.bush2.frac ?? 0.4)) ? T.bush2 : B;
       bcolor.setHSL(
-        B.h + Math.random() * B.hVar,
-        B.s + Math.random() * B.sVar,
-        B.l + Math.random() * B.lVar
+        B2.h + Math.random() * B2.hVar,
+        B2.s + Math.random() * B2.sVar,
+        B2.l + Math.random() * B2.lVar
       );
       // SOFT scenery: cars brush through, spraying leaves — no removal needed
       this.bushes.push({ x: p.x, z: p.z, y: by, r: 1.0 * s, id: bk, lastHit: 0 });
@@ -23975,8 +24001,13 @@ export class Track {
 
     // hay bales
     const hayCount = this.T.hayCount !== undefined ? this.T.hayCount : 50;
-    const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
-    hayGeo.rotateZ(Math.PI / 2);
+    // r366c (owner deconstruction board): harvest country stacks RECTANGULAR
+    // straw bales in working groups — pairs, and sometimes one on top —
+    // where every other world keeps the rolled round bale
+    const rectHay = this.T.hayStyle === 'rect';
+    const hayGeo = rectHay
+      ? new THREE.BoxGeometry(1.7, 0.95, 0.95)
+      : (() => { const g = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10); g.rotateZ(Math.PI / 2); return g; })();
     const hay = new THREE.InstancedMesh(
       hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), Math.max(hayCount, 1)
     );
@@ -23994,10 +24025,28 @@ export class Track {
       const p = this._trackSidePos(hayNear, hayFar);
       return p && !this._inWater(p.x, p.z) ? p : null;
     }, (p) => {
-      q.setFromAxisAngle(up, Math.random() * Math.PI);
-      m4.compose(new THREE.Vector3(p.x, this._seatY(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
+      const yaw = Math.random() * Math.PI;
+      q.setFromAxisAngle(up, yaw);
+      const baseY = this._seatY(p.x, p.z) + (rectHay ? 0.48 : 0.8);
+      m4.compose(new THREE.Vector3(p.x, baseY, p.z), q, new THREE.Vector3(1, 1, 1));
       hay.setMatrixAt(hk++, m4);
       this._addShadow(p.x, p.z, 1.6);
+      if (rectHay && hk < hayCount && Math.random() < 0.55) {
+        // a second bale shoulder-to-shoulder, off the first's long axis
+        const sd = Math.random() < 0.5 ? -1 : 1;
+        const nx = p.x + Math.sin(yaw + Math.PI / 2) * 1.15 * sd;
+        const nz = p.z + Math.cos(yaw + Math.PI / 2) * 1.15 * sd;
+        q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.3);
+        m4.compose(new THREE.Vector3(nx, this._seatY(nx, nz) + 0.48, nz), q, new THREE.Vector3(1, 1, 1));
+        hay.setMatrixAt(hk++, m4);
+        if (hk < hayCount && Math.random() < 0.45) {
+          // and one stacked on the pair, turned slightly
+          q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.5);
+          m4.compose(new THREE.Vector3((p.x + nx) / 2, baseY + 0.95, (p.z + nz) / 2),
+            q, new THREE.Vector3(1, 1, 1));
+          hay.setMatrixAt(hk++, m4);
+        }
+      }
     });
     hay.count = hk;
     this.group.add(hay);
