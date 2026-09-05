@@ -799,7 +799,12 @@ export const LEVELS = [
     // Up here the town has run out and the terraces take over, so the houses
     // thin and the olives come back.
     tune: {
-      hutCount: 26, hutZone: [0.1, 0.5], treeCount: 620,
+      // r362 (owner photo: "The maps aren't matching"): the grid stands "out
+      // of the town at sea level" per the note above, but the town zone
+      // began 10% up the lap — the photo shows the start in bare scrub with
+      // the houses on the horizon. The zone now reaches the grid, so the
+      // world opens where its own design says it does: in the town.
+      hutCount: 26, hutZone: [0.0, 0.5], treeCount: 620,
       // above the haze, and looking down on it
       fogNear: 460, fogFar: 2100, hemiIntensity: 0.92,
       // `profile: 'ascent'` IS HAND-SHAPED AND REQUIRES `keys` — it reads
@@ -21291,6 +21296,14 @@ export class Track {
         // check — on a coast world it was planting conifers IN the sea
         if (!p || this._inWater(p.x, p.z) || this._onQuayStrip(p.x, p.z)
           || !this._altOK(p.x, p.z)) return null;
+        // r362: the street band belongs to the street — same law as the
+        // olive scatter (see _buildOliveGrove), for frontage worlds whose
+        // theme runs the default stand instead.
+        if (this.T.frontage) {
+          const Ff = this.T.frontage;
+          const bandF = (Ff.lateral ?? 15.5) + 7 + (Ff.depth ?? 8) * 0.5 + 1.6;
+          if (this._distToTrack(p.x, p.z) < bandF) return null;
+        }
         // NOR DOES ANY BRANCH ASK WHETHER A TRUNK FITS. `_trackSidePos` only
         // promises `belt[0] - 1`, and a theme may run its belt close: on
         // DEEPWOOD TRAIL solid boles stood 10.75 u out against a 9 u
@@ -22385,6 +22398,20 @@ export class Track {
     const wide = this.T.roadWidth ?? 1;
     const clear = (x, z) => this.widthAt(this.nearestIndex(
       { x, y: 0, z, isVector3: true })) + 5;
+    // r362 (owner photo, CAPO VELA: "The maps aren't matching"): ON A
+    // FRONTAGE WORLD THE STREET BAND BELONGS TO THE STREET. The terrace
+    // walk offers laterals up to F.lateral + 7 and `put` refuses any block
+    // within its diagonal + 1.6 of the road OR within r + 1.4 of a TRUNK —
+    // and one refusal resets the whole terrace run. This scatter plants
+    // down to 14-15 u, so the trees claimed the band first and the town
+    // never built: measured on ALBAROSA SEAFRONT, 77 olives in the 9-30 u
+    // band and the street wall almost entirely refused — five of the six
+    // Riviera worlds read as bare sand corridors between their own
+    // back-rank islands, which is the photo. Trees stay out of the band;
+    // the hundreds beyond it are untouched. (IL VICOLO already proved the
+    // mechanism the other way round: treeCount 26, and its street builds.)
+    const FB = this.T.frontage;
+    const bandR = FB ? (FB.lateral ?? 15.5) + 7 + (FB.depth ?? 8) * 0.5 + 1.6 : 0;
     this._scatter(COUNT - Math.round(cypWt * COUNT),
       () => {
         if (anchors.length && Math.random() < 0.45) {
@@ -22394,7 +22421,8 @@ export class Track {
           const gz = (((Math.random() * 9) | 0) - 4) * GRID;
           const x = an.x + gx * cs - gz * sn + (Math.random() - 0.5) * 0.7;
           const z = an.z + gx * sn + gz * cs + (Math.random() - 0.5) * 0.7;
-          return this._distToTrack(x, z) < clear(x, z) ? null : { x, z, grid: true };
+          return this._distToTrack(x, z) < Math.max(clear(x, z), bandR)
+            ? null : { x, z, grid: true };
         }
         const p = Math.random() < 0.55
           ? this._trackSidePos(Math.max(15, ROAD_HALF * wide + 6), 48 + ROAD_HALF * (wide - 1))
@@ -22405,6 +22433,7 @@ export class Track {
             return this._distToTrack(x, z) < clear(x, z) ? null : { x, z };
           })();
         // no olives rooted in the bay: the ring branch bypasses _trackSidePos
+        if (FB && p && this._distToTrack(p.x, p.z) < bandR) return null;
         return p && !this._inWater(p.x, p.z) && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
@@ -22427,7 +22456,7 @@ export class Track {
       const n = 4 + ((Math.random() * 3) | 0);
       for (let t = 0; t < n; t++) {
         const x = p.x + dx * t, z = p.z + dz * t;
-        if (this._distToTrack(x, z) < 13) continue;
+        if (this._distToTrack(x, z) < Math.max(13, bandR)) continue;
         plant('cypress', x, z, 0.85 + Math.random() * 0.45, Math.random() * Math.PI * 2);
       }
     }
