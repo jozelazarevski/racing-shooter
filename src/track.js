@@ -607,7 +607,7 @@ export const LEVELS = [
     // orchard keeps its grass in autumn; the stubble gold stays HARVEST
     // RUN's. Ground colours in sqrt form per the r365 product rule.
     tune: {
-      vineRows: { count: 70 },
+      vineRows: { count: 70, hue: 0.115, hueVar: 0.075 },   // r366d: amber-green orchard rows
       stoneBridges: { count: 1 },
       terrainLow: '#a4bc7c', terrainHigh: '#bcd18f', terrainDirt: '#bca680',
       ground: {
@@ -17165,7 +17165,11 @@ export class Track {
         nx.push(-tz / m); nz.push(tx / m);
       }
 
-      const hue = 0.245 + Math.random() * 0.045;                   // parcel varietal
+      // r366d (owner screenshot: a spring-green terraced mound in an autumn
+      // world): the varietal hue obeys the WORLD now. Default is the summer
+      // vineyard green every existing world planted; an autumn orchard asks
+      // for amber-green via T.vineRows.hue/hueVar.
+      const hue = (V.hue ?? 0.245) + Math.random() * (V.hueVar ?? 0.045); // parcel varietal
       let any = 0;
       for (let r = 0; r < rows; r++) {
         const off = (r - (rows - 1) / 2) * SPACING;
