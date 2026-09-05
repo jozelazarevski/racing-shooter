@@ -1,0 +1,1305 @@
+[
+ {
+  "id": 1,
+  "name": "PINE VALLEY",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 18,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 2,
+  "name": "DUST CANYON",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.6,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 3,
+  "name": "FROST PEAK",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 9,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 170
+ },
+ {
+  "id": 4,
+  "name": "CANYON RUN",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 5,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 5,
+  "name": "EMBER PASS",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 180
+ },
+ {
+  "id": 6,
+  "name": "SUMMIT CLIMB",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 40,
+    "unculled": 3,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 4,
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 7,
+  "name": "GLACIAL PASS",
+  "rotated": {
+   "by": 630,
+   "worstRadiusM": 879
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 170
+ },
+ {
+  "id": 8,
+  "name": "AMAZON RAPIDS",
+  "rotated": {
+   "by": 84,
+   "worstRadiusM": 501
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 16,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 9,
+  "name": "THE DUNE SERPENT",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.6,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 212
+ },
+ {
+  "id": 11,
+  "name": "OASIS AMBUSH",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 27,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 212
+ },
+ {
+  "id": 12,
+  "name": "REDWOOD RAMPAGE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 21,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 13,
+  "name": "LOG FLUME FURY",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 14,
+  "name": "FOREST FIRE ESCAPE",
+  "rotated": {
+   "by": 840,
+   "worstRadiusM": 4012
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 49,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 15,
+  "name": "GLACIER'S GRIND",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 170
+ },
+ {
+  "id": 16,
+  "name": "AVALANCHE ALLEY",
+  "rotated": {
+   "by": 108,
+   "worstRadiusM": 2453
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 170
+ },
+ {
+  "id": 17,
+  "name": "NEON GRID EXPRESSWAY",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 160
+ },
+ {
+  "id": 18,
+  "name": "UNDERCITY SLIPSTREAM",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 160
+ },
+ {
+  "id": 10,
+  "name": "ROCKFALL RAVINE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 3,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.5,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 19,
+  "name": "KARVEN CLIMB",
+  "rotated": {
+   "by": 162,
+   "worstRadiusM": 692
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 34,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 20,
+  "name": "SERPENTINA DESCENT",
+  "rotated": {
+   "by": 744,
+   "worstRadiusM": 165
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 21,
+    "unculled": 22,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 21,
+  "name": "FALKEN RIDGE",
+  "rotated": {
+   "by": 600,
+   "worstRadiusM": 3141
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 22,
+  "name": "COL DE VERNAY",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 20,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 23,
+  "name": "SERPENT PASS",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 15,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 24,
+  "name": "PENEDO LEAP",
+  "rotated": {
+   "by": 165,
+   "worstRadiusM": 9999
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 7,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 7,
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 25,
+  "name": "HIGHCROWN PEAK",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 10,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 26,
+  "name": "SAFARI PLAINS",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 7,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 212
+ },
+ {
+  "id": 27,
+  "name": "CORNICHE",
+  "rotated": {
+   "by": 831,
+   "worstRadiusM": 979
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.4,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 28,
+  "name": "BIRCHLAND CRESTS",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 21,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 29,
+  "name": "OLIVE COAST",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 11,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 2,
+    "worstM": 0.4,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 30,
+  "name": "LANTERN QUARTER",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 160
+ },
+ {
+  "id": 31,
+  "name": "HEDGEROW DASH",
+  "rotated": {
+   "by": 66,
+   "worstRadiusM": 1262
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 7,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 32,
+  "name": "RED CENTRE RUN",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 6,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 1.2,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 212
+ },
+ {
+  "id": 33,
+  "name": "ALPENRING",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 41,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 34,
+  "name": "PRINCIPALITY STREETS",
+  "rotated": {
+   "by": 684,
+   "worstRadiusM": 709
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 35,
+  "name": "AERODROME CIRCUIT",
+  "rotated": {
+   "by": 384,
+   "worstRadiusM": 7942
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 36,
+  "name": "ARDENNES SWEEP",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 17,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 37,
+  "name": "CROSSOVER RING",
+  "rotated": {
+   "by": 189,
+   "worstRadiusM": 2550
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 17,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 4,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 38,
+  "name": "WALDSCHLEIFE",
+  "rotated": {
+   "by": 267,
+   "worstRadiusM": 1106
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 27,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 39,
+  "name": "AUTODROMO VELOCE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 40,
+  "name": "NEON MARINA",
+  "rotated": {
+   "by": 78,
+   "worstRadiusM": 3142
+  },
+  "violations": [],
+  "ceilKmh": 210
+ },
+ {
+  "id": 41,
+  "name": "RAZORBACK MOUNTAIN",
+  "rotated": {
+   "by": 294,
+   "worstRadiusM": 1381
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 42,
+  "name": "RALLYCROSS ARENA",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 6,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 43,
+  "name": "ORCHARD PARK",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 9,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 44,
+  "name": "DRY LAGOON",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "kicker-landing",
+    "kickers": 6,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 45,
+  "name": "TOUR DES CAPS",
+  "rotated": {
+   "by": 498,
+   "worstRadiusM": 111
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 8,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 210
+ },
+ {
+  "id": 46,
+  "name": "VINEYARD VELOCE",
+  "rotated": {
+   "by": 738,
+   "worstRadiusM": 411
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 47,
+  "name": "DEEPWOOD TRAIL",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 7,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 48,
+  "name": "TORRI CORSA",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 9,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 49,
+  "name": "HARBOR QUAY",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 50,
+  "name": "CINQUE BORGHI",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 2,
+    "unculled": 2,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 51,
+  "name": "AEGEAN BLUE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 8,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 52,
+  "name": "COSTA BRAVA",
+  "rotated": {
+   "by": 84,
+   "worstRadiusM": 8238
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 5,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 53,
+  "name": "DALMATIA DRIVE",
+  "rotated": {
+   "by": 84,
+   "worstRadiusM": 485
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 54,
+  "name": "COTE D AZUR",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 11,
+    "unculled": 2,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 55,
+  "name": "BRIDGE RUN",
+  "rotated": {
+   "by": 819,
+   "worstRadiusM": 842
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 3,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 56,
+  "name": "OLIVE CROSSING",
+  "rotated": {
+   "by": 858,
+   "worstRadiusM": 591
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 15,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 57,
+  "name": "MOUNTAIN TO SEA",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 5,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 58,
+  "name": "CITADEL BAY",
+  "rotated": null,
+  "violations": [],
+  "ceilKmh": 160
+ },
+ {
+  "id": 59,
+  "name": "CLIFF KNOT",
+  "rotated": {
+   "by": 834,
+   "worstRadiusM": 2224
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 61,
+  "name": "OLIVE PASS",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 19,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 60,
+  "name": "SEA CLIFF RUN",
+  "rotated": {
+   "by": 63,
+   "worstRadiusM": 4569
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 31,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 62,
+  "name": "CAPE OLIVETO",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 8,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 63,
+  "name": "TERRAZZA ALTA",
+  "rotated": {
+   "by": 498,
+   "worstRadiusM": 111
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 15,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 64,
+  "name": "SALINE SPRINT",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 10,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 65,
+  "name": "GRANITE NARROWS",
+  "rotated": {
+   "by": 684,
+   "worstRadiusM": 2761
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 15,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 66,
+  "name": "GLACIER COL",
+  "rotated": {
+   "by": 294,
+   "worstRadiusM": 1381
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 12,
+    "unculled": 54,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 190
+ },
+ {
+  "id": 67,
+  "name": "TIMBER GORGE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 8,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 68,
+  "name": "LARCH GOLD",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 0,
+    "fix": "auto"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 69,
+  "name": "MAPLE MILE",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 2,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 70,
+  "name": "HARVEST RUN",
+  "rotated": {
+   "by": 66,
+   "worstRadiusM": 1262
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 0,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 71,
+  "name": "CIDER LANE",
+  "rotated": {
+   "by": 738,
+   "worstRadiusM": 411
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 1,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 72,
+  "name": "BRACKEN MOOR",
+  "rotated": {
+   "by": 381,
+   "worstRadiusM": 111
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 4,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 180
+ },
+ {
+  "id": 73,
+  "name": "ALBAROSA SEAFRONT",
+  "rotated": {
+   "by": 831,
+   "worstRadiusM": 979
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 7,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 74,
+  "name": "IL VICOLO",
+  "rotated": {
+   "by": 684,
+   "worstRadiusM": 709
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 0,
+    "unculled": 1,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 75,
+  "name": "PORTO MOLO",
+  "rotated": {
+   "by": 78,
+   "worstRadiusM": 3142
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 6,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 76,
+  "name": "CAPO VELA",
+  "rotated": null,
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 17,
+    "unculled": 5,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 77,
+  "name": "PORTO GRANDE",
+  "rotated": {
+   "by": 588,
+   "worstRadiusM": 1382
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 1,
+    "unculled": 4,
+    "fix": "generator"
+   },
+   {
+    "rule": "structure-hover",
+    "count": 1,
+    "worstM": 0.5,
+    "fix": "generator"
+   }
+  ],
+  "ceilKmh": 160
+ },
+ {
+  "id": 78,
+  "name": "LIGURIA STAGE",
+  "rotated": {
+   "by": 381,
+   "worstRadiusM": 111
+  },
+  "violations": [
+   {
+    "rule": "street-obstacles",
+    "culled": 15,
+    "unculled": 1,
+    "fix": "generator"
+   },
+   {
+    "rule": "kicker-landing",
+    "kickers": 5,
+    "culled": 1,
+    "unculled": 0,
+    "fix": "auto"
+   }
+  ],
+  "ceilKmh": 160
+ }
+]
