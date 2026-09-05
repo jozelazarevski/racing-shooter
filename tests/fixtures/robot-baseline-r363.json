@@ -1,0 +1,42 @@
+{
+ "build": "r363",
+ "driver": "airace expert stand-in",
+ "skill": 0.94,
+ "note": "robot reference, not a human lap — see HANDOVER item 1",
+ "worlds": {
+  "PINE VALLEY": {
+   "world": "PINE VALLEY",
+   "raceS": 0,
+   "laps": [],
+   "bestLapS": null,
+   "rank": 8,
+   "finished": false
+  },
+  "CANYON RUN": {
+   "world": "CANYON RUN",
+   "raceS": 323.7,
+   "laps": [
+    113.2,
+    108.2,
+    102.3,
+    0
+   ],
+   "bestLapS": 0,
+   "rank": 3,
+   "finished": true
+  },
+  "FROST PEAK": {
+   "world": "FROST PEAK",
+   "raceS": 460.4,
+   "laps": [
+    166.4,
+    142.3,
+    151.7,
+    0
+   ],
+   "bestLapS": 0,
+   "rank": 8,
+   "finished": true
+  }
+ }
+}

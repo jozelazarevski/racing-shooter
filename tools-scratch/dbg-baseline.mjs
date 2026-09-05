@@ -5,14 +5,14 @@
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const WORLDS = [1, 4, 3, 32, 76, 9]; // forest, canyon, snow, outback, riviera, open
+const WORLDS = (process.env.WORLDS ?? '1,4,3,32,76,9').split(',').map(Number); // forest, canyon, snow, outback, riviera, open
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 p.on('pageerror', () => {});
 const out = {};
 for (const lvl of WORLDS) {
-  await p.goto(`${BASE}/?level=${lvl}&go=1&fresh=1`, { waitUntil: 'load', timeout: 300000 });
+  await p.goto(`${BASE}/?level=${lvl}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
   await p.waitForFunction(() => window.__game?.player && window.__game.track,
     undefined, { timeout: 300000 });
   const res = await p.evaluate(async () => {
@@ -73,9 +73,12 @@ for (const lvl of WORLDS) {
         lastT = g.raceTime; lastLap = car.lap;
       }
     }
-    if (car.finished) lapT.push(+(g.raceTime - lastT).toFixed(1));
+    // the finish itself increments `lap`, so the last real lap is already
+    // pushed by the loop — no remainder push, and zero-length stubs are
+    // trimmed before taking the best
+    const laps = lapT.filter((x) => x > 5);
     return { world: g.level?.name, raceS: +g.raceTime.toFixed(1),
-      laps: lapT, bestLapS: lapT.length ? Math.min(...lapT) : null,
+      laps, bestLapS: laps.length ? Math.min(...laps) : null,
       rank: g.playerRank, finished: !!car.finished };
   });
   out[res.world] = res;
