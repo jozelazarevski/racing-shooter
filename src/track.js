@@ -599,9 +599,36 @@ export const LEVELS = [
     // machinery does not care what is planted in them — so the route that was
     // written for vines lays out an orchard, in a season when an orchard is
     // the reason to be there.
+    //
+    // r366b (owner WORLD LANE board — an isometric reference tile of this
+    // exact world): the lane is PAVED with big rounded multicolour stones
+    // (rust, slate, tan, mauve — rows/per sized so a stone reads ~0.7 u,
+    // twice the standard sett), and the verges are ORCHARD GREEN — a working
+    // orchard keeps its grass in autumn; the stubble gold stays HARVEST
+    // RUN's. Ground colours in sqrt form per the r365 product rule.
     tune: {
       vineRows: { count: 70 },
       stoneBridges: { count: 1 },
+      terrainLow: '#a4bc7c', terrainHigh: '#bcd18f', terrainDirt: '#bca680',
+      ground: {
+        base: '#a4bc7c',
+        bandLight: 'rgba(220,240,170,0.10)', bandDark: 'rgba(70,92,44,0.08)',
+        patchA: 'rgba(150,180,90,0.26)',
+        patchB: 'rgba(190,170,90,0.20)',
+        speckA: 'rgba(120,150,70,0.7)', speckB: 'rgba(226,214,150,0.8)', speckCount: 130,
+      },
+      tuftCount: 2200, grass: { bladeA: '#7aa848', bladeB: '#a8c86a' },
+      road: {
+        base: '#8a7856', mottleA: [112, 94, 66], mottleB: [162, 144, 108],
+        rut: 'rgba(86,70,46,0.5)', rutCore: 'rgba(62,50,32,0.45)', tread: 'rgba(36,28,16,0.45)',
+        stoneA: 'rgba(216,202,168,0.65)', stoneB: 'rgba(98,82,56,0.7)',
+        fringe: [110, 150, 62], fringeVar: [36, 40, 24],
+        cobbles: {
+          stones: ['#b06a4a', '#8a92a0', '#c2a878', '#9a7a88', '#9a948c', '#a08058'],
+          mortar: 'rgba(58,50,40,0.8)', rows: 19, per: 30,
+        },
+        leaves: { count: 70, colors: ['#d8a838', '#c8862a', '#b8462a', '#e0c050'] },
+      },
     } },
 
   { id: 72, name: 'BRACKEN MOOR', theme: 'mistfell', region: 'AUTUMN',
