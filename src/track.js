@@ -4351,7 +4351,9 @@ const THEMES = {
     elev: { amp: 10, ph: [0.7, 2.1, 2.6] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'alpine',
-    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
+    // r365b, refined by the owner's design sheet: weathered steel beam on
+    // dark timber posts (the sheet's barrier element, exactly)
+    edgeRailColor: 0x8e9296, edgeRailPostColor: 0x4a3a2c,
     vizZoneSpec: { count: 2, kind: 'fogbank' },          // morning mist in the hollows
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xd8863a },        // the wood is shedding
@@ -4406,7 +4408,9 @@ const THEMES = {
     elev: { amp: 7, ph: [1.3, 2.0, 0.5] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'hedgerow',
-    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
+    // r365b, refined by the owner's design sheet: weathered steel beam on
+    // dark timber posts (the sheet's barrier element, exactly)
+    edgeRailColor: 0x8e9296, edgeRailPostColor: 0x4a3a2c,
     crossroads: 2,
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xc8a044 },        // chaff and orchard leaf
@@ -4461,7 +4465,9 @@ const THEMES = {
     elev: { amp: 13, ph: [1.8, 0.9, 2.4] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'alpine',
-    edgeRailColor: 0x4a3a2c,   // r365b: dark timber post-and-rail (asset board E)
+    // r365b, refined by the owner's design sheet: weathered steel beam on
+    // dark timber posts (the sheet's barrier element, exactly)
+    edgeRailColor: 0x8e9296, edgeRailPostColor: 0x4a3a2c,
     vizZoneSpec: { count: 3, kind: 'fogbank' },          // the mist that names it
     season: 'AUTUMN',
     weather: { type: 'leaves', color: 0xa06838 },        // bracken litter on the wind
@@ -12395,12 +12401,22 @@ export class Track {
     // clear-the-road guard could not catch it: the anchor point was fine and
     // the mesh reached across anyway.
     const bay = 4.5, H = 1.0;
-    const geo = mergeBoxes([
+    const POSTS = [
       { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: -bay / 2 },
       { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: bay / 2 },
+    ];
+    const BEAMS = [
       { w: 0.10, h: 0.22, d: bay + 0.3, x: 0, y: H - 0.14, z: 0 },
       { w: 0.09, h: 0.16, d: bay + 0.3, x: 0, y: H - 0.52, z: 0 },
-    ]);
+    ];
+    // r365b (owner design sheet): TWO-TONE RAILS where a theme asks for them
+    // — the sheet's autumn barrier is a weathered steel beam carried on
+    // timber posts. When `edgeRailPostColor` is declared, posts and beams
+    // split into two instanced meshes sharing the same per-bay matrices (one
+    // extra draw call); every other world keeps the single-material rail,
+    // geometry and colours exactly as before.
+    const twoTone = this.T.edgeRailPostColor != null;
+    const geo = mergeBoxes(twoTone ? BEAMS : [...POSTS, ...BEAMS]);
     // steel where the road is sealed, timber where it is not — the world
     // already knows which it is from the surface it gives the physics
     const sealed = this.T.surface === 'wet' || this.T.tarmac || this.T.lamps;
@@ -12412,6 +12428,13 @@ export class Track {
     const mesh = new THREE.InstancedMesh(geo, mat, n);
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.name = 'edge-rail';
+    let meshPosts = null;
+    if (twoTone) {
+      meshPosts = new THREE.InstancedMesh(mergeBoxes(POSTS),
+        new THREE.MeshStandardMaterial({ color: this.T.edgeRailPostColor, roughness: 0.95 }), n);
+      meshPosts.castShadow = meshPosts.receiveShadow = true;
+      meshPosts.name = 'edge-rail-posts';
+    }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     for (let k = 0; k < n; k++) {
@@ -12422,6 +12445,7 @@ export class Track {
       q.setFromAxisAngle(up, hd);
       m4.compose(new THREE.Vector3(p.x, this.center[i].y - LIFT, p.z), q, one);
       mesh.setMatrixAt(k, m4);
+      if (meshPosts) meshPosts.setMatrixAt(k, m4);
       // SOLID. The whole point: `banners` is breakable scenery, `barriers` is
       // the list the car cannot pass. Overlap the bays slightly (4.9 for a 4.5
       // pitch) so a run has no seam for a nose to find.
@@ -12434,6 +12458,10 @@ export class Track {
     }
     mesh.instanceMatrix.needsUpdate = true;
     this.group.add(mesh);
+    if (meshPosts) {
+      meshPosts.instanceMatrix.needsUpdate = true;
+      this.group.add(meshPosts);
+    }
     this._edgeRailCount = n;
     this._edgeRailDropped = want.length - n;
   }
