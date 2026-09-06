@@ -4171,6 +4171,33 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r374 — HIGH-POLY TREES (owner: "Add more high poly definition to the trees")
+
+The mixed-stand species were bare primitives: cones with 6-8 sides and ONE
+height segment, spheres at 7x5 — flat shading drew each crown as a handful
+of big flat panels. r374 gives every near-belt species real vertex detail
+in _buildTrees: segment counts up (cones 9-10 sides x 3 height segments,
+crowns 9-11 x 6-8) plus a `roughen()` vertex-jitter pass, which flat
+shading breaks into dozens of small irregular facets — reads as foliage
+mass, not geometry. Applied to pineA/B, fir, larch tiers, birch, poplar,
+oak/maple domes, kapok/cecropia/fern crowns, and (subtly, amp 0.05-0.06)
+the oak trunk and shared conifer trunk.
+
+THE TRAP THAT SHAPED THE HELPER: Cone/Sphere/Cylinder geometries DUPLICATE
+their seam vertices (UV seam) — random per-vertex jitter tears the seam
+open as a visible crack. So the jitter is HASHED FROM VERTEX POSITION
+(sin-dot-fract), never rolled: co-located duplicates displace identically.
+Poles and apexes (radius < 1e-4) are skipped so silhouettes hold; radial
+jitter is proportional to local radius so cone tips stay tight. Geometries
+translated in x/z (lowB/midB/topB) MUST be roughened before their
+translate — the helper jitters radially about the y-axis.
+
+Left cheap on purpose: the far forest carpet (6-sided, 45-585 u away),
+distant-stand groves, and the specialty builders (palms, cacti, redwoods,
+jungle, olive, charred/burnt) — separate systems, same treatment available
+on ask. Vertex cost roughly 2.5-3x per tree part on instanced geometry;
+draw-call count unchanged (still one per part per species).
+
 ## r373 — THE CARPET SITS DOWN (nothing-floats repair on r372)
 
 r372's gate run had one red the deploy chain sailed past: nothing-floats

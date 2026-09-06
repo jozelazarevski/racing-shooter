@@ -22475,20 +22475,49 @@ export class Track {
       for (const part of parts) part.castShadow = true;
       return parts;
     };
+    // r374 (owner: "Add more high poly definition to the trees"): the crowns
+    // were bare primitives — one height segment, 6-8 sides — so flat shading
+    // drew each as a handful of big flat panels. Every near-belt species now
+    // gets real vertex detail: more segments plus vertex jitter, which flat
+    // shading breaks into dozens of small irregular facets — foliage, not
+    // geometry. The jitter is HASHED FROM POSITION, not rolled: cone, sphere
+    // and cylinder geometries duplicate their seam vertices, and random
+    // per-vertex offsets would tear the seam open as a visible crack.
+    const jitH = (x, y, z, s) => {
+      const t = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + s * 53.7) * 43758.5453;
+      return (t - Math.floor(t)) - 0.5;
+    };
+    const roughen = (g, amp) => {
+      const P = g.attributes.position;
+      for (let i = 0; i < P.count; i++) {
+        const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+        const rr = Math.hypot(x, z);
+        if (rr < 1e-4) continue;    // apex and pole points hold the silhouette
+        const j = 1 + jitH(x, y, z, 1) * 2 * amp;
+        P.setXYZ(i, x * j, y + jitH(x, y, z, 2) * amp * rr * 1.4, z * j);
+      }
+      P.needsUpdate = true;
+      return g;
+    };
+    const coneHP = (r, h, seg = 10) =>
+      roughen(new THREE.ConeGeometry(r, h, seg, 3), 0.10);
+    const crownHP = (r, w = 10, hgt = 7, amp = 0.13) =>
+      roughen(new THREE.SphereGeometry(r, w, hgt), amp);
+    roughen(trunkGeo, 0.06);   // bark facets (y-only translate, so still safe)
     // --- conifers ---
-    const lowA = new THREE.ConeGeometry(2.6, 4.2, 8);
+    const lowA = coneHP(2.6, 4.2);
     lowA.translate(0, 4.0, 0);
-    const topA = new THREE.ConeGeometry(1.8, 3.4, 8);
+    const topA = coneHP(1.8, 3.4);
     topA.translate(0, 6.6, 0);
-    const lowB = new THREE.ConeGeometry(2.3, 3.4, 7);
+    const lowB = coneHP(2.3, 3.4, 9);
     lowB.translate(0.2, 3.6, -0.12);
-    const midB = new THREE.ConeGeometry(1.75, 2.9, 7);
+    const midB = coneHP(1.75, 2.9, 9);
     midB.translate(-0.16, 5.6, 0.12);
-    const topB = new THREE.ConeGeometry(1.15, 2.6, 7);
+    const topB = coneHP(1.15, 2.6, 9);
     topB.translate(0.05, 7.4, -0.05);
     const larchTiers = [];
     for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
-      const tg = new THREE.ConeGeometry(r, 1.5, 7);      // sparse gappy tiers
+      const tg = coneHP(r, 1.5, 9);      // sparse gappy tiers
       tg.translate(0, y, 0);
       larchTiers.push([tg, lowMat]);
     }
@@ -22496,21 +22525,21 @@ export class Track {
     const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 6);
     birchTrunk.translate(0, 1.8, 0);
     const birchBark = new THREE.MeshStandardMaterial({ color: 0xe6e8e0, roughness: 0.9 });
-    const birchCrown = new THREE.SphereGeometry(1.45, 7, 5);
+    const birchCrown = crownHP(1.45);
     birchCrown.scale(1, 1.3, 1);
     birchCrown.translate(0, 4.7, 0);
-    const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
+    const birchTop = crownHP(0.85, 9, 6);
     birchTop.translate(0.15, 6.1, -0.1);
     // r366c (owner deconstruction board): the POPLAR CLUSTER — a pale slim
     // trunk carrying three separate round crowns at stepped heights, which is
     // the silhouette the board draws between the maples
     const popTallTrunk = new THREE.CylinderGeometry(0.16, 0.24, 5.2, 6);
     popTallTrunk.translate(0, 2.6, 0);
-    const popLow = new THREE.SphereGeometry(1.3, 7, 5);
+    const popLow = crownHP(1.3, 9, 6);
     popLow.translate(0.2, 3.3, 0.1);
-    const popMid = new THREE.SphereGeometry(1.0, 7, 5);
+    const popMid = crownHP(1.0, 9, 6);
     popMid.translate(-0.25, 4.7, -0.1);
-    const popTop = new THREE.SphereGeometry(0.72, 6, 4);
+    const popTop = crownHP(0.72, 8, 5);
     popTop.translate(0.05, 5.9, 0);
     const bareBranch = (rz, tx, ty2, tz) => {
       const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
@@ -22521,16 +22550,16 @@ export class Track {
     // r372 (owner: "Pay attention to the details"): the reference's conifer
     // is a FIR — four spiky tiers stepping in, not two smooth cones. Same
     // trunk, its own tier stack.
-    const firT1 = new THREE.ConeGeometry(2.05, 2.3, 7); firT1.translate(0, 2.6, 0);
-    const firT2 = new THREE.ConeGeometry(1.6, 2.1, 7); firT2.translate(0, 4.1, 0);
-    const firT3 = new THREE.ConeGeometry(1.15, 1.9, 7); firT3.translate(0, 5.5, 0);
-    const firT4 = new THREE.ConeGeometry(0.65, 1.7, 6); firT4.translate(0, 6.9, 0);
-    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
+    const firT1 = coneHP(2.05, 2.3, 9); firT1.translate(0, 2.6, 0);
+    const firT2 = coneHP(1.6, 2.1, 9); firT2.translate(0, 4.1, 0);
+    const firT3 = coneHP(1.15, 1.9, 9); firT3.translate(0, 5.5, 0);
+    const firT4 = coneHP(0.65, 1.7, 8); firT4.translate(0, 6.9, 0);
+    const oakTrunk = roughen(new THREE.CylinderGeometry(0.42, 0.6, 2.7, 8), 0.05);
     oakTrunk.translate(0, 1.35, 0);
-    const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
+    const oakDome = crownHP(2.35, 11, 8);
     oakDome.scale(1, 0.78, 1);
     oakDome.translate(0, 4.0, 0);
-    const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
+    const oakTop = crownHP(1.4, 9, 6);
     oakTop.translate(0.35, 5.5, 0.2);
     // --- rainforest ---
     // AMAZON RAPIDS was falling through to the default two-pine stand, so the
@@ -22542,20 +22571,20 @@ export class Track {
     const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 6);   // flared root flare
     kapokButtress.translate(0, 1.2, 0);
     // emergents are flat-topped: the crown spreads sideways above the canopy
-    const kapokCrown = new THREE.SphereGeometry(3.5, 9, 5);
+    const kapokCrown = crownHP(3.5, 11, 7);
     kapokCrown.scale(1, 0.42, 1);
     kapokCrown.translate(0, 9.1, 0);
-    const kapokCrown2 = new THREE.SphereGeometry(2.2, 8, 5);
+    const kapokCrown2 = crownHP(2.2, 10, 6);
     kapokCrown2.scale(1, 0.5, 1);
     kapokCrown2.translate(0.9, 8.2, -0.6);
     const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 6);
     cecTrunk.translate(0, 2.7, 0);
-    const cecCrown = new THREE.SphereGeometry(2.5, 8, 5);          // parasol
+    const cecCrown = crownHP(2.5, 10, 6);          // parasol
     cecCrown.scale(1, 0.5, 1);
     cecCrown.translate(0, 5.9, 0);
     const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 6);
     fernTrunk.translate(0, 0.95, 0);
-    const fernFrond = new THREE.SphereGeometry(1.55, 7, 4);
+    const fernFrond = crownHP(1.55, 9, 5, 0.18);   // fronds are the raggedest
     fernFrond.scale(1, 0.34, 1);
     fernFrond.translate(0, 2.35, 0);
     const SPECIES = {
