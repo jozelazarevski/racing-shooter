@@ -2562,6 +2562,11 @@ const THEMES = {
       sheen: 'rgba(235,250,255,0.5)', gleam: 'rgba(255,255,255,0.75)',
     },
     puddleCount: 5,
+    // r368: three EXTRA fog banks over VIZ_TUNE's one — the winter chapter's
+    // aurora hint delivered as weather, not a sky shader. Declared on `viz`
+    // because that is the channel _buildVizZones actually consumes (the
+    // vizZoneSpec key mistfell carries is read by nothing).
+    viz: [['fogbank', 4]],
   },
   // AMAZON RAPIDS: dense deep-green jungle — layered canopies close over a
   // dark mud road, rivers cross beneath it, humid haze hangs low.
@@ -2948,6 +2953,9 @@ const THEMES = {
     },
     puddleCount: 8,
     fallHazard: { kind: 'icicle', period: 6, dmg: 16 }, // hazard spec (lead implements)
+    // r368: three EXTRA fog banks over VIZ_TUNE's one — see the glacial note;
+    // `viz` is the live channel, vizZoneSpec is dormant.
+    viz: [['fogbank', 4]],
   },
   // AVALANCHE ALLEY: narrow high pass — dramatic hand-shaped climb with a long
   // downhill final third, multi-ramp jumps. Hazard contract: chase wall.
@@ -6325,6 +6333,9 @@ const PEAK_STYLE = {
 };
 const SCREE_THEMES = new Set(['alpine', 'pass', 'tremola', 'furka',
   'canyon', 'ravine', 'volcano', 'avalanche']);
+// r368: the winter chapter — the four themes that get the winter dressing
+// pass (the autumn r365/r366 treatment translated into snow and ice).
+const WINTER_THEMES = new Set(['snow', 'glacial', 'sheetice', 'avalanche']);
 
 // How many decorative side-road junctions each RURAL world gets (city, ice
 // and cliff-walled worlds get none). A theme can override via T.crossroads.
@@ -11801,6 +11812,7 @@ export class Track {
     this._buildHuts(m4);
     this._buildTrackside(m4);
     if (this.T.season === 'AUTUMN') this._buildAutumnDressing();   // r365
+    if (WINTER_THEMES.has(this.level && this.level.theme)) this._buildWinterDressing();   // r368
     if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
@@ -16784,6 +16796,282 @@ export class Track {
         const spot = this._trackSidePos(14, 44);
         if (spot) put(spot.x, spot.z, 0.8 + Math.random() * 0.35);
       }
+    }
+  }
+
+  /* ---- r368 · WINTER DRESSING ------------------------------------------
+   * The autumn chapter got its season furnished in r365/r366; the winter
+   * worlds get the same treatment translated into snow and ice, under the
+   * same rules: everything instanced or tiny, everything outside the 4 u
+   * band (§7.3), every mass that could stop a car registered in this.solids
+   * (the Law of Solidity), ankle-high scatter visual-only. Per theme:
+   *   all four         — snowdrift banks along the verges, two raven flights
+   *   snow / avalanche — frozen ponds off-track, ice-crusted boulder clusters
+   *   glacial/sheetice — ice shard clusters (their aurora hint is the extra
+   *                      fog banks on the theme's `viz` declaration)
+   *   avalanche        — snapped-tree debris beside the slide path */
+  _buildWinterDressing() {
+    const theme = this.level?.theme;
+    this._buildRavenFlights();
+    this._buildSnowdriftBanks();
+    if (theme === 'snow' || theme === 'avalanche') {
+      this._buildFrozenPonds();
+      this._buildIcedBoulders();
+    }
+    if (theme === 'glacial' || theme === 'sheetice') this._buildIceShards();
+    if (theme === 'avalanche') this._buildSnappedTrees();
+  }
+
+  /** Snowdrift banks along the verges: the leaf-drift pattern in white — low
+   *  mounds where the wind (or the plough) would actually bank them, each
+   *  stretched along a random axis so it reads as a drift and not a scoop of
+   *  ice cream. The tint carries a faint blue shadow, because a pure-white
+   *  lump on a near-white snowfield vanishes. Shin-high and drive-through by
+   *  nature: a drift of powder is not a wall. */
+  _buildSnowdriftBanks() {
+    const COUNT = 60;
+    const G = new THREE.ConeGeometry(1.5, 0.34, 9);
+    G.translate(0, 0.13, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), COUNT);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(0.8, 3.6);
+      if (!spot) continue;
+      const sc = 0.7 + Math.random() * 1.1;
+      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+      pos.set(spot.x, spot.y, spot.z);
+      scl.set(sc * (1.5 + Math.random() * 0.9), sc * 0.8, sc);
+      m.compose(pos, q, scl);
+      im.setMatrixAt(n, m);
+      const b = 0.05 + Math.random() * 0.06;             // the blue in the shade
+      im.setColorAt(n, col.setRGB(1 - b * 1.6, 1 - b * 0.8, 1));
+      n++;
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Two raven flights in slow circles over the course — the rook machinery
+   *  verbatim (the `animated.rooks` update loop is theme-agnostic), with
+   *  near-black birds in a slightly looser V. Against a snowfield a dark
+   *  wingspan is the highest-contrast moving thing in the world, which is
+   *  the whole point of flying them here. */
+  _buildRavenFlights() {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x16130f, side: THREE.DoubleSide });
+    const wingG = new THREE.PlaneGeometry(0.98, 0.28);
+    for (let f = 0; f < 2; f++) {
+      const flock = new THREE.Group();
+      for (let b = 0; b < 9; b++) {
+        const bird = new THREE.Group();
+        for (const sd of [-1, 1]) {
+          const w = new THREE.Mesh(wingG, mat);
+          w.position.x = sd * 0.44;
+          w.rotation.set(-0.35, sd * 0.4, sd * 0.28);
+          bird.add(w);
+        }
+        const k = Math.ceil(b / 2), sd = b % 2 ? -1 : 1;
+        bird.position.set(sd * k * 2.0, -k * 0.14, -k * 2.4);
+        flock.add(bird);
+      }
+      const ci = this.center[(Math.random() * N) | 0];
+      this.group.add(flock);
+      this.animated.rooks.push({
+        g: flock, cx: ci.x, cz: ci.z,
+        r: 130 + Math.random() * 130,
+        h: 38 + Math.random() * 22,
+        a: Math.random() * Math.PI * 2,
+        dir: Math.random() < 0.5 ? -1 : 1,
+        y: null,
+      });
+    }
+  }
+
+  /** Frozen ponds off-track: flat hexagonal ice discs, 8–14 u across, pale
+   *  blue-white over a darker rim so the pond has a readable shoreline
+   *  instead of a white-on-white edge. A pond only exists where water could
+   *  stand, so each candidate is gradient-tested the way the windmill tests
+   *  its ground — tighter, because a disc on a slope shows daylight under
+   *  one edge. Visual only: sheet ice you can drive across is scenery. */
+  _buildFrozenPonds() {
+    const iceMat = new THREE.MeshStandardMaterial({
+      color: 0xdceef8, roughness: 0.25, flatShading: true,
+    });
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x8aa6ba, roughness: 0.9, flatShading: true,
+    });
+    const WANT = 3 + ((Math.random() * 2) | 0);
+    let built = 0;
+    for (let tries = 0; tries < 40 && built < WANT; tries++) {
+      const r = 4 + Math.random() * 3;                   // 8–14 u across
+      const p = this._trackSidePos(r + 14, 64);
+      if (!p || (this._inWater && this._inWater(p.x, p.z))) continue;
+      let lo = this.terrainHeight(p.x, p.z), hi = lo, ok = true;
+      for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r],
+        [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7]]) {
+        const h = this.terrainHeight(p.x + dx, p.z + dz);
+        lo = Math.min(lo, h); hi = Math.max(hi, h);
+        if (hi - lo > 0.4) { ok = false; break; }
+      }
+      if (!ok) continue;
+      // the rim seats around the low edge and the ice rides just above it,
+      // so nothing shows an underside; where the ground runs a little higher
+      // it laps over the sheet, which is what a snowed-in shoreline does
+      const yaw = Math.random() * Math.PI;
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.1, r * 1.12, 0.5, 6), rimMat);
+      rim.position.set(p.x, lo, p.z);
+      const ice = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.16, 6), iceMat);
+      ice.position.set(p.x, lo + 0.2, p.z);
+      ice.rotation.y = rim.rotation.y = yaw;
+      ice.receiveShadow = true;
+      this.group.add(rim, ice);
+      built++;
+    }
+  }
+
+  /** Ice-crusted boulder clusters: the autumn boulder-cluster pattern with a
+   *  white crust seated on every stone, exactly the way the theme's own rock
+   *  scatter wears its T.rockSnowCap. Twos to fours, walked off each other's
+   *  shoulders, and every one a collider — a boulder under ice is still a
+   *  boulder. */
+  _buildIcedBoulders() {
+    const CL = 8;
+    const G = new THREE.DodecahedronGeometry(0.9, 0);
+    const rocks = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      CL * 4);
+    const caps = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xf2f6fa, roughness: 0.9, flatShading: true }),
+      CL * 4);
+    const base = new THREE.Color(this.T.rockColor ?? 0x9aa6b0);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < CL; c++) {
+      const spot = this._autumnSpot(2.5, 18);
+      if (!spot) continue;
+      const many = 2 + ((Math.random() * 3) | 0);
+      let ox = 0, oz = 0;
+      for (let k = 0; k < many; k++) {
+        const x = spot.x + ox, z = spot.z + oz;
+        const sc = k === 0 ? 1.3 + Math.random() * 1.1 : 0.7 + Math.random() * 0.9;
+        const sy = sc * (0.72 + Math.random() * 0.2);
+        const y = this.terrainHeight(x, z);
+        eu.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.5);
+        q.setFromEuler(eu);
+        pos.set(x, y + 0.55 * sc, z);
+        scl.set(sc, sy, sc);
+        m.compose(pos, q, scl);
+        rocks.setMatrixAt(n, m);
+        const tone = 0.84 + Math.random() * 0.28;
+        rocks.setColorAt(n, col.copy(base).multiplyScalar(tone));
+        // the crust: a flattened copy riding the top facets, sharing the
+        // boulder's rotation so it sits ON the stone rather than through it
+        pos.set(x, y + 0.55 * sc + sy * 0.45, z);
+        scl.set(sc * 0.8, sy * 0.4, sc * 0.8);
+        m.compose(pos, q, scl);
+        caps.setMatrixAt(n, m);
+        n++;
+        this.solids.push({ x, z, r: 0.85 * sc, y: y + 0.5 * sc, mat: 'stone' });
+        // walk the next boulder off the last one's shoulder
+        const a2 = Math.random() * Math.PI * 2;
+        ox += Math.cos(a2) * (1.1 + sc * 0.8);
+        oz += Math.sin(a2) * (1.1 + sc * 0.8);
+      }
+      this._addShadow(spot.x, spot.z, 2.2, spot.y);
+    }
+    rocks.count = caps.count = n;
+    rocks.castShadow = true;
+    this.group.add(rocks, caps);
+  }
+
+  /** Ice shard clusters: pale-blue crystal spikes in threes — the toadstool
+   *  cluster pattern at winter scale. No transparency: at this art scale
+   *  translucency is a colour, not a blend mode (a blended mesh would also
+   *  buy a sort against the snow layer on phones). Shards tall enough to
+   *  gut a car (over 1.4 u) register a solid; the small ones are scenery. */
+  _buildIceShards() {
+    const CL = 12, PER = 3;
+    const G = new THREE.ConeGeometry(0.3, 1, 6);
+    G.translate(0, 0.5, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, flatShading: true }),
+      CL * PER);
+    const cols = [0xcfe8f6, 0xb8dcf0, 0xdff2fc, 0xa8d2ea];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < CL; c++) {
+      const spot = this._autumnSpot(1.6, 16);
+      if (!spot) continue;
+      for (let k = 0; k < PER; k++) {
+        const x = spot.x + (Math.random() - 0.5) * 2.4;
+        const z = spot.z + (Math.random() - 0.5) * 2.4;
+        const hgt = 1.0 + Math.random() * 0.8;
+        const y = this.terrainHeight(x, z);
+        // grown, not planted: each spike leans its own way off vertical
+        eu.set((Math.random() - 0.5) * 0.5, Math.random() * Math.PI * 2,
+          (Math.random() - 0.5) * 0.5);
+        q.setFromEuler(eu);
+        pos.set(x, y - 0.06, z);
+        scl.set(0.7 + Math.random() * 0.5, hgt, 0.7 + Math.random() * 0.5);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        im.setColorAt(n, col.setHex(cols[(Math.random() * cols.length) | 0]));
+        n++;
+        if (hgt > 1.4) this.solids.push({ x, z, r: 0.45, y: y + hgt * 0.5, mat: 'stone' });
+      }
+      this._addShadow(spot.x, spot.z, 1.1, spot.y);
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Snapped-tree debris beside the slide path: fallen trunks lying at
+   *  shallow angles, half-buried in the snow, each with the stump it broke
+   *  from and the pale broken core showing at the butt. The one theme where
+   *  the mountain itself is the antagonist, so the wreckage it leaves is
+   *  the dressing. Trunks and stumps are solid: a downed tree stops a car
+   *  in any season. */
+  _buildSnappedTrees() {
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x5a4028, roughness: 1, flatShading: true,
+    });
+    const coreMat = new THREE.MeshStandardMaterial({ color: 0xc8b088, roughness: 1 });
+    const COUNT = 3 + ((Math.random() * 2) | 0);
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(2.2, 14);
+      if (!spot) continue;
+      const len = 5.5 + Math.random() * 2.5;
+      // lie the trunk roughly along the verge: the spot test clears its
+      // CENTRE of the 4 u band, and a 7 u log dropped crosswise would poke
+      // its far end straight back in
+      const c0 = this.center[spot.i], c1 = this.center[(spot.i + 2) % N];
+      const ang = Math.atan2(c1.x - c0.x, c1.z - c0.z) + (Math.random() - 0.5) * 0.6;
+      const g = new THREE.Group();
+      const trunkG = new THREE.CylinderGeometry(0.26, 0.36, len, 7);
+      trunkG.rotateX(Math.PI / 2);                       // axis along local z
+      const trunk = new THREE.Mesh(trunkG, trunkMat);
+      trunk.rotation.x = 0.05 + Math.random() * 0.08;    // the shallow tilt
+      trunk.position.y = 0.16;                           // half-buried
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 7), coreMat);
+      core.rotation.x = Math.PI / 2;
+      core.position.set(0, 0.22, -len / 2 - 0.02);       // the break face
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.9, 7), trunkMat);
+      const stx = 0.8 + Math.random() * 0.8, stz = -len / 2 - 0.6;
+      stump.position.set(stx, 0.35, stz);
+      trunk.castShadow = stump.castShadow = true;
+      g.add(trunk, core, stump);
+      g.position.set(spot.x, spot.y, spot.z);
+      g.rotation.y = ang;
+      this.group.add(g);
+      this._addShadow(spot.x, spot.z, len * 0.35, spot.y);
+      this.solids.push({ x: spot.x, z: spot.z, r: 0.5, y: spot.y + 0.2, mat: 'wood' });
+      const sx = spot.x + Math.sin(ang) * stz + Math.cos(ang) * stx;
+      const sz = spot.z + Math.cos(ang) * stz - Math.sin(ang) * stx;
+      this.solids.push({ x: sx, z: sz, r: 0.4, y: this.terrainHeight(sx, sz) + 0.4, mat: 'wood' });
     }
   }
 
