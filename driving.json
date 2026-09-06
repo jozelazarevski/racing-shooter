@@ -23,7 +23,7 @@
   "csAssistSlipMin": 0.22,
   "spinSlipAngle": 1.13,
   "driftScrubCap": 2.1,
-  "driftReward": 0.5,
+  "driftReward": 0.15,
   "driftYawAssist": 0.85,
   "driftBetaMax": 1.0,
   "driftBetaEase": 6,
@@ -217,5 +217,6 @@
       0
     ],
     "firstClearCr": 600
-  }
+  },
+  "driftForwardScrub": 0.5
 }

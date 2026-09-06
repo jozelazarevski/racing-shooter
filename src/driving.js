@@ -82,7 +82,8 @@ export const DRIVING = {
   // the held-drift laws. Measured before: a 2 s handbrake drift at 70 km/h
   // yawed the nose 52° while scrubbing 70 -> 2 km/h — all slide, no turn.
   driftScrubCap: 2.1,        // × budget kinetic ceiling WITH the handbrake (unloaded tyres); 4.4 otherwise
-  driftReward: 0.5,          // slice of scrubbed slide returned as forward speed while held (0.35 free)
+  driftReward: 0.15,         // r379: slice of scrubbed slide returned as forward speed while held (0.35 free); 0.5 made drifts FASTER than entry
+  driftForwardScrub: 0.5,    // r379: forward speed lost per second at full slip with the handbrake held — a drift costs real speed
   driftYawAssist: 0.85,      // rad/s of rotation help toward the steer, 15°-65° slip, handbrake held
   // r341 (owner, on r340: "Drift is spinning the car way too much"): a held
   // drift HOLDS its angle. Measured (tools-scratch/driftspin.mjs): while the

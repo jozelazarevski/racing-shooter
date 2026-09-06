@@ -2505,9 +2505,25 @@ export class Car {
     vl -= Math.sign(vl) * Math.min(Math.abs(vl), aScrub * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into
     // forward speed — a bigger slice while the handbrake is deliberately
-    // held, so a drift carries its momentum through the corner
-    const reward = inputs.drift ? (DRIVING.driftReward ?? 0.5) : 0.35;
+    // held, so a drift carries its momentum through the corner.
+    // r379: the slice shrank 0.5 -> 0.15 — at 0.5 the reward handed back
+    // half of everything the slide cost and a drift ended FASTER than the
+    // corner entry ("drifting without any slowdowns").
+    const reward = inputs.drift ? (DRIVING.driftReward ?? 0.15) : 0.35;
     if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * reward * (vf >= 0 ? 1 : -1));
+    // r379 (owner: "When I drift I need to slow down significantly — now
+    // I'm drifting without any slowdowns"): a sideways tyre scrubs ENERGY,
+    // not just lateral velocity, and nothing above ever taxed forward
+    // speed. A held handbrake pays driftForwardScrub of itself per second
+    // scaled by slip (~70 -> ~40 km/h over a 1.5 s slide); a slide the car
+    // fell into WITHOUT the button (kept slip past 0.55) pays a reduced
+    // rate, so committed grip-cornering (ambient slip well under 0.55) and
+    // the FT1-FT6 feel floor stay untouched.
+    const driftSlip = inputs.drift ? this.slip
+      : Math.max(0, this.slip - 0.55) * 1.4;
+    if (driftSlip > 0.05 && !this.airborne) {
+      vf -= vf * (DRIVING.driftForwardScrub ?? 0.5) * driftSlip * dt;
+    }
 
     // ---- IN THE AIR THERE ARE NO TYRES ----
     //
