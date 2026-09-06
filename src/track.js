@@ -6379,6 +6379,19 @@ const CARPET_THEMES = new Set(['forest', 'deepwood', 'autumnwood', 'harvestvale'
   'flume', 'alpine', 'pass', 'tremola', 'furka', 'dolomiti', 'avalanche',
   'snow', 'glacial', 'jungle', 'redwood', 'mountainsea']);
 const NEON_THEMES = new Set(['neon', 'undercity']);
+// r378 (owner): "Mountain passes need to have at least 1200m climbing
+// difference. Olive and vine yards at least 500m vertical difference."
+// Minimum route elevation RANGE (max y - min y) per theme, in world units
+// (1 u = 1 m). Applied in the constructor right after the elevation
+// profile: worlds short of their mandate get a pass-shaped climb added —
+// valley at the start line, one summit opposite. A world's tune can
+// override with `minElevRange` (0 disables).
+const ELEV_MANDATE = {
+  alpine: 1200, pass: 1200, tremola: 1200, furka: 1200,
+  avalanche: 1200, dolomiti: 1200,
+  vineyard: 500, olivecountry: 500, medterrace: 500, sanremo: 500,
+  liguria: 500, aegean: 500, brava: 500, dalmatia: 500, azur: 500,
+};
 // r368: the winter chapter — the four themes that get the winter dressing
 // pass (the autumn r365/r366 treatment translated into snow and ice).
 const WINTER_THEMES = new Set(['snow', 'glacial', 'sheetice', 'avalanche']);
@@ -6777,6 +6790,58 @@ export class Track {
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
     for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
+    // r378 THE VERTICAL MANDATE (owner: passes >= 1200 m of climbing
+    // difference, olive and vine country >= 500 m). The octave profile tops
+    // out around +-27 u, two orders short. Worlds whose theme carries a
+    // mandate get a PASS added under their existing profile: a C1-smoothed
+    // triangle — flat valley through the start line, one summit at half
+    // distance — with quadratic caps (a = 0.16 of the lap each side) so the
+    // grade is a steady ~2R/L through the climb instead of spiking at the
+    // corners. At ROUTE_SCALE 4 that is ~38% for a 1200 m pass: steep,
+    // arcade, and inside the 35-degree wheel-drive cap (§3.3). The octave
+    // profile rides on top as texture. Applied BEFORE the editor sculpt and
+    // the coast lift, so a sea-side olive world still keeps its corniche
+    // freeboard on top of the climb.
+    {
+      const mand = T.minElevRange ?? ELEV_MANDATE[level && level.theme];
+      if (mand) {
+        let lo = Infinity, hi = -Infinity;
+        for (let i = 0; i < N; i++) {
+          const y = this.center[i].y;
+          if (y < lo) lo = y; if (y > hi) hi = y;
+        }
+        if (hi - lo < mand) {
+          this._elevMandate = mand;
+          // damp the octave texture first: stacked raw on the 38% ramp it
+          // spiked local grades to 48-52% (measured on SERPENTINA/SUMMIT);
+          // at 0.45 the character survives and the climb stays a climb
+          for (let i = 0; i < N; i++) this.center[i].y *= 0.45;
+          lo *= 0.45; hi *= 0.45;
+          const a2 = 0.16, m2 = 1 / (1 - a2);
+          const S = (t2) => t2 <= a2 ? m2 * t2 * t2 / (2 * a2)
+            : t2 >= 1 - a2 ? 1 - m2 * (1 - t2) * (1 - t2) / (2 * a2)
+              : m2 * (t2 - a2 / 2);
+          const need = mand - (hi - lo);
+          for (let i = 0; i < N; i++) {
+            const u = i / N;
+            this.center[i].y += need * S(1 - Math.abs(2 * u - 1));
+          }
+          // "at least" means AT LEAST: the octave texture can shave the
+          // summit, so measure the result and stretch to the mandate exactly
+          let lo2 = Infinity, hi2 = -Infinity;
+          for (let i = 0; i < N; i++) {
+            const y = this.center[i].y;
+            if (y < lo2) lo2 = y; if (y > hi2) hi2 = y;
+          }
+          if (hi2 - lo2 < mand) {
+            const k2 = mand / Math.max(1, hi2 - lo2);
+            for (let i = 0; i < N; i++) {
+              this.center[i].y = lo2 + (this.center[i].y - lo2) * k2;
+            }
+          }
+        }
+      }
+    }
     // THE SCULPT MOVES THE ROAD TOO.
     //
     // "The road is the floor" clamps the GROUND to the road, so an editor
@@ -7830,7 +7895,11 @@ export class Track {
       Math.sin(x * 0.0042 + 0.9) * Math.cos(z * 0.0039 - 0.4) * 0.55 +
       Math.sin(x * 0.0091 - 2.1) * Math.cos(z * 0.0084 + 1.3) * 0.30 +
       Math.sin(x * 0.0180 + 4.2) * Math.cos(z * 0.0165 + 2.7) * 0.15;
-    const massif = t * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+    // r378: a mandated pass climbs a MOUNTAIN, not a stilt-ridge — the
+    // highland rises with the route's vertical mandate (half its range) so
+    // the summit road runs through high country instead of above it
+    const hAmp = this._elevMandate ? Math.max(68, this._elevMandate * 0.5) : 68;
+    const massif = t * hAmp * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
     return scale * (massif + this._rimWall(x, z));
   }
 

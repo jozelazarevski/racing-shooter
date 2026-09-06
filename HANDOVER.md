@@ -4171,6 +4171,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r378 — THE VERTICAL MANDATE (owner: passes >= 1200 m, olive/vine >= 500 m)
+
+"Mountain passes need to have at least 1200m climbing difference. Olive
+and vine yards at least 500m vertical difference." Implemented as a
+per-theme minimum route elevation RANGE (ELEV_MANDATE: the six
+alpine-family themes at 1200; vineyard + the eight olive-coast themes at
+500; a tune's `minElevRange` overrides, 0 disables). The octave profile
+tops out around +-27 u — two orders short — so a mandated world gets a
+PASS added under its profile in the constructor: C1-smoothed triangle,
+flat valley through the start line, summit at half distance, quadratic
+caps (a=0.16) so the climb is a steady ~2R/L grade (~38% for 1200 m at
+ROUTE_SCALE 4 — steep, arcade, inside the 35-degree wheel-drive cap).
+The octave texture is damped x0.45 first (raw it spiked grades to 48-52%,
+measured), and a final measure-and-stretch guarantees "at least" exactly.
+Applied BEFORE the editor sculpt and coast lift, so sea-side olive worlds
+keep their corniche freeboard on top of the climb. _highland rises with
+the mandate (amp = max(68, mand/2)) so the summit road runs through high
+country instead of on a stilt-ridge.
+
+Verified: SERPENTINA/SUMMIT range 1200, OLIVE COAST/VINEYARD VELOCE 500,
+worlds build clean. Watch item: pass lap times will run past the 5-minute
+median (crawling a 38% climb is slower than the flat median the r376
+scale was sized on) — per-world routeScale is the lever if the owner
+wants those laps shorter.
+
 ## r377 — THE FOREST FLOOR (owner's mockup: their own r373 frame, re-imagined)
 
 The owner sent their 13:52 LARCH GOLD screenshot back as a lush concept

@@ -23,7 +23,7 @@ git checkout main && git merge claude/agent-driver-tracks-4d3jve \
   && git push origin main && git checkout claude/agent-driver-tracks-4d3jve
 for i in $(seq 1 40); do
   t=$(curl -s "https://jozelazarevski.github.io/racing-shooter/index.html?nocache=$RANDOM" | grep -o 'build-tag">r[0-9]*')
-  if [ "$t" = 'build-tag">r377' ]; then echo "LIVE: r377"; exit 0; fi
+  if [ "$t" = 'build-tag">r378' ]; then echo "LIVE: r378"; exit 0; fi
   sleep 15
 done
 echo "DEPLOY-TIMEOUT last=$t"; exit 1
