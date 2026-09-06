@@ -4171,6 +4171,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r383 — PATCH_02 v3 FIX-3: THE START GATE ALWAYS STANDS, AND THE "ORPHANS" WERE THE VOID
+
+B-6 (floating start banner, R11 0:00): `_buildStartGate`'s scaffold towers
+bail per side when no seat with margin >= 0.3 exists — correct on
+crossing-start worlds where a tower would stand in another carriageway —
+but the banner and crossbar build unconditionally at y0+9, so a bailed
+side left the strip hanging from nothing. Now a `towered` set records
+which sides got scaffolds, and every un-towered side gets a slim grounded
+verge post (Cylinder 0.24/0.3, at widthAt(0)+1.6 outside the lane, footed
+at min(y0, terrain), top at the crossbar). Mesh-only per the r167
+no-collider rule for gate furniture. Verified: RED CENTRE RUN (a
+documented tower-bail world) shows exactly two posts rising
+ground-to-crossbar; GLACIER COL keeps its full 8-leg scaffolds (its
+"floating strip" in R11 is the portrait crop hiding the ±12 u towers).
+
+B-5 (white sphere / white rectangle / green shards, R11 0:14 / 0:28 /
+0:56): a full scene-graph interrogation of GLACIER COL (dbg-orphans:
+every mesh's geometry, material, map, world position, hover over
+terrain) finds NO orphaned billboards. Every candidate resolves to a
+deliberate, textured, grounded object: the "green shards" are the health
+pickup's emissive cross plus its additive halo (gameplay, on the road by
+design); the "white sphere" is the shield pickup's boss / paired
+pengWhite snow-scenery spheres (grounded, the hover is body height); the
+"white rectangles" are sponsor boards carrying bannerTexture maps on
+posts, span-clearance-gated since r198. What R11 actually filmed is the
+pre-r380 terrain patch: the fixed ±1000 u ground ended long before the
+mandate-scale route did, so correctly-placed pickups and boards stood
+over UNDRAWN VOID and read as floating garbage — the same defect family
+as the LARCH GOLD road-over-void screenshot, cured in r380 when
+PATCH_HALF learned the route extent. Nothing to delete; deleting the
+"shards" would delete the health pickups. Pickup hover re-checked against
+§7.12: every pickup sits at road height (the 0.5–1.2 u terrain gap is
+the road slab, not a float).
+
+Gates: boot, stagerules, nothing-floats (GLACIER COL 0/2015 floating,
+positive control detects a deliberate 6 u lift), dbg-gate66 post census.
+
 ## r382 — PATCH_02 v3 FIX-1/2: THE RACE IS A RACE AGAIN
 
 FIX-1 (A-1/A-2, measured end to end): the rival LOOKAHEAD was denominated
