@@ -4171,6 +4171,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r375 — TWENTY TIMES THE TREES (owner: "Add 20x more trees")
+
+Delivered through the INSTANCED CARPET, not the solid belt. The solid
+gameplay trees (treeCount) carry colliders, the accept gate, the
+tree-in-carriageway census and the AI clamps — 20x those is a physics and
+suite bill, not art. The carpet is pure GPU: _buildForestCarpet is now two
+LOD rings totalling ~40,000 trees per world (near ring 8,000 two-cone trees
+at 45-190 u; far ring 32,000 single 5-sided cones at 190-640 u, open-ended
+— nobody ever sees a base cap), four draw calls, roughly 450k tris. And it
+now runs on EVERY forested theme via CARPET_THEMES (forest, deepwood,
+autumnwood, harvestvale, flume, the alpine family, dolomiti, avalanche,
+snow, glacial, jungle, redwood, mountainsea), with a per-theme crown
+palette: autumn keeps its red/gold split, larch country gets spruce+gold,
+snow worlds get frost-dusted crowns, jungle goes full green. Deliberately
+excluded: mistfell (the moor is treeless BY DESIGN), deserts, neon,
+streets, and the Mediterranean terrace coast — a spruce sea behind olive
+terraces is wrong, not rich. Roster arithmetic: a forest world went from
+~1,500 drawn trees to ~42,000 (28x); LARCH GOLD from ~6,000 to ~42,000
+(7x); across the forested roster the average lands near the asked 20x.
+The r373 seating law (lowest footprint corner, base at origin) is kept in
+the shared ring placer — that is what keeps 40,000 trees out of
+nothing-floats.
+
+A world's tune can size its own carpet: `forestCarpet: { near: N, far: N }`
+(true = defaults).
+
 ## r374 — HIGH-POLY TREES (owner: "Add more high poly definition to the trees")
 
 The mixed-stand species were bare primitives: cones with 6-8 sides and ONE

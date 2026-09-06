@@ -6364,6 +6364,13 @@ const SCREE_THEMES = new Set(['alpine', 'pass', 'tremola', 'furka',
 // dune crests, saltbush, bleached bones, sandstone clusters, and termite
 // mounds where the outback earns them; the neon worlds get roadside light.
 const DESERT_THEMES = new Set(['dunes', 'desert', 'oasis', 'outback', 'savanna', 'canyon', 'ravine']);
+// r375 (owner: "Add 20x more trees"): every FORESTED theme gets the far-field
+// carpet, not just autumnwood. Moors (mistfell), deserts, streets, and the
+// Mediterranean terrace coast stay out — a spruce sea behind olive terraces
+// or a deliberately treeless moor would be wrong, not rich.
+const CARPET_THEMES = new Set(['forest', 'deepwood', 'autumnwood', 'harvestvale',
+  'flume', 'alpine', 'pass', 'tremola', 'furka', 'dolomiti', 'avalanche',
+  'snow', 'glacial', 'jungle', 'redwood', 'mountainsea']);
 const NEON_THEMES = new Set(['neon', 'undercity']);
 // r368: the winter chapter — the four themes that get the winter dressing
 // pass (the autumn r365/r366 treatment translated into snow and ice).
@@ -11857,7 +11864,8 @@ export class Track {
     if (WINTER_THEMES.has(this.level && this.level.theme)) this._buildWinterDressing();   // r368
     if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
     if (DESERT_THEMES.has(this.level && this.level.theme)) this._buildDesertDressing();   // r369
-    if (this.T.forestCarpet) this._buildForestCarpet();   // r372
+    if (this.T.forestCarpet
+      || CARPET_THEMES.has(this.level && this.level.theme)) this._buildForestCarpet();   // r372/r375
     if (NEON_THEMES.has(this.level && this.level.theme)) this._buildNeonDressing();       // r369
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
@@ -16428,46 +16436,72 @@ export class Track {
    *  at an invisible fence. Far scenery: no colliders (the near field's
    *  trees and solids already own everything reachable at speed). */
   _buildForestCarpet() {
-    const COUNT = 4200;   // r372b: 2600 read as dots on amber, not a carpet
-    // r373: bases AT the origin, not 0.7 u above it — the r372 offsets scaled
-    // with the tree and hung 850 cones over the ground (nothing-floats LAW 3)
-    const lo = new THREE.ConeGeometry(1.9, 3.4, 6); lo.translate(0, 1.7, 0);
-    const hi = new THREE.ConeGeometry(1.15, 2.6, 6); hi.translate(0, 3.9, 0);
-    // two draw calls (lower and upper cone), one matrix per tree in each —
-    // cheap enough that merging isn't worth a util this file doesn't have
-    const meshes = [lo, hi].map((g2) => new THREE.InstancedMesh(g2,
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
-      COUNT));
+    // r375 (owner: "Add 20x more trees"): the carpet is now the bulk of the
+    // forest — two LOD rings totalling ~40,000 instanced trees per world, on
+    // every CARPET_THEMES world. The near ring keeps the two-cone silhouette;
+    // the far ring is a single open-ended cone (no base cap, nobody ever sees
+    // one) so forty thousand trees stay a four-draw-call, sub-500k-tri bill.
+    // Solid gameplay trees (treeCount) are untouched: they carry colliders,
+    // censuses and AI clamps, and 20x THOSE would be a physics bill, not art.
+    const theme = (this.level && this.level.theme) || '';
+    const spec = (typeof this.T.forestCarpet === 'object' && this.T.forestCarpet) || {};
+    // per-theme crown palette — roll < cut ? spruce : accent (a third band
+    // keeps autumn's red/gold split)
+    const paint = (col) => {
+      const roll = Math.random();
+      if (theme === 'autumnwood' || theme === 'harvestvale') {
+        if (roll < 0.55) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
+        else if (roll < 0.8) col.setHSL((0.985 + Math.random() * 0.05) % 1, 0.62, 0.26 + Math.random() * 0.08);
+        else col.setHSL(0.075 + Math.random() * 0.03, 0.7, 0.32 + Math.random() * 0.08);
+      } else if (theme === 'snow' || theme === 'glacial') {
+        if (roll < 0.6) col.setHSL(0.35 + Math.random() * 0.03, 0.25, 0.10 + Math.random() * 0.06);
+        else col.setHSL(0.40 + Math.random() * 0.03, 0.14, 0.48 + Math.random() * 0.14);
+      } else if (theme === 'jungle' || theme === 'redwood') {
+        col.setHSL(0.30 + Math.random() * 0.09, 0.5, 0.13 + Math.random() * 0.14);
+      } else if (SCREE_THEMES.has(theme) || theme === 'avalanche' || theme === 'dolomiti') {
+        if (roll < 0.7) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
+        else col.setHSL(0.075 + Math.random() * 0.035, 0.65, 0.30 + Math.random() * 0.09);
+      } else {
+        if (roll < 0.7) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
+        else col.setHSL(0.24 + Math.random() * 0.05, 0.42, 0.22 + Math.random() * 0.09);
+      }
+    };
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
-    let n = 0;
-    for (let tries = 0; tries < COUNT * 3 && n < COUNT; tries++) {
-      const a2 = Math.random() * Math.PI * 2;
-      const r2 = 45 + Math.random() * Math.random() * 540;
-      const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
-      // 30, not 42: the old ring left a bare no-man's-land between the
-      // playable belt (out to ~85 u along the road) and the carpet start —
-      // exactly the empty amber band the owner's reference does not have
-      if (this._distToTrack(x, z) < 30) continue;
-      if (this._underwater && this._underwater(x, z)) continue;
-      const sc = 1.1 + Math.random() * 1.6;
-      // r373: seat on the LOWEST corner of the footprint, not the centre —
-      // a wide cone on a hillside hung its downhill edge 2 to 3 u in the air
-      const fr = 1.9 * sc;
-      let y = this.terrainHeight(x, z);
-      y = Math.min(y, this.terrainHeight(x + fr, z), this.terrainHeight(x - fr, z),
-        this.terrainHeight(x, z + fr), this.terrainHeight(x, z - fr));
-      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
-      pos.set(x, y - 0.35, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
-      m.compose(pos, q, scl);
-      const roll = Math.random();
-      if (roll < 0.55) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
-      else if (roll < 0.8) col.setHSL((0.985 + Math.random() * 0.05) % 1, 0.62, 0.26 + Math.random() * 0.08);
-      else col.setHSL(0.075 + Math.random() * 0.03, 0.7, 0.32 + Math.random() * 0.08);
-      for (const mesh of meshes) { mesh.setMatrixAt(n, m); mesh.setColorAt(n, col); }
-      n++;
-    }
-    for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
+    const mat = () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+    // ring: geometries share matrices; placement rejects the playable belt
+    // and water, and seats each tree on the LOWEST corner of its footprint
+    // (r373 — centre sampling hung downhill edges in the air)
+    const ring = (geos, count, r0, r1, scMin, scRange) => {
+      const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
+      let n = 0;
+      for (let tries = 0; tries < count * 3 && n < count; tries++) {
+        const a2 = Math.random() * Math.PI * 2;
+        const r2 = r0 + Math.random() * Math.random() * (r1 - r0);
+        const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
+        if (this._distToTrack(x, z) < 30) continue;
+        if (this._underwater && this._underwater(x, z)) continue;
+        const sc = scMin + Math.random() * scRange;
+        const fr = 1.9 * sc;
+        let y = this.terrainHeight(x, z);
+        y = Math.min(y, this.terrainHeight(x + fr, z), this.terrainHeight(x - fr, z),
+          this.terrainHeight(x, z + fr), this.terrainHeight(x, z - fr));
+        eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+        pos.set(x, y - 0.35, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
+        m.compose(pos, q, scl);
+        paint(col);
+        for (const mesh of meshes) { mesh.setMatrixAt(n, m); mesh.setColorAt(n, col); }
+        n++;
+      }
+      for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
+    };
+    // near ring: the two-cone tree, bases AT the origin (r373)
+    const lo = new THREE.ConeGeometry(1.9, 3.4, 6, 1, true); lo.translate(0, 1.7, 0);
+    const hi = new THREE.ConeGeometry(1.15, 2.6, 6, 1, true); hi.translate(0, 3.9, 0);
+    ring([lo, hi], spec.near ?? 8000, 45, 190, 1.1, 1.6);
+    // far ring: one 5-sided cone, scaled up so it still reads at 600 u
+    const fg = new THREE.ConeGeometry(1.8, 4.6, 5, 1, true); fg.translate(0, 2.3, 0);
+    ring([fg], spec.far ?? 32000, 190, 640, 1.3, 1.9);
   }
 
   /** r369 (owner: "Iterate on the design richness") — DESERT DRESSING.
