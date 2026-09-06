@@ -12,12 +12,12 @@ p.on('pageerror', (e) => console.log('PAGEERR', String(e).slice(0, 120)));
 await p.goto(`${BASE}/?level=${LEVEL}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
   undefined, { timeout: 300000 });
-await p.evaluate(async (CAM2) => {
+await p.evaluate(async ({ CAM2, IDX }) => {
   const g = window.__game;
   g.clock.getDelta = () => 1 / 60;
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
   g.camMode = CAM2;
-  g.player.placeAt(120, 0);
+  g.player.placeAt(IDX, 0);
   // drive properly so the camera settles into the mode: steer at the line
   const t = g.track, N = t.center.length;
   for (let f = 0; f < 420; f++) {
@@ -31,7 +31,7 @@ await p.evaluate(async (CAM2) => {
     g.input.analog.throttle = 0.5;
     g.frame();
   }
-}, CAM);
+}, { CAM2: CAM, IDX: +(process.env.IDX ?? 120) });
 await p.screenshot({ path: OUT, timeout: 120000 });
 console.log('saved', OUT);
 await browser.close();

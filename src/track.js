@@ -2238,7 +2238,8 @@ const THEMES = {
     // trees (material color multiplies per-instance HSL variation)
     // r367 (owner: "Add thick forests"): was 641 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1400, trunkColor: 0x6b4423,
+    treeCount: 2000, trunkColor: 0x6b4423,  // r368: "The roads are all deserted" — was 1400
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
     treeSnowCap: false,
@@ -2324,7 +2325,8 @@ const THEMES = {
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
     // r367 (owner: "Add thick forests"): was 592 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1050, trunkColor: 0x5a4028,
+    treeCount: 1400, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 1050
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -2471,7 +2473,8 @@ const THEMES = {
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
     // r367 (owner: "Add thick forests"): was 690 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1150, trunkColor: 0x6b4423,
+    treeCount: 1600, trunkColor: 0x6b4423,  // r368: "The roads are all deserted" — was 1150
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
     foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -2531,7 +2534,8 @@ const THEMES = {
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
     // r367 (owner: "Add thick forests"): was 345 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 600, trunkColor: 0x5a4028,
+    treeCount: 800, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 600
+    treeBelt: [13, 70],   // r368: the stand starts at the verge, not 15 u past it
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -2604,7 +2608,8 @@ const THEMES = {
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
     vegetation: 'jungle', // r367 (owner: "Add thick forests"): was 789 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1350, trunkColor: 0x7a5c3a,
+    treeCount: 1800, trunkColor: 0x7a5c3a,  // r368: "The roads are all deserted" — was 1350
+    treeBelt: [12, 80],   // r368: at the verge (see the halfWidth+1.7 note)
     foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
     foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
     treeSnowCap: false,
@@ -2786,7 +2791,8 @@ const THEMES = {
     hillColor: 0x3f6e34, peakColor: 0x8a8578,
     vegetation: 'redwood', // r367 (owner: "Add thick forests"): was 468 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 850, trunkColor: 0x7a3f24,
+    treeCount: 1150, trunkColor: 0x7a3f24,  // r368: "The roads are all deserted" — was 850
+    treeBelt: [12, 90],   // r368: the stand starts at the verge, not 15 u past it
     foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
     foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
     treeSnowCap: false,
@@ -2825,7 +2831,8 @@ const THEMES = {
     hillColor: 0x4e7a3c, peakColor: 0x8d8578,
     // r367 (owner: "Add thick forests"): was 592 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1150, trunkColor: 0x6b4423,
+    treeCount: 1600, trunkColor: 0x6b4423,  // r368: "The roads are all deserted" — was 1150
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -2874,7 +2881,8 @@ const THEMES = {
     hillColor: 0x54291c, peakColor: 0x2e1812,
     vegetation: 'burnt', // r367 (owner: "Add thick forests"): was 542 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 850, trunkColor: 0x241d18,
+    treeCount: 1150, trunkColor: 0x241d18,  // r368: "The roads are all deserted" — was 850
+    treeBelt: [12, 85],   // r368: at the verge (see the halfWidth+1.7 note)
     foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
     foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
     treeSnowCap: false,
@@ -2985,7 +2993,8 @@ const THEMES = {
     hillColor: 0xcfdce4, peakColor: 0xf4f8fc,
     // r367 (owner: "Add thick forests"): was 323 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 620, trunkColor: 0x5a4028,
+    treeCount: 850, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 620
+    treeBelt: [12, 75],   // r368: the stand starts at the verge, not 15 u past it
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -3202,7 +3211,8 @@ const THEMES = {
     hillColor: 0x557a4e, peakColor: 0xe4edf4,
     // r367 (owner: "Add thick forests"): was 789 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1250, trunkColor: 0x6b4423,
+    treeCount: 1700, trunkColor: 0x6b4423,  // r368: "The roads are all deserted" — was 1250
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x276634, foliageTop: 0x3d9444,
     foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
     treeSnowCap: false,
@@ -3269,7 +3279,8 @@ const THEMES = {
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
     // r367 (owner: "Add thick forests"): was 542 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 900, trunkColor: 0x6b4423,
+    treeCount: 1300, trunkColor: 0x6b4423,  // r368: "The roads are all deserted" — was 900
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2a6636, foliageTop: 0x428a48,
     foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
     treeSnowCap: false,
@@ -3335,7 +3346,8 @@ const THEMES = {
     hillColor: 0x8a9a84, peakColor: 0xf2f7fb,           // green-grey rock, snow crowns
     // r367 (owner: "Add thick forests"): was 740 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1100, trunkColor: 0x5a4028,
+    treeCount: 1500, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 1100
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -3435,7 +3447,7 @@ const THEMES = {
     // FLORA. Olive/cypress/cork oak/umbrella pine — see _buildOliveGrove.
     // r367 (owner: "Add thick forests"): was 510 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 700, trunkColor: 0x8a7a5e,               // grey olive wood
+    treeCount: 850, trunkColor: 0x8a7a5e,               // grey olive wood  // r368: "The roads are all deserted" — was 700
     foliageLow: 0x6e7a4e, foliageTop: 0x8f9a6c,         // foliage mid → silvered
     // hue 0.21 s 0.22: the olive band. Saturation stays under the 55 % ceiling
     // the checklist sets for foliage (R02).
@@ -3545,7 +3557,7 @@ const THEMES = {
     hillColor: 0x4e6e38, peakColor: 0x8a9a78,
     // r367 (owner: "Add thick forests"): was 900 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1100, trunkColor: 0x6b4a28,
+    treeCount: 1300, trunkColor: 0x6b4a28,  // r368: "The roads are all deserted" — was 1100
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
     treeSnowCap: false,
@@ -3602,7 +3614,7 @@ const THEMES = {
     hillColor: 0x33512c, peakColor: 0x4e6a48,
     // r367 (owner: "Add thick forests"): was 900 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1600, trunkColor: 0x5a4028,
+    treeCount: 2000, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 1600
     // Same product structure as the ground (the r365 product rule): the
     // canopy material multiplies the per-instance HSL tint, and #24522c x a
     // mid tint bottomed out at ~#041f05. Square roots of the designed crowns,
@@ -3659,7 +3671,8 @@ const THEMES = {
     hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
     // r367 (owner: "Add thick forests"): was 900 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 1300, trunkColor: 0x5a4028,
+    treeCount: 1800, trunkColor: 0x5a4028,  // r368: "The roads are all deserted" — was 1300
+    treeBelt: [12, 85],   // r368: at the verge — 12, not 10: the accept gate scales by room past halfWidth+1.7, and these are halfWidth-9 worlds
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -4163,7 +4176,7 @@ const THEMES = {
     // over the tree tier so they sum to 1.0 (checklist R04).
     // r367 (owner: "Add thick forests"): was 740 — density, not distance,
     // per the autumnwood precedent
-    treeCount: 900, trunkColor: 0x6b5a44,
+    treeCount: 1100, trunkColor: 0x6b5a44,  // r368: "The roads are all deserted" — was 900
     foliageLow: 0x35502a, foliageTop: 0x4a6b34,
     foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
     treeSnowCap: false,
@@ -22315,7 +22328,24 @@ export class Track {
       () => {
         let p;
         const belt = T.treeBelt;
-        if (Math.random() < 0.62) p = this._trackSidePos(belt ? belt[0] : 15, belt ? belt[1] : 46);
+        // r368 ("The roads are all deserted"): a theme whose belt STARTS at
+        // the verge means it. The grove pull dragged 70% of every tree 20 u
+        // off the road, so the roadside stayed bare however high the count
+        // went — measured on PINE VALLEY at 2000 trees, still open verges.
+        // Where belt[0] <= 12 the roadside fraction rises and most of those
+        // trees escape the pull; the accept gate still scales every near
+        // tree to the room it actually has, so the camera keeps its lane.
+        const verge = !!(belt && belt[0] <= 12);
+        // ...and the belt being 70+ u deep, a uniform draw puts ~5% of it in
+        // the first 10 u — measured 130 of 2102 trees within 16 u of the
+        // line. Verge themes send four in ten belt trees to a dedicated
+        // near band instead, which is what actually lines a road.
+        if (Math.random() < (verge ? 0.78 : 0.62)) {
+          const nearBand = verge && Math.random() < 0.4;
+          p = nearBand
+            ? this._trackSidePos(belt[0], belt[0] + 10)
+            : this._trackSidePos(belt ? belt[0] : 15, belt ? belt[1] : 46);
+        }
         else {
           const a = Math.random() * Math.PI * 2;
           const r = 80 + Math.random() * 560;
@@ -22325,7 +22355,7 @@ export class Track {
         if (!p) return null;
         // pull toward the nearest grove (70% of trees), and stay out of the
         // clearings - the pull keeps the tree on the same side of the road
-        if (GROVES.length && Math.random() < 0.7) {
+        if (GROVES.length && Math.random() < (verge ? 0.35 : 0.7)) {
           let g2 = null, bd = 1e9;
           for (const G of GROVES) {
             const d2 = Math.hypot(G.x - p.x, G.z - p.z);
