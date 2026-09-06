@@ -4171,6 +4171,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r370 — THE OWNER'S LARCH GOLD REFERENCE ("This is what I want to see")
+
+The reference render decodes to three gaps, all closed:
+
+- **Dark conifers as the forest body.** Pines carried tint 'conifer' but no
+  case handled it, so they fell to the default and wore the theme band —
+  ORANGE pines on the autumn worlds. And a case alone is not enough: the
+  canopy MATERIAL (T.foliageLow, amber in sqrt form) multiplies the tint,
+  so the spruce target is divided through a warm material to survive the
+  product (an r>g guard leaves every green-band world bit-identical).
+  Verified numerically: crown instance [0.20,0.85,0.56] × material #c68954
+  = spruce green, 552 pines on LARCH GOLD.
+- **Mix rebalanced** — autumnwood is conifer-dominant now (pineA 0.30,
+  maple 0.26, larch 0.16, birch 0.14, oak 0.14): green wood, maples
+  burning against it, larches gold — which is also what the world's NAME
+  says.
+- **The stream** — LARCH GOLD tunes `fords: {count: 1}`, which is all the
+  river machinery needs to carve the rocky reach beside the road.
+
+Note for future eyes: the orange stepped cones near the road that looked
+like a failed fix were LARCHES, correctly gold. Measure instance colors,
+not screenshots, when a tint is in question.
+
 ## r369 — DESIGN RICHNESS: THE DESERT LIVES, THE NIGHT GLOWS
 
 Owner: "Iterate on the design richness." Survey round first (chase frames

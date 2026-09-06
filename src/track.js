@@ -558,6 +558,9 @@ export const LEVELS = [
     // the trees ARE the content, and a route that keeps you among them shows
     // the most of it.
     tune: {
+      // r370 (owner reference render): a rocky stream winds beside the road
+      // through the wood — the ford machinery carves the reach and banks
+      fords: { count: 1 }, riverBank: { base: '#6a6252' },
       // A shade denser than the theme, because this is the showcase — the
       // theme moved to 1650 underneath this override (r367), so the number
       // moves with it; 1150 had started quietly THINNING the one world
@@ -6285,7 +6288,7 @@ const FLORA_MIX = {
   // the colours are set. Birch, oak and larch each take a different tint shift
   // in `_buildTrees`, so one amber `foliage` band comes out as pale gold,
   // deep russet and red — a wood, not three thousand orange copies.
-  autumnwood: [['maple', 0.24], ['oak', 0.18], ['birch', 0.22], ['poplar', 0.10], ['larch', 0.18], ['pineA', 0.08]],
+  autumnwood: [['pineA', 0.30], ['maple', 0.26], ['larch', 0.16], ['birch', 0.14], ['oak', 0.14]],   // r370: the owner's reference is dark spruce with maples burning against it
   // orchard country: standards in the fields, a few conifers in the shelter belts
   harvestvale: [['oak', 0.32], ['maple', 0.12], ['birch', 0.22], ['poplar', 0.12], ['larch', 0.10], ['pineA', 0.12]],
   // the moor is nearly treeless, and what stands there is bare or wind-bitten
@@ -22675,6 +22678,25 @@ export class Track {
         });
         // per-tree foliage variation (themed hue band, shifted per species)
         switch (spec.tint) {
+          case 'conifer': { // r370 (owner reference render): a spruce is dark
+            // green in October — it was falling to the default case and
+            // wearing the theme band, which painted the autumn chapter's
+            // pines ORANGE and lost the green-vs-maple contrast the owner's
+            // reference is built on. And the tint alone is not enough: the
+            // canopy MATERIAL multiplies it (T.foliageLow, amber on the
+            // autumn themes), so the target green is divided through a warm
+            // material to survive the product. Green-band worlds hit the
+            // r>g guard false and keep their exact old colours.
+            color.setHSL(0.315 + Math.random() * 0.04, 0.42 + Math.random() * 0.12,
+              0.2 + Math.random() * 0.09);
+            const M = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
+            if (M.r > M.g) {
+              color.setRGB(Math.min(1, color.r / Math.max(0.2, M.r)),
+                Math.min(1, color.g / Math.max(0.2, M.g)),
+                Math.min(1, color.b / Math.max(0.2, M.b)));
+            }
+            break;
+          }
           case 'larch':   // paler, yellow-shifted soft needles
             color.setHSL(F.h - 0.045 + Math.random() * F.hVar, F.s * 0.85,
               Math.min(0.6, F.l + 0.10 + Math.random() * F.lVar)); break;
