@@ -558,8 +558,11 @@ export const LEVELS = [
     // the trees ARE the content, and a route that keeps you among them shows
     // the most of it.
     tune: {
-      // A shade denser than the theme, because this is the showcase.
-      treeCount: 1150,
+      // A shade denser than the theme, because this is the showcase — the
+      // theme moved to 1650 underneath this override (r367), so the number
+      // moves with it; 1150 had started quietly THINNING the one world
+      // whose job is to show the wood off.
+      treeCount: 1800,
       elev: { amp: 11, ph: [0.7, 2.1, 2.6] },
     } },
 
@@ -2228,7 +2231,7 @@ const THEMES = {
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
-    treeCount: 641, trunkColor: 0x6b4423,
+    treeCount: 1400,  // r367 (owner: "Add thick forests") was 641 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
     treeSnowCap: false,
@@ -2312,7 +2315,7 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
-    treeCount: 592, trunkColor: 0x5a4028,
+    treeCount: 1050,  // r367 (owner: "Add thick forests") was 592 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -2457,7 +2460,7 @@ const THEMES = {
     ground: {},   // lush meadow defaults read right at altitude too
     road: {},     // classic dirt rally surface
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
-    treeCount: 690, trunkColor: 0x6b4423,
+    treeCount: 1150,  // r367 (owner: "Add thick forests") was 690 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4423,
     foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
     foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -2515,7 +2518,7 @@ const THEMES = {
       },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
-    treeCount: 345, trunkColor: 0x5a4028,
+    treeCount: 600,  // r367 (owner: "Add thick forests") was 345 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -2581,7 +2584,7 @@ const THEMES = {
       wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
-    vegetation: 'jungle', treeCount: 789, trunkColor: 0x7a5c3a,
+    vegetation: 'jungle', treeCount: 1350,  // r367 (owner: "Add thick forests") was 789 — density, not distance, per the autumnwood precedent trunkColor: 0x7a5c3a,
     foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
     foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
     treeSnowCap: false,
@@ -2761,7 +2764,7 @@ const THEMES = {
       fringe: [48, 110, 36], fringeVar: [30, 46, 22],
     },
     hillColor: 0x3f6e34, peakColor: 0x8a8578,
-    vegetation: 'redwood', treeCount: 468, trunkColor: 0x7a3f24,
+    vegetation: 'redwood', treeCount: 850,  // r367 (owner: "Add thick forests") was 468 — density, not distance, per the autumnwood precedent trunkColor: 0x7a3f24,
     foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
     foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
     treeSnowCap: false,
@@ -2798,7 +2801,7 @@ const THEMES = {
       fringe: [64, 124, 40], fringeVar: [34, 46, 20],
     },
     hillColor: 0x4e7a3c, peakColor: 0x8d8578,
-    treeCount: 592, trunkColor: 0x6b4423,
+    treeCount: 1150,  // r367 (owner: "Add thick forests") was 592 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -2845,7 +2848,7 @@ const THEMES = {
       fringe: [90, 70, 50], fringeVar: [34, 26, 18],    // ash-choked verge
     },
     hillColor: 0x54291c, peakColor: 0x2e1812,
-    vegetation: 'burnt', treeCount: 542, trunkColor: 0x241d18,
+    vegetation: 'burnt', treeCount: 850,  // r367 (owner: "Add thick forests") was 542 — density, not distance, per the autumnwood precedent trunkColor: 0x241d18,
     foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
     foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
     treeSnowCap: false,
@@ -2951,7 +2954,7 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xf4f8fc,
-    treeCount: 323, trunkColor: 0x5a4028,
+    treeCount: 620,  // r367 (owner: "Add thick forests") was 323 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -3166,7 +3169,7 @@ const THEMES = {
       fringe: [70, 118, 50], fringeVar: [34, 46, 24],
     },
     hillColor: 0x557a4e, peakColor: 0xe4edf4,
-    treeCount: 789, trunkColor: 0x6b4423,
+    treeCount: 1250,  // r367 (owner: "Add thick forests") was 789 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4423,
     foliageLow: 0x276634, foliageTop: 0x3d9444,
     foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
     treeSnowCap: false,
@@ -3231,7 +3234,7 @@ const THEMES = {
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
-    treeCount: 542, trunkColor: 0x6b4423,
+    treeCount: 900,  // r367 (owner: "Add thick forests") was 542 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4423,
     foliageLow: 0x2a6636, foliageTop: 0x428a48,
     foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
     treeSnowCap: false,
@@ -3295,7 +3298,7 @@ const THEMES = {
       fringe: [86, 124, 62], fringeVar: [30, 40, 22],
     },
     hillColor: 0x8a9a84, peakColor: 0xf2f7fb,           // green-grey rock, snow crowns
-    treeCount: 740, trunkColor: 0x5a4028,
+    treeCount: 1100,  // r367 (owner: "Add thick forests") was 740 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -3393,7 +3396,7 @@ const THEMES = {
     },
     hillColor: 0x8f9160, peakColor: 0xdcd0b0,           // dry olive hills, limestone tops
     // FLORA. Olive/cypress/cork oak/umbrella pine — see _buildOliveGrove.
-    treeCount: 510, trunkColor: 0x8a7a5e,               // grey olive wood
+    treeCount: 700,  // r367 (owner: "Add thick forests") was 510 — density, not distance, per the autumnwood precedent trunkColor: 0x8a7a5e,               // grey olive wood
     foliageLow: 0x6e7a4e, foliageTop: 0x8f9a6c,         // foliage mid → silvered
     // hue 0.21 s 0.22: the olive band. Saturation stays under the 55 % ceiling
     // the checklist sets for foliage (R02).
@@ -3501,7 +3504,7 @@ const THEMES = {
       fringe: [128, 138, 74], fringeVar: [36, 40, 26],
     },
     hillColor: 0x4e6e38, peakColor: 0x8a9a78,
-    treeCount: 900, trunkColor: 0x6b4a28,
+    treeCount: 1100,  // r367 (owner: "Add thick forests") was 900 — density, not distance, per the autumnwood precedent trunkColor: 0x6b4a28,
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
     treeSnowCap: false,
@@ -3546,7 +3549,7 @@ const THEMES = {
       fringe: [62, 88, 46], fringeVar: [26, 34, 20],
     },
     hillColor: 0x33512c, peakColor: 0x4e6a48,
-    treeCount: 900, trunkColor: 0x5a4028,
+    treeCount: 1600,  // r367 (owner: "Add thick forests") was 900 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x24522c, foliageTop: 0x36703c,
     foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
     treeSnowCap: false,
@@ -3555,7 +3558,7 @@ const THEMES = {
     // beside it - an audit called it '1500 trees and no wood'. Starting at
     // 10.4 puts the trunks at the road edge, and pulling the belt in to 52
     // concentrates the same count into the band you actually drive through.
-    treeBelt: [10.4, 52],
+    treeBelt: [9.5, 72],   // r367: the wood closes over the road
     tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
     bushCount: 416, bushColor: 0x2c5c2c,
     bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
@@ -3596,7 +3599,7 @@ const THEMES = {
       fringe: [96, 128, 66], fringeVar: [30, 40, 22],
     },
     hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
-    treeCount: 900, trunkColor: 0x5a4028,
+    treeCount: 1300,  // r367 (owner: "Add thick forests") was 900 — density, not distance, per the autumnwood precedent trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -4098,7 +4101,7 @@ const THEMES = {
     // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
     // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
     // over the tree tier so they sum to 1.0 (checklist R04).
-    treeCount: 740, trunkColor: 0x6b5a44,
+    treeCount: 900,  // r367 (owner: "Add thick forests") was 740 — density, not distance, per the autumnwood precedent trunkColor: 0x6b5a44,
     foliageLow: 0x35502a, foliageTop: 0x4a6b34,
     foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
     treeSnowCap: false,
