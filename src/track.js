@@ -2270,6 +2270,7 @@ const THEMES = {
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#b8814c', hutGlow: 0.45,
     ground: {
+      ripples: true,   // r369: wind ripples
       base: '#c9a86a', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,0,0,0.04)',
       patchA: 'rgba(160,110,60,0.18)', patchB: 'rgba(235,205,140,0.16)',
       speckA: 'rgba(140,90,50,0.7)', speckB: 'rgba(240,225,190,0.8)', speckCount: 90,
@@ -2641,6 +2642,7 @@ const THEMES = {
     terrainScree: '#c08d50', hutGlow: 0.45,
     ground: {
       base: '#d8b273', bandLight: 'rgba(255,240,200,0.07)', bandDark: 'rgba(150,100,50,0.06)',
+      ripples: true,   // r369: wind ripples on the open sand
       patchA: 'rgba(170,120,60,0.16)', patchB: 'rgba(245,220,160,0.18)',
       speckA: 'rgba(150,100,55,0.7)', speckB: 'rgba(250,235,200,0.8)', speckCount: 80,
     },
@@ -2736,6 +2738,7 @@ const THEMES = {
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#a8813f', hutGlow: 0.45,
     ground: {
+      ripples: true,   // r369: wind ripples
       base: '#b0a266', bandLight: 'rgba(255,245,200,0.05)', bandDark: 'rgba(60,70,20,0.05)',
       patchA: 'rgba(80,120,40,0.20)', patchB: 'rgba(235,215,150,0.16)',
       speckA: 'rgba(120,150,60,0.7)', speckB: 'rgba(250,240,200,0.8)', speckCount: 80,
@@ -4289,6 +4292,7 @@ const THEMES = {
     // stand up out at r > 400
     relief: 0.55, highland: 1, blend: { near: 18, far: 84 },
     ground: {
+      ripples: true,   // r369: wind ripples
       // dark red laterite, stony rather than sandy: patches of bleached dust
       // over it and a heavy dark speckle for the gibber
       base: '#cf8568', bandLight: 'rgba(255,232,200,0.05)', bandDark: 'rgba(112,48,28,0.06)',
@@ -6346,6 +6350,11 @@ const PEAK_STYLE = {
 };
 const SCREE_THEMES = new Set(['alpine', 'pass', 'tremola', 'furka',
   'canyon', 'ravine', 'volcano', 'avalanche']);
+// r369 (design richness): the desert family gets its own dressing pass —
+// dune crests, saltbush, bleached bones, sandstone clusters, and termite
+// mounds where the outback earns them; the neon worlds get roadside light.
+const DESERT_THEMES = new Set(['dunes', 'desert', 'oasis', 'outback', 'savanna', 'canyon', 'ravine']);
+const NEON_THEMES = new Set(['neon', 'undercity']);
 // r368: the winter chapter — the four themes that get the winter dressing
 // pass (the autumn r365/r366 treatment translated into snow and ice).
 const WINTER_THEMES = new Set(['snow', 'glacial', 'sheetice', 'avalanche']);
@@ -11837,6 +11846,8 @@ export class Track {
     if (this.T.season === 'AUTUMN') this._buildAutumnDressing();   // r365
     if (WINTER_THEMES.has(this.level && this.level.theme)) this._buildWinterDressing();   // r368
     if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
+    if (DESERT_THEMES.has(this.level && this.level.theme)) this._buildDesertDressing();   // r369
+    if (NEON_THEMES.has(this.level && this.level.theme)) this._buildNeonDressing();       // r369
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
     // "remove the spectators stand from all races". `_buildGrandstand` was
@@ -16394,6 +16405,234 @@ export class Track {
     }
     im.count = n;
     this.group.add(im);
+  }
+
+  /** r369 (owner: "Iterate on the design richness") — DESERT DRESSING.
+   *  The survey put THE DUNE SERPENT last on the roster for roadside life:
+   *  a bare ribbon over flat sand. Same library as autumn/winter: instanced
+   *  scatter through the shared verge helper, reachable mass solid. */
+  _buildDesertDressing() {
+    const theme = this.level?.theme;
+    this._buildDuneCrests();
+    this._buildSaltbush();
+    this._buildBleachedBones();
+    this._buildSandstoneClusters();
+    if (theme === 'outback' || theme === 'savanna') this._buildTermiteMounds();
+  }
+
+  /** Soft crescent dune banks along the verges — the leaf-drift pattern at
+   *  desert scale, elongated crosswind. Visual only: a sand bank yields. */
+  _buildDuneCrests() {
+    const COUNT = 80;   // r369b: 46 read as pebbles from the driving seat
+    const G = new THREE.ConeGeometry(2.6, 0.9, 9);
+    G.translate(0, 0.32, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), COUNT);
+    const base = new THREE.Color(this.T.terrainHigh ?? '#e8cc8a');
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(1.2, 9);
+      if (!spot) continue;
+      const sc = 1.2 + Math.random() * 2.2;   // r369b: dune-bank scale, not anthill
+      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+      pos.set(spot.x, spot.y, spot.z);
+      scl.set(sc * (1.6 + Math.random() * 1.4), sc * 0.6, sc);
+      m.compose(pos, q, scl);
+      im.setMatrixAt(n, m);
+      im.setColorAt(n, col.copy(base).multiplyScalar(0.9 + Math.random() * 0.2));
+      n++;
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Saltbush: low silver-sage domes in loose pairs — the desert's bush,
+   *  where the theme's own bushCount is spent on the far field. */
+  _buildSaltbush() {
+    const COUNT = 96;   // r369b
+    const G = new THREE.SphereGeometry(0.55, 7, 5);
+    G.scale(1, 0.62, 1);
+    G.translate(0, 0.3, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), COUNT);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT / 2; k++) {
+      const spot = this._autumnSpot(1.5, 14);
+      if (!spot) continue;
+      for (let j = 0; j < 2 && n < COUNT; j++) {
+        const x = spot.x + (Math.random() - 0.5) * 3;
+        const z = spot.z + (Math.random() - 0.5) * 3;
+        const sc = 0.7 + Math.random() * 1.0;
+        eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+        pos.set(x, this.terrainHeight(x, z), z); scl.set(sc, sc, sc);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        col.setHSL(0.18 + Math.random() * 0.06, 0.18 + Math.random() * 0.1,
+          0.42 + Math.random() * 0.12);
+        im.setColorAt(n, col);
+        n++;
+      }
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Sun-bleached bones by the road — a skull-and-ribs vignette is the one
+   *  prop that says DESERT from a moving car. Eight per world, visual only
+   *  (bone is smaller than the pebbles the car already ignores). */
+  _buildBleachedBones() {
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xeee6d4, roughness: 0.9, flatShading: true });
+    for (let k = 0; k < 8; k++) {
+      const spot = this._autumnSpot(1.4, 12);
+      if (!spot) continue;
+      const g = new THREE.Group();
+      if (Math.random() < 0.5) {
+        // a longhorn skull: dome + muzzle + two out-curved horn cones
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.26, 7, 5), boneMat);
+        dome.position.y = 0.22;
+        const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.3), boneMat);
+        muzzle.position.set(0, 0.14, 0.24);
+        g.add(dome, muzzle);
+        for (const sd of [-1, 1]) {
+          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.55, 5), boneMat);
+          horn.position.set(sd * 0.38, 0.3, 0);
+          horn.rotation.z = sd * -1.9;
+          g.add(horn);
+        }
+      } else {
+        // a ribcage half-sunk in the sand: five arcs falling in size
+        for (let r = 0; r < 5; r++) {
+          const rib = new THREE.Mesh(new THREE.TorusGeometry(0.34 - r * 0.03, 0.035, 5, 8, Math.PI), boneMat);
+          rib.position.set(0, 0.05, r * 0.22);
+          rib.rotation.z = Math.PI;
+          rib.rotation.x = Math.PI;
+          g.add(rib);
+        }
+      }
+      g.position.set(spot.x, spot.y, spot.z);
+      g.rotation.y = Math.random() * Math.PI * 2;
+      this.group.add(g);
+      this._addShadow(spot.x, spot.z, 0.6, spot.y);
+    }
+  }
+
+  /** Sandstone outcrop clusters — the boulder-cluster pattern in the
+   *  theme's own rock tones. Solid, like every reachable mass. */
+  _buildSandstoneClusters() {
+    const CL = 7;
+    const G = new THREE.DodecahedronGeometry(0.9, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), CL * 4);
+    const base = new THREE.Color(this.T.rockColor ?? 0xc09058);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let c = 0; c < CL; c++) {
+      const spot = this._autumnSpot(3, 20);
+      if (!spot) continue;
+      const many = 2 + ((Math.random() * 3) | 0);
+      let ox = 0, oz = 0;
+      for (let k = 0; k < many; k++) {
+        const x = spot.x + ox, z = spot.z + oz;
+        const sc = k === 0 ? 1.4 + Math.random() * 1.2 : 0.7 + Math.random() * 0.9;
+        const y = this.terrainHeight(x, z);
+        eu.set(Math.random() * 0.4, Math.random() * Math.PI * 2, Math.random() * 0.4);
+        q.setFromEuler(eu);
+        pos.set(x, y + 0.5 * sc, z);
+        scl.set(sc, sc * (0.6 + Math.random() * 0.25), sc);
+        m.compose(pos, q, scl);
+        im.setMatrixAt(n, m);
+        im.setColorAt(n, col.copy(base).multiplyScalar(0.85 + Math.random() * 0.3));
+        n++;
+        this.solids.push({ x, z, r: 0.85 * sc, y: y + 0.45 * sc, mat: 'stone' });
+        const a2 = Math.random() * Math.PI * 2;
+        ox += Math.cos(a2) * (1.1 + sc * 0.8);
+        oz += Math.sin(a2) * (1.1 + sc * 0.8);
+      }
+      this._addShadow(spot.x, spot.z, 2.4, spot.y);
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** Termite mounds — the outback's standing stones. Tapered rust spires in
+   *  ones and twos; the big ones are solid. */
+  _buildTermiteMounds() {
+    const COUNT = 16;
+    const G = new THREE.ConeGeometry(0.55, 1.7, 6);
+    G.translate(0, 0.82, 0);
+    const im = new THREE.InstancedMesh(G,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), COUNT);
+    const base = new THREE.Color(this.T.terrainDirt ?? '#b8823f');
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(2.5, 18);
+      if (!spot) continue;
+      const sc = 0.6 + Math.random() * 1.1;
+      eu.set((Math.random() - 0.5) * 0.12, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.12);
+      q.setFromEuler(eu);
+      pos.set(spot.x, spot.y, spot.z); scl.set(sc, sc, sc);
+      m.compose(pos, q, scl);
+      im.setMatrixAt(n, m);
+      im.setColorAt(n, col.copy(base).multiplyScalar(0.8 + Math.random() * 0.3));
+      n++;
+      if (sc > 0.85) {
+        this.solids.push({ x: spot.x, z: spot.z, r: 0.5 * sc, y: spot.y + 0.8 * sc, mat: 'stone' });
+      }
+      this._addShadow(spot.x, spot.z, 0.7 * sc, spot.y);
+    }
+    im.count = n;
+    this.group.add(im);
+  }
+
+  /** r369 — NIGHT DRESSING for the neon worlds. The survey frame was neon
+   *  rails over a void: nothing glows between the lines. Roadside light
+   *  posts with coloured heads (MeshBasic burns through the dark, same as
+   *  the tunnel lamps) and a warm pool sprite under each. */
+  _buildNeonDressing() {
+    // r369b: 56 posts with 0.5 u heads vanished into the dark — one dot per
+    // survey frame. Doubled and enlarged, plus a flat glow quad under each
+    // head so the light reads as LIGHT and not as a coloured brick.
+    const COUNT = 110;
+    const postG = new THREE.CylinderGeometry(0.07, 0.1, 4.6, 5);
+    postG.translate(0, 2.3, 0);
+    const headG = new THREE.BoxGeometry(0.8, 1.3, 0.3);
+    headG.translate(0, 4.8, 0);
+    const glowG = new THREE.PlaneGeometry(3.4, 3.4);
+    glowG.rotateX(-Math.PI / 2);
+    glowG.translate(0, 0.06, 0);
+    const posts = new THREE.InstancedMesh(postG,
+      new THREE.MeshStandardMaterial({ color: 0x2a2c34, roughness: 0.6 }), COUNT);
+    const heads = new THREE.InstancedMesh(headG,
+      new THREE.MeshBasicMaterial({ color: 0xffffff }), COUNT);
+    const glows = new THREE.InstancedMesh(glowG,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28,
+        depthWrite: false }), COUNT);
+    const NEON = [0x35e0ff, 0xff4fd8, 0xffc94f, 0x7dff6a];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), col = new THREE.Color();
+    let n = 0;
+    for (let k = 0; k < COUNT; k++) {
+      const spot = this._autumnSpot(1.2, 3.5);
+      if (!spot) continue;
+      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+      pos.set(spot.x, spot.y, spot.z);
+      m.compose(pos, q, one);
+      posts.setMatrixAt(n, m); heads.setMatrixAt(n, m); glows.setMatrixAt(n, m);
+      col.setHex(NEON[(Math.random() * NEON.length) | 0]);
+      heads.setColorAt(n, col);
+      glows.setColorAt(n, col);
+      n++;
+      this.solids.push({ x: spot.x, z: spot.z, r: 0.25, y: spot.y + 2, mat: 'metal' });
+    }
+    posts.count = heads.count = glows.count = n;
+    this.group.add(posts, heads, glows);
   }
 
   /* ---- r365 · AUTUMN DRESSING ------------------------------------------

@@ -846,6 +846,26 @@ export function groundTexture(palette = {}) {
   const t = make(512, 512, (g, w, h) => {
     g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
+    // r369 (design richness): WIND RIPPLES for sand grounds — paired light
+    // crest / dark trough strokes wandering across the tile, the desert's
+    // answer to the mow bands below. A flat sand plane reads as mustard
+    // paint; rippled, it reads as a surface the wind has been at.
+    if (P.ripples) {
+      for (let ry = -8; ry < h + 8; ry += 9 + Math.random() * 5) {
+        const amp = 3 + Math.random() * 4, ph = Math.random() * 9;
+        for (const [dy, style, lw] of [[0, P.rippleLight ?? 'rgba(255,238,196,0.16)', 2.2],
+          [2.6, P.rippleDark ?? 'rgba(120,84,44,0.14)', 1.8]]) {
+          g.strokeStyle = style;
+          g.lineWidth = lw;
+          g.beginPath();
+          for (let x = 0; x <= w; x += 16) {
+            const y = ry + dy + Math.sin(x / 34 + ph) * amp;
+            if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+          }
+          g.stroke();
+        }
+      }
+    }
     // subtle mow bands
     for (let x = 0; x < w; x += 64) {
       g.fillStyle = (x / 64) % 2 === 0 ? P.bandLight : P.bandDark;
