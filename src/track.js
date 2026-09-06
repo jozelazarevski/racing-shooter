@@ -13788,6 +13788,29 @@ export class Track {
     return mx;
   }
 
+  /** r376: A HORIZON MASS MUST STILL CLEAR THE ROAD. "Nothing drives at
+   *  900 u" stopped being true when ROUTE_SCALE reached 4: the lap grew out
+   *  into the skyline rings, and PINE VALLEY's range stood ON the
+   *  carriageway (solids r 127-296 at d 6-10 u — the every-frame return
+   *  trap the scale-4 stall hunt found at idx 111/134/145). Same law the
+   *  massif builder has always enforced, packaged for the radial horizon
+   *  builders: walk the footprint OUTWARD along its own azimuth (the ring
+   *  stays a ring, locally bulged) until it clears every leg of the lap;
+   *  null when eight pushes cannot find room — the caller skips that mass.
+   *  halfW is the SOLID's radius (the collider is the mountain). */
+  _clearOfRoad(x, z, halfW, extra = 26) {
+    for (let pass = 0; pass < 9; pass++) {
+      const s = this._nearestSample(x, z);
+      const need = halfW + (this.widthAt?.(s.i) ?? 9) + extra;
+      if (s.d >= need) return { x, z };
+      if (pass === 8) return null;
+      const rr = Math.hypot(x, z) || 1;
+      const step = need - s.d + 8;
+      x += (x / rr) * step; z += (z / rr) * step;
+    }
+    return null;
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
@@ -22025,9 +22048,14 @@ export class Track {
           const r = rMin + Math.random() * rSpan;
           const h = (hMin + Math.random() * hSpan) * band;
           const w = wMin + Math.random() * wSpan;
-          const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+          let px = Math.cos(a) * r, pz = Math.sin(a) * r;
           if (inSea(px, pz, w)) continue;
           if (this._nearGoat(px, pz, w * 0.6)) continue;  // the climbable peak keeps its sky
+          // r376: the scale-4 lap reaches this ring — walk clear or skip
+          // (0.62 covers the widest footprint the zs roll below can make)
+          const pc = this._clearOfRoad(px, pz, w * 0.62);
+          if (!pc || inSea(pc.x, pc.z, w)) continue;
+          px = pc.x; pz = pc.z;
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
@@ -22182,12 +22210,15 @@ export class Track {
         const w = R.w0 + Math.random() * R.wv;
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
-        const dx = Math.cos(a) * r, dz = Math.sin(a) * r;
-        if (this._nearGoat(dx, dz, w * 0.5)) {           // not on the climbable peak
+        let dx = Math.cos(a) * r, dz = Math.sin(a) * r;
+        // r376: the scale-4 lap reaches this ring — walk clear or hide
+        const dc = this._clearOfRoad(dx, dz, w * 0.48);
+        if (!dc || this._nearGoat(dc.x, dc.z, w * 0.5)) { // not on road or the climbable peak
           m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
           mesh.setMatrixAt(i, m4);
           continue;
         }
+        dx = dc.x; dz = dc.z;
         m4.compose(
           new THREE.Vector3(dx, h / 2 - 6 + this._highland(dx, dz), dz),
           q,
@@ -22231,12 +22262,17 @@ export class Track {
     const towers = new THREE.InstancedMesh(geo, mat, COUNT);
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     let k = 0;
-    const put = (x, z, w, h) => {
-      if (this._nearGoat(x, z, w)) {                    // not on the climbable peak
+    const put = (x0, z0, w, h) => {
+      // r376: the scale-4 lap reaches even the outer tower rings — walk
+      // clear or hide (mid towers already reject <90 u at pick time, but
+      // the walk re-verifies against every leg)
+      const tc = this._clearOfRoad(x0, z0, w * 0.7);
+      if (!tc || this._nearGoat(tc.x, tc.z, w)) {        // not on road or the climbable peak
         m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
         towers.setMatrixAt(k++, m4);
         return;
       }
+      const x = tc.x, z = tc.z;
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(
         new THREE.Vector3(x, -4 + this._highland(x, z), z), q,
@@ -22272,21 +22308,23 @@ export class Track {
   /** Canyon horizon: rings of big flat-topped mesas instead of cone hills. */
   _buildMesaHorizon(m4) {
     const specs = [];
+    // r376: the scale-4 lap reaches both mesa rings — every spec walks
+    // clear of the road (or is dropped) BEFORE tiers and solids build from it
+    const push = (x, z, w, h) => {
+      const mc = this._clearOfRoad(x, z, w * 0.6);
+      if (mc) specs.push({ x: mc.x, z: mc.z, w, h });
+    };
     for (let i = 0; i < 34; i++) {
       const a = (i / 34) * Math.PI * 2 + Math.random() * 0.15;
       const r = 750 + Math.random() * 130;
-      specs.push({
-        x: Math.cos(a) * r, z: Math.sin(a) * r,
-        w: 110 + Math.random() * 130, h: 60 + Math.random() * 60,
-      });
+      push(Math.cos(a) * r, Math.sin(a) * r,
+        110 + Math.random() * 130, 60 + Math.random() * 60);
     }
     for (let i = 0; i < 22; i++) {
       const a = (i / 22) * Math.PI * 2 + 0.13;
       const r = 980 + Math.random() * 150;
-      specs.push({
-        x: Math.cos(a) * r, z: Math.sin(a) * r,
-        w: 160 + Math.random() * 170, h: 95 + Math.random() * 85,
-      });
+      push(Math.cos(a) * r, Math.sin(a) * r,
+        160 + Math.random() * 170, 95 + Math.random() * 85);
     }
     this._addMesaTiers(m4, specs);
     // THE HORIZON MESAS ARE SOLID TOO — same hole as the mountain rings, same
