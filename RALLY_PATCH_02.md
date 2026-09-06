@@ -1,170 +1,145 @@
-# RALLY_PATCH_02.md — Repair Patch v2: AI Line, Grounding, Camera, Physics
+# RALLY_PATCH_02.md — Repair + Track Directive v3
 
-**Status:** NORMATIVE. Supersedes v1 of this document in full.
-**Authority hierarchy:** RALLY_RULES.md > RALLY_WORLD_BIBLE.md > RALLY_PATCH_02.md (this file) > RALLY_PATCH_01.md > RALLY_SYSTEMS.md. On conflict, the higher document wins.
-**Evidence:** R10.MP4, 2:21 run, stage "Harvest Run", seed r379, iPhone Safari portrait. Two analysis passes: 35-frame survey + 71-frame scan with zoom verification.
+**Status:** NORMATIVE. Supersedes v1 and v2 in full.
+**Authority hierarchy:** RALLY_RULES.md > RALLY_WORLD_BIBLE.md > RALLY_PATCH_02.md (this file) > RALLY_PATCH_01.md > RALLY_SYSTEMS.md.
+**Evidence:** R10.MP4 (Harvest Run, 2:21) and R11.MP4 (Glacier Col, 2:14, ended DESTROYED: 3 hulls spent, race not finished, 0 credits). Two-pass frame analysis with zoom verification on both.
 
-## 0. Frozen constraints (MUST NOT violate)
+## 0. Constraints (amended 2026-09-06 by owner directive)
 
 | ID | Constraint |
 |---|---|
 | C-1 | In-race HUD frozen as shipped. No element added, removed, moved, restyled, resized. |
 | C-2 | No new on-screen elements. No world overlays (route lines, arrows, markers). Delete any that exist. |
-| C-3 | World stays fully drivable. No fences, invisible walls, kill zones, or forced respawn for leaving the road. |
-| C-4 | Repair-only. Tuning, fixing, material repair in scope. New content systems out of scope. |
+| C-3 | World stays fully drivable. No invisible walls or kill zones. Physical guardrails are permitted where they already exist as a world element and MUST be breakable. |
+| C-4 | AMENDED: world and track content changes are authorized (track geometry, length, curvature, mountains, snow, scenery bands, valley composition). Repair-only restriction lifted for world/track scope. HUD (C-1) and overlay (C-2) restrictions unchanged. |
 
-## 1. Defect register
+## PART I — Cross-stage defects (evidence from both videos)
 
-### Cluster A — AI opponents (the race is not a race)
+### Cluster A — AI opponents
 
-| ID | t | Observed | Root cause |
+| ID | Evidence | Defect | Root cause |
 |---|---|---|---|
-| A-1 | 0:18 (verified zoom) | Four opponents drive single-file in the ditch beside an empty road on a right curve | AI waypoint spline laterally offset from road mesh by ~1 road-width on curves. Opponents grind off-road drag + trees all lap: explains slow pace, invisibility after 0:30, player P1 while stuck at 2 km/h |
-| A-2 | 0:06, 0:21 | One car crosses the track perpendicular at the finish gate; another drives perpendicular into forest | Spline discontinuity / heading snap at waypoint joins |
-| A-3 | 0:01–0:04 | All 8 cars including player encased in ice on the grid; five opponents overlapping, two pairs interpenetrating | (a) Freeze status applied globally at t=0, likely countdown lock implemented as freeze debuff; (b) grid spawn slots collapsed |
-| A-4 | 0:47 vs 2:10 | Player frozen at 194 km/h (no effect) vs frozen to a standstill | Freeze semantics inconsistent: VFX-only in one path, hard stop in another |
+| A-1 | R10 0:18 (zoom-verified) | Four opponents single-file in the ditch beside an empty road on curves | AI spline laterally offset from road mesh ~1 road-width on curves; AI grinds off-road drag all lap |
+| A-2 | R10 0:06, 0:21 | Cars driving perpendicular to track | Heading snap at waypoint joins |
+| A-3 | R10 0:01–0:04; R11 0:05 | All cars incl. player frozen in ice on the grid; opponents overlapping/interpenetrating | Countdown lock implemented as freeze debuff at t=0; spawn slots collapsed |
+| A-4 | R10 0:47 vs 2:10; R11 0:40 respawn | Freeze inconsistent: no effect at 194 km/h, hard stop elsewhere, respawn delivers player frozen at 12 km/h | Two freeze code paths; respawn applies freeze |
+| A-5 | R11 0:52 | Six AI in one touching blob, bodies clipping; position oscillates 8th→2nd→1st in 4 s | No AI-AI separation/avoidance; convoy target spacing 0 |
 
 ### Cluster B — Object grounding (levitation)
 
-| ID | t | Observed |
+| ID | Evidence | Defect |
 |---|---|---|
-| B-1 | 0:03 | Cabin floats above hillside, visible gap under base |
-| B-2 | 0:42 | Green cube hovering mid-air at terrain edge |
-| B-3 | 1:10 | Supply crates hovering at various heights off road right |
-| B-4 | 1:42 | Distant treeline floats above dune with hard gap (terrain LOD seam) |
-| B-5 | 0:05–0:07 | Black unlit mountain silhouette hanging in sky above horizon, clouds beneath it |
+| B-1 | R10 0:03 | Cabin floating above hillside |
+| B-2 | R10 0:42, 1:10; R11 1:14 | Cubes and crates hovering mid-air |
+| B-3 | R10 1:42 | Distant treeline detached above dune (LOD seam) |
+| B-4 | R10 0:05; R11 1:20 | Black unlit meshes hanging in sky/void |
+| B-5 | R11 0:14, 0:28, 0:56–1:24 | Floating white sphere; white untextured rectangle in sky; persistent translucent green shards hovering over road |
+| B-6 | R11 0:05 | Start gate is a thin checkered strip floating above the road, not a grounded arch |
 
-Root causes: props placed at authored Y without terrain-height raycast on sloped ground; far terrain LOD lacks skirts so treelines detach; distant mountain mesh unlit (renders black) and positioned above the far-plane fog cut.
+Root causes: props placed without terrain raycast; LOD without skirts; unlit distant meshes; orphaned billboard/decal planes (green shards, white rectangle) with broken transforms.
 
 ### Cluster C — Camera and rendering
 
-| ID | t | Observed | Root cause |
-|---|---|---|---|
-| C-A | 0:05–0:07, 2:12–2:20 | DRIVER camera: 60% of portrait frame is raw untextured cockpit geometry (gray band, black planes, raw orange hood) | Cockpit mesh has no material/lighting; driver cam framing not adapted to portrait |
-| C-B | 0:30–0:35, 0:43, 1:07, 1:44 | 4–6 s stretches of blank terrain, car fully off-screen at 143–214 km/h; unseen collision at 0:33 (182→35 km/h) | No framing guarantee on slope transitions; TRAIL anchor drift |
-| C-C | 0:52–1:12, 1:55–2:07 | Screen 70–100% tree geometry up to 12 s continuous | No occlusion fade, no camera collision |
-| C-D | 2:16 | Scene overexposed to near white in driver cam; desert horizon blown white throughout | Exposure/fog luminance unclamped |
+| ID | Evidence | Defect |
+|---|---|---|
+| C-A | R10 0:05, 2:12 | Driver cam: 60% of portrait frame is untextured gray/black/raw-orange cockpit mesh |
+| C-B | R10 0:30–0:35, 1:07; R11 0:03 | Car fully off-screen for 4–6 s stretches; unseen collision at 182 km/h |
+| C-C | R10 0:52–1:12, 1:55–2:07 | Screen 70–100% blocked by tree geometry up to 12 s |
+| C-D | R11 0:32–0:34 | During the cliff fall the camera frames an AI car, not the player |
+| C-E | R10 2:16; both | Overexposure to near-white; blown horizons |
 
 ### Cluster D — Player physics
 
-| ID | t | Observed | Root cause |
-|---|---|---|---|
-| D-A | 1:52–2:06 | Car drives on top of tree canopy; "HIT ROCK −15" while on treetops | Tree colliders are the full foliage cone acting as ramps; trunks not distinctly collidable |
-| D-B | 1:28, 2:00 | Spontaneous sideways launches, all wheels airborne, no ramp (once at 11 km/h) | Collider edge pops on terrain facet seams + cone collider edges; contact offset too small |
-| D-C | 1:50 | Car hovers with daylight under all four wheels on flat sand | Suspension/visual wheel offset mismatch vs collision height |
-| D-D | 1:46–1:48 | Wedged nose-up on dune at 3 km/h, no recovery | No stuck detection wired to existing SOS respawn |
-| D-E | 0:12–1:43 | 202–222 km/h sustained on forest floor and sand | Surface grip/drag undifferentiated |
+| ID | Evidence | Defect |
+|---|---|---|
+| D-A | R10 1:52–2:06 | Car drives on tree canopy (cone colliders act as ramps) |
+| D-B | R10 1:28, 2:00 | Spontaneous sideways launches on flat ground |
+| D-C | R10 1:50 | Car hovers with daylight under all wheels |
+| D-D | R10 1:46; R11 falls | No stuck recovery; cliff fall = instant −300 wreck |
+| D-E | R10 all; R11 climb | Off-road speed = road speed; **no slope physics: 139→201 km/h accelerating up a steep grade (R11 1:14–1:24), 35→123 uphill (0:18–0:24)** |
 
 ### Cluster E — Scoring validity
 
-| ID | t | Observed |
+CRASH+CLEAN PASS same second (R10 0:17); BIG AIR grounded (R10 1:58); ROCK SHOVED CLEAR with no rock (R10 1:06); CLEAN PASS while alone (R10 2:16); score/position jitter both runs.
+
+## PART II — Fixes (execution order in §4)
+
+### FIX-1 (A-1, A-2): AI racing line — P0
+Rebuild AI path from road mesh centerline, 5 m samples, raycast-validated on-road. Per-AI lateral offset ±1.5 m clamped inside road bounds, shrinking with curvature. Max heading delta 25°/segment. validation.spec.ts: any off-road waypoint fails the stage.
+**Accept:** zero AI off-road in a clean lap except combat knock-offs.
+
+### FIX-2 (A-3, A-4, A-5): Grid, freeze, separation — P0
+Countdown = input lock, never freeze debuff; clear all statuses at green. Grid 6 m × 3 m, 2 columns, assert non-overlap. Freeze = 40 km/h cap, ≤ 3 s, one code path; respawn never applies freeze. AI-AI separation: min 2.5 m following distance, lateral avoidance steering; convoy spacing target 8–25 m staggered.
+**Accept:** clean grid start; no interpenetration in 20 laps; field spreads within 30 s.
+
+### FIX-3 (B-1..B-6): Grounding sweep — P0
+Terrain-raycast snap for every static prop at load (base gap ≤ 0.15 m validation). Pickups hover ≤ 0.5 m terrain-relative. LOD skirts for distant treelines. Distant meshes lit, bases below horizon. Delete orphaned billboard planes (green shards, white rectangle, white sphere) — trace their spawner and fix or remove. Start gate: grounded arch posts on both verges.
+**Accept:** replay of every Part I B timestamp shows grounded objects; zero floating shards over any road.
+
+### FIX-4 (C-A..C-E): Camera package — P0
+Driver cam: lit textured cockpit ≤ 20% of frame or remove DRIVER from cycle. Chase: occlusion sphere-cast with foliage fade (0.15 opacity, 120 ms, cap 12), terrain pull-in, camera ≥ 1.2 m above heightfield. Framing guarantee: vehicle inside central 60% of viewport, snap after 200 ms; camera target is ALWAYS the player vehicle, including falls and wreck cinematics. Exposure: fog luminance ≤ 0.85, ≤ 90% pixels above 0.9.
+**Accept:** vehicle visible ≥ 95% of frames on both R10 and R11 routes; player framed throughout a forced cliff fall.
+
+### FIX-5 (D-A..D-C): Colliders and pops — P1
+Trunk capsules (r 0.35 m) replace cone colliders; canopy non-collidable. CCD + raised contact offset on vehicle body. Wheel visual/raycast alignment: rest gap ≤ 0.02 m.
+**Accept:** no canopy mounting, no spontaneous launches in 20 laps, no hover.
+
+### FIX-6 (D-E): Surface AND slope physics — P1
+Surfaces: road 1.00/1.00/1.00; grass 0.85/0.72/1.35; sand 0.80/0.65/1.55; snow 0.75/0.85/1.15 (grip/top-speed/drag), 0.4 s lerp.
+**Slope:** longitudinal gravity in the powertrain: available acceleration = engine acceleration − g·sin(θ) − drag. Normative outcomes: at 10% uphill grade, top speed −25% and acceleration −35% vs flat; at 10% downhill, +15% top speed with engine braking; the car MUST decelerate when grade demand exceeds engine power. No stage may permit gaining speed up a sustained ≥ 8% climb at full throttle above 80% of flat top speed.
+**Accept:** R11 climb replay shows monotonic speed loss on the 1:14–1:24 grade at constant throttle.
+
+### FIX-7 (D-D): Falls, wrecks, recovery — P1
+Cliff fall: −1 hull retained, respawn on road, unfrozen, 3 s invulnerability, camera on player throughout. Stuck detection (< 8 km/h, 6 s, throttle > 0.5, or roll/pitch > 75° for 3 s) auto-invokes existing SOS respawn, 15 s cooldown. Continuous breakable guardrail on any drop > 15 m (C-3-compliant: breakable).
+**Accept:** R11's three-wreck DESTROYED outcome is unreachable by terrain alone in a normal run.
+
+### FIX-8 (E-*): Scoring validity — P2
+CLEAN PASS: opponent within 6 m/15 m, both on-road, no contact ±1.5 s. BIG AIR: all wheels off ≥ 0.7 s, clean landing, ≤ 20 m from road spline. ROCK SHOVED CLEAR: requires rock-collider contact. AI pace (apply LAST, after FIX-1 and FIX-6): leaders 96% / mid 90% / tail 85% of player top speed; rubber-bands +8% (> 150 m behind) / −5% (> 250 m ahead).
+
+## PART III — Track Design Directive (owner-ordered, applies to ALL rally stages)
+
+Applies to every stage in the rally class: Harvest Run, Glacier Col, Alpine Pass, Old Town Night (when built), and any future stage. Existing stages are rebuilt to this spec; RALLY_WORLD_BIBLE.md route sections are updated to match.
+
+### TD-1: Length and curvature
+
+| Parameter | Current (observed) | Normative target |
 |---|---|---|
-| E-1 | 0:17 | "CRASH −19 HULL" and "CLEAN PASS +38" in the same second |
-| E-2 | 1:58 | "BIG AIR +50" with wheels on ground; also awarded mid-forest scramble |
-| E-3 | 1:06, 1:30 | "ROCK SHOVED CLEAR" with no rock visible, deep in forest |
-| E-4 | 2:16 | "CLEAN PASS +38" while alone off-road in driver cam |
+| Lap length | ~2.0–2.5 km (est.) | 4.5 km minimum, 5.5 km target |
+| Corner density | long 10+ s straights | ≥ 7 corners per km |
+| Max straight | > 600 m | 300 m |
+| Hairpins per lap (R 12–20 m) | 0 observed | ≥ 2, stacked on climbs |
+| Medium corners per lap (R 30–60 m) | few | ≥ 6 |
+| Sweepers (R 80–150 m) | some | ≥ 4 |
+| Chicanes per lap | 0 | ≥ 1 |
+| Sustained grades | present, no effect | 6–12%, with crests; slope physics per FIX-6 |
 
-## 2. Fix specifications
+Corner sequencing MUST alternate direction at least every 3 corners; no more than 2 identical-radius corners in a row.
 
-### FIX-1 (A-1, A-2): AI racing line — P0, do this first
+### TD-2: Valley and mountain composition
+1. Every stage gets layered mountain massifs on BOTH sides of the route: 2–3 ridge layers at 300–1500 m, peaks rising above the road's visual horizon from all road positions. The road is never the highest visible geometry.
+2. Cloud sea: permitted only as a layer ≥ 60 m BELOW road edge, only in the high-altitude band, rendered as soft layered planes with depth fade. A flat white plane beside or level with the road is prohibited. The void sections at R11 0:16 and 1:16–1:24 are the reference violation.
+3. Valley floors exist and are visible from edges: terrain, forest carpet, or cloud sea per rule 2 — never untextured void.
 
-1. Rebuild the AI path from the road mesh itself: sample the road centerline at 5 m intervals; every waypoint MUST lie on the road surface (raycast-validated at build time).
-2. Per-AI lateral offset from centerline: random in ±1.5 m, clamped so the full car width stays inside road bounds.
-3. Curve handling: offsets shrink toward 0 as curvature rises; no waypoint heading delta > 25° per segment (kills the perpendicular drivers).
-4. Build-time check in validation.spec.ts: every AI waypoint within road bounds or the stage fails.
+### TD-3: Altitude scenery bands (change of scenery per climb)
+| Band (of stage max altitude) | Scenery |
+|---|---|
+| 0–40% | Valley: dense forest, cabins, meadows (stage-themed) |
+| 40–70% | Treeline: thinning trees, exposed rock, patchy snow on verges |
+| 70–100% | Full snow: snow albedo on shoulders and terrain, snow-dusted trees, snow surface physics (FIX-6), existing snowman props relocated here |
 
-**Acceptance:** Top-down replay of the 0:18 curve shows all AI on the road surface. Zero AI off-road during a clean lap except when knocked off by combat.
+Glacier Col MUST reach band 3 (it is named for a glacier and currently shows zero snow while snowman props sit on grass). Harvest Run may cap at band 2 rock/autumn transition. Band transitions blend over ≥ 150 m of route.
 
-### FIX-2 (A-3, A-4): Start grid and freeze semantics — P0
+### TD-4: Validation
+validation.spec.ts gains: lap-length ≥ 4500 m; corner-density ≥ 7/km; max-straight ≤ 300 m; grade-effect test (constant-throttle speed must fall on ≥ 8% grades); cloud-plane altitude check (≥ 60 m below nearest road edge); band-coverage check per stage.
 
-1. Countdown lock MUST be an input lock, not the freeze status effect. Clear all status effects on every car at green light. No freeze VFX on the grid.
-2. Grid spawn: 6 m longitudinal, 3 m lateral, 2 columns, zero overlap; assert non-intersecting spawn AABBs.
-3. Freeze status, one semantic everywhere: caps speed at 40 km/h for its duration, always shows VFX, always expires ≤ 3 s. Never VFX-only, never a hard stop from speed.
+## 4. Execution order
+1. FIX-1 AI line + FIX-2 grid/freeze/separation
+2. FIX-3 grounding + FIX-4 camera package
+3. FIX-6 slope + surfaces (before any track rebuild, so new geometry is tuned against real physics)
+4. PART III track rebuild: Glacier Col first (worst offender), then Harvest Run, applying TD-1/2/3 to both
+5. FIX-5 colliders, FIX-7 falls/recovery on the rebuilt tracks
+6. FIX-8 scoring + AI pace last
+7. Full regression on rebuilt stages against every acceptance criterion and TD-4 checks
 
-**Acceptance:** Race start shows 8 unfrozen cars in a proper grid. A frozen car at speed visibly decelerates to ≤ 40 km/h within 1 s.
-
-### FIX-3 (B-1..B-5): Object grounding — P0
-
-1. Placement pass: every prop (buildings, crates, cubes, signs, cones, rocks) snaps at load to terrain height at its XZ via raycast, plus per-type embed offset (buildings −0.05 m, crates 0). Slopes: align to surface normal up to 20°, else embed base.
-2. Pickup crates: if intentionally floating as pickups, max hover 0.5 m above terrain, terrain-relative. The crates at 1:10 exceed this; clamp them.
-3. Terrain LOD: add skirt geometry (or bias LOD morph) so distant tree rows never detach from the ground plane (1:42 seam).
-4. Distant mountains: assign the lit stylized material used by near terrain (flat-shaded is fine, black is not) and lower them until bases sit below the visible horizon line from all road positions.
-5. Build-time check: any static prop whose base is > 0.15 m above terrain fails validation.
-
-**Acceptance:** Replay of 0:03, 0:42, 1:10, 1:42 positions shows every object grounded (or crates ≤ 0.5 m); no black shapes above the horizon.
-
-### FIX-4 (C-A): Driver camera repair — P0
-
-1. Assign the cockpit/hood mesh a lit, textured material consistent with the car body. Raw gray/black/unlit is prohibited.
-2. Portrait framing: cockpit geometry MUST occupy ≤ 20% of frame height. Raise/pitch the driver cam or hide the dash mesh in portrait until true.
-3. If neither is achievable this patch, remove DRIVER from the camera cycle (existing control, no HUD change) until repaired.
-
-**Acceptance:** Driver cam at 0:05 and 2:12 positions shows ≥ 80% world, zero untextured surfaces.
-
-### FIX-5 (C-B, C-C): Chase camera guarantees — P0
-
-1. Sphere-cast (r = 0.4 m) camera target → camera each frame. Foliage in the cast fades to opacity 0.15 in 120 ms (dither preferred), restores in 250 ms; cap fade set at 12 trees.
-2. Terrain/rock hits: pull camera in to hit point −0.5 m at ≤ 8 m/s, recover at 3 m/s. Never fade terrain.
-3. Camera Y clamped ≥ 1.2 m above terrain heightfield, all modes.
-4. Framing guarantee: vehicle bounding-sphere center inside central 60% of viewport; blend at ≤ 90°/s; snap after 200 ms violation. TRAIL re-anchors to vehicle transform or is removed from the cycle.
-
-**Acceptance:** Vehicle visible ≥ 95% of frames replaying 0:30–0:35 and 1:55–2:07; never off-screen > 200 ms.
-
-### FIX-6 (D-A, D-B, D-C): Tree colliders and physics pops — P1
-
-1. Remove all foliage-cone colliders. Trees ≥ 2 m get one static trunk capsule, r = 0.35 m, trunk height only. Canopy is non-collidable. (Kills treetop driving and cone-edge launches.)
-2. Trunk impact ≥ 60 km/h: existing debris-hit damage path, −40% speed.
-3. Raise physics contact offset / use continuous collision detection for the vehicle body to stop terrain-seam pops (1:28, 2:00 launches).
-4. Align visual wheel rest position with suspension raycast contact: at rest on flat ground, tire-to-ground gap ≤ 0.02 m (fixes the 1:50 hover).
-
-**Acceptance:** Car cannot mount a canopy; 20 laps produce zero spontaneous airborne events on flat ground; no visible gap under wheels.
-
-### FIX-7 (D-E): Surface differentiation — P1
-
-| Surface | Grip | Top speed | Drag |
-|---|---|---|---|
-| Road | 1.00 | 1.00 | 1.00 |
-| Grass/forest floor | 0.85 | 0.72 | 1.35 |
-| Open sand | 0.80 | 0.65 | 1.55 |
-
-0.4 s lerp between states. This is the C-3-compliant substitute for fences: off-road drivable, honestly slower. Tune AI pace AFTER this and after FIX-1, since AI currently loses most pace to off-road grinding.
-
-**AI pace (apply last):** leaders 96% of player top speed, midfield 90%, tail 85%; forward rubber-band +8% beyond 150 m behind (decay to 0 at 40 m); reverse −5% beyond 250 m ahead (decay at 100 m).
-
-**Acceptance:** Clean on-road run reaches P1 no earlier than 60 s. Leaving the road > 20 s costs ≥ 1 position. ≥ 1 opponent on screen ≥ 30% of an on-road lap.
-
-### FIX-8 (D-D): Stuck recovery — P1
-
-1. Stuck = speed < 8 km/h for 6 s with throttle > 0.5, OR roll/pitch > 75° for 3 s.
-2. Auto-invoke existing SOS respawn routine. No new UI (C-1, C-2). 15 s cooldown.
-
-**Acceptance:** The 1:46 dune wedge self-resolves within 7 s.
-
-### FIX-9 (E-1..E-4): Scoring validity — P2
-
-1. CLEAN PASS: opponent within 6 m lateral / 15 m longitudinal at pass moment, both on-road, no contact ±1.5 s. A crash in the same window voids it.
-2. BIG AIR: all wheels off-ground ≥ 0.7 s, clean landing, within 20 m of road spline. Ground contact at award time = bug; assert against it.
-3. ROCK SHOVED CLEAR: requires actual rock-collider contact event.
-
-**Acceptance:** Zero awards replaying the 0:17 crash-pass, 1:58 grounded big-air, 1:06 phantom rock.
-
-### FIX-10 (C-D): Exposure and fog — P2
-
-1. Fog luminance ceiling 0.85; 3 s blends across region boundaries.
-2. Tonemap clamp: no region renders > 90% of pixels above 0.9 luminance (fixes blown desert and 2:16 whiteout).
-3. Anisotropic ×8 on terrain albedo; road base −12% brightness, rut normals +25% so the road reads at 150 m without overlays (C-2).
-
-## 3. Execution order
-
-1. FIX-1 AI line + FIX-2 grid/freeze (turns it into a race)
-2. FIX-3 grounding + validator rules
-3. FIX-4 driver cam + FIX-5 chase cam
-4. FIX-6 colliders/physics, FIX-7 surfaces then AI pace, FIX-8 stuck
-5. FIX-9 scoring, FIX-10 exposure
-6. Full R10-route regression against every acceptance criterion
-
-## 4. Regression guards
-
-- 60 fps mobile Safari budget holds: trunk capsules are static and batched; occlusion fade capped at 12.
-- validation.spec.ts gains: AI-waypoints-on-road, prop-grounding (≤ 0.15 m), material-resolution (no unlit/untextured), fog-luminance ceiling.
-- No HUD-module file may appear in the diff (C-1).
+## 5. Regression guards
+60 fps mobile Safari budget holds: ridge layers are low-poly silhouettes with baked lighting; cloud sea max 3 planes; trunk capsules static and batched; occlusion fade cap 12. No HUD-module file in the diff (C-1). No overlays introduced by the track rebuild (C-2).

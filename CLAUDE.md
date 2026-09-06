@@ -96,6 +96,10 @@ Open, in priority order. Each row is a repair of observed behaviour.
 
 **3.4a Fatal drops, owner override (r320, recorded r330).** "Should be wrecked at this kind of falls" (phone report, PIKES PEAK shelf). Falls past the damper-priced free band WRECK the car (`fallWreckOver`); §3.4's return-at-apex with no hull change is superseded by that direct request. The under-12 m landing-damage shape and the water rule stand.
 
+**3.4b Fatal drops, owner override v2 (RALLY_PATCH_02 v3 FIX-7, 2026-09-06).** R11 ended DESTROYED from three terrain falls: a cliff fall now costs −1 hull retained, respawns the car on the road unfrozen with 3 s invulnerability, and the camera stays on the player throughout. DESTROYED by terrain alone MUST be unreachable in a normal run. Supersedes 3.4a's full wreck. Breakable physical guardrails are permitted on any drop > 15 m (C-3 as amended: breakable, never invisible).
+
+**Scope amendment (RALLY_PATCH_02 v3 C-4, 2026-09-06).** The repair-only restriction is LIFTED for world and track scope: track geometry, length, curvature, mountains, snow, scenery bands and valley composition may be redesigned per PART III of that document. HUD freeze (recording E) and the no-overlays rule stand unchanged.
+
 **3.7 Landing assist.** For 300 ms after touchdown: lateral velocity blended toward heading at 80% per 100 ms, yaw rate clamped 60[deg]/s, steer honoured, handbrake cancels and preserves the slide.
 
 ---
