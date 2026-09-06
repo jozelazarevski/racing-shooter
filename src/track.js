@@ -9697,7 +9697,10 @@ export class Track {
    *  The lattice is memoized and cleared by `_buildTerrain`, which is the one
    *  place the drawn ground is (re)made. */
   _drawnGroundY(x, z) {
-    const STEP = 10, HALF = 1000, W = 201;
+    // r381: HALF follows the per-world patch size (see _buildTerrain) — the
+    // lattice must reproduce the mesh that is actually drawn, or every
+    // scatter on a wide-footprint world seats against the wrong ground
+    const STEP = 10, HALF = this._patchHalf ?? 1000, W = (HALF * 2) / STEP + 1;
     const gx = (x + HALF) / STEP, gz = (z + HALF) / STEP;
     const i0 = Math.floor(gx), j0 = Math.floor(gz);
     if (!(i0 >= 0 && j0 >= 0 && i0 + 1 < W && j0 + 1 < W)) return null;
@@ -9707,7 +9710,7 @@ export class Track {
       let v = cache.get(k);
       if (v === undefined) {
         const vx = i * STEP - HALF, vz = j * STEP - HALF;
-        const far = Math.max(Math.abs(vx), Math.abs(vz)) > 900;
+        const far = Math.max(Math.abs(vx), Math.abs(vz)) > HALF - 100;
         let h = far ? this._hillNoise(vx, vz) : this._terrainMeshHeight(vx, vz);
         if (far && this.T.coast) h = this._coastDepress(vx, vz, h, 9999);
         if (far && this._delta) h += this._delta.at(vx, vz);
@@ -21348,9 +21351,24 @@ export class Track {
     //
     // Physics is untouched: terrainHeight() is analytic (_blendHeight), it
     // never samples this mesh, so nothing here can move a car.
-    const SIZE = 2000, SEG = 200;
+    // r381 (owner screenshot, 20:54 — "Serious issue": the LARCH GOLD road
+    // riding over brown VOID with the car fallen beside it): the ±1000 u
+    // near patch was sized when "no circuit reaches past ~320 u", and a
+    // ROUTE_SCALE 4 lap wanders past ±1000 — beyond the patch the road ran
+    // over raw far-patch hill noise with no datum blend under it. The near
+    // patch now follows the ROUTE'S OWN FOOTPRINT (10 u cells kept — they
+    // are load-bearing for the road-ribbon cap window); small circuits pay
+    // nothing, the wanderers get the ground they stand on.
+    let ext = 0;
+    for (let i = 0; i < this.center.length; i += 4) {
+      const c = this.center[i];
+      ext = Math.max(ext, Math.abs(c.x), Math.abs(c.z));
+    }
+    const PATCH_HALF = Math.max(1000, Math.ceil((ext + 320) / 100) * 100);
+    this._patchHalf = PATCH_HALF;
+    const SIZE = PATCH_HALF * 2, SEG = SIZE / 10;
     const UNITS_PER_TILE = 87.5;                 // 4200/48 — keep texel density
-    this._buildFarTerrain(4200, 105, UNITS_PER_TILE);
+    this._buildFarTerrain(Math.max(4200, SIZE + 1600), 105, UNITS_PER_TILE);
     // THE WORLD NEVER ENDS ("no white stuff like this ever"): an immense
     // ground-toned disk under everything, far past every camera reach. Any
     // view that outruns the terrain patches - the roam TOP FAR camera at the
@@ -21358,7 +21376,7 @@ export class Track {
     // raw background. Coast worlds' seas draw over it; fog owns the far end.
     {
       const skirt = new THREE.Mesh(
-        new THREE.CircleGeometry(9000, 48),
+        new THREE.CircleGeometry(Math.max(9000, PATCH_HALF * 6), 48),
         new THREE.MeshStandardMaterial({
           color: new THREE.Color(T.terrainLow).lerp(new THREE.Color(T.terrainHigh), 0.4),
           roughness: 1,
@@ -21368,8 +21386,8 @@ export class Track {
       // seat it under the world's true floor: gorges carve to -30, rivers and
       // coasts to -8 - a fixed depth would fill them with a flat wash
       let floor = -3.2 - (T.hillDrop || 0);
-      for (let gx = -1000; gx <= 1000; gx += 80) {
-        for (let gz = -1000; gz <= 1000; gz += 80) {
+      for (let gx = -PATCH_HALF; gx <= PATCH_HALF; gx += 80) {
+        for (let gz = -PATCH_HALF; gz <= PATCH_HALF; gz += 80) {
           floor = Math.min(floor, this.terrainHeight(gx, gz));
         }
       }
@@ -21389,7 +21407,7 @@ export class Track {
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
-      const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
+      const far = Math.max(Math.abs(x), Math.abs(z)) > PATCH_HALF - 100;
       let h = far
         // skip the track-distance falloff far away, but keep the FULL hill
         // noise: dropping octaves here left a visible ±2.4 u step at the 900 u
@@ -21458,6 +21476,7 @@ export class Track {
     });
     this._facetGround(mat, SEG / REPEAT);
     const ground = new THREE.Mesh(geo, mat);
+    ground.name = 'terrain-near';   // r381: suites derive the lattice from this mesh's own parameters
     ground.receiveShadow = true;
     this.group.add(ground);
   }

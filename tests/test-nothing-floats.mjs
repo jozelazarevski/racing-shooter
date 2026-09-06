@@ -159,16 +159,20 @@ await page.evaluate(() => {
     // Found by the near patch's own geometry parameters. The find is REPORTED,
     // not assumed: a probe that matched nothing would score every world as
     // perfectly seated and never say so.
+    // r381: the near patch sizes itself from the route's footprint, so the
+    // suite finds it BY NAME and derives the lattice from the geometry's own
+    // parameters instead of hardcoding 2000/200
     let gm = null;
     t.group.traverse((o) => {
-      if (gm || !o.isMesh || !o.geometry?.parameters) return;
-      const p = o.geometry.parameters;
-      if (p.width === 2000 && p.height === 2000 && p.widthSegments === 200) gm = o;
+      if (gm || !o.isMesh) return;
+      if (o.name === 'terrain-near') gm = o;
     });
     if (!gm) return { patch: 0 };
     gm.updateWorldMatrix(true, false);
     const gp = gm.geometry.attributes.position;
-    const STEP = 10, HALF = 1000, W = 201;
+    const gpp = gm.geometry.parameters;
+    const STEP = gpp.width / gpp.widthSegments, HALF = gpp.width / 2,
+      W = gpp.widthSegments + 1;
     const H = new Float32Array(W * W).fill(NaN);
     {
       const e = gm.matrixWorld.elements;
@@ -386,7 +390,7 @@ await page.evaluate(() => {
         if (gap > worst) { worst = gap; worstSig = p.name; wx = Math.round(p.cx); wz = Math.round(p.cz); }
       }
     }
-    return { patch, parts: parts.length, tested, over, supp,
+    return { patch, patchWant: W * W, parts: parts.length, tested, over, supp,
       worst: +worst.toFixed(2), worstSig, wx, wz,
       rows: [...rows.values()].sort((a, b) => b.worst - a.worst).slice(0, 6)
         .map((r) => ({ ...r, worst: +r.worst.toFixed(2) })) };
@@ -419,10 +423,13 @@ for (const lv of worlds) {
 }
 
 // ---- LAW 1: the instrument works ------------------------------------------
-const noPatch = results.filter((r) => r.patch !== 40401);
+// r381: the patch sizes itself per world, so completeness is measured
+// against the geometry's OWN vertex count, floored at the old 40401
+const noPatch = results.filter((r) => r.patch < 40401 || r.patch !== r.patchWant);
 check('LAW 1  the drawn terrain patch is found and complete on every world',
   noPatch.length === 0,
-  noPatch.length ? noPatch.map((r) => `${r.name} ${r.patch}/40401`).join(', ') : `${results.length} worlds, 40401 vertices each`);
+  noPatch.length ? noPatch.map((r) => `${r.name} ${r.patch}/${r.patchWant}`).join(', ')
+    : `${results.length} worlds, patch complete (40401+ vertices each)`);
 const measured = results.reduce((s, r) => s + r.tested, 0);
 check('LAW 1  and it measured real geometry', measured > 40000, `${measured} column-bottom parts tested roster-wide`);
 for (const k of ['foliage', 'prop', 'banner']) {
