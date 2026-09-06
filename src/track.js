@@ -4405,8 +4405,9 @@ const THEMES = {
   // AUTUMNWOOD: deciduous woodland at peak colour, in raking afternoon light.
   // The dense one — this is the world the season is FOR.
   autumnwood: {
-    fogColor: 0xe8d4b4, fogNear: 190, fogFar: 1100,
+    fogColor: 0xe8d4b4, fogNear: 130, fogFar: 1050,   // r372: the reference's warm depth haze starts earlier
     hemiSky: 0xd8c8a8, hemiGround: 0x6a4c2c, hemiIntensity: 0.86,
+    forestCarpet: true,   // r372: forest to the horizon, not to a fence
     // 2.45, not the 2.7 a summer world runs. A low sun is not a BRIGHT sun,
     // and at 2.7 the warm key washed the leaf-mould ground out to bare sand —
     // the season was in the canopy and nowhere else.
@@ -4463,13 +4464,13 @@ const THEMES = {
     foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
     treeSnowCap: false,
     treeBelt: [9.5, 78],
-    tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
+    tuftCount: 1500, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },   // r372: grass clumps thick along the shoulders
     // undergrowth to match — bare trunks over clean ground is a plantation,
     // and the thing being asked for is a wood
     bushCount: 760, bushColor: 0xbc895d,        // r365: sqrt form
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
     bush2: { h: 0.27, hVar: 0.05, s: 0.55, sVar: 0.1, l: 0.36, lVar: 0.1, frac: 0.35 },   // r366c: still-green undergrowth
-    rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
+    rockCount: 460, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,   // r372: the reference road is LINED with grey stone
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
     hutRoof: 0x5a3020, hayColor: 0xc8a860,
     hutCount: 9, hutZone: [0.9, 0.1], hayCount: 10, hayStyle: 'rect',
@@ -6294,7 +6295,7 @@ const FLORA_MIX = {
   // the colours are set. Birch, oak and larch each take a different tint shift
   // in `_buildTrees`, so one amber `foliage` band comes out as pale gold,
   // deep russet and red — a wood, not three thousand orange copies.
-  autumnwood: [['pineA', 0.30], ['maple', 0.26], ['larch', 0.16], ['birch', 0.14], ['oak', 0.14]],   // r370: the owner's reference is dark spruce with maples burning against it
+  autumnwood: [['fir', 0.34], ['maple', 0.26], ['larch', 0.16], ['birch', 0.12], ['oak', 0.12]],   // r370/r372: dark spiky FIRS with maples burning against them
   // orchard country: standards in the fields, a few conifers in the shelter belts
   harvestvale: [['oak', 0.32], ['maple', 0.12], ['birch', 0.22], ['poplar', 0.12], ['larch', 0.10], ['pineA', 0.12]],
   // the moor is nearly treeless, and what stands there is bare or wind-bitten
@@ -11856,6 +11857,7 @@ export class Track {
     if (WINTER_THEMES.has(this.level && this.level.theme)) this._buildWinterDressing();   // r368
     if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
     if (DESERT_THEMES.has(this.level && this.level.theme)) this._buildDesertDressing();   // r369
+    if (this.T.forestCarpet) this._buildForestCarpet();   // r372
     if (NEON_THEMES.has(this.level && this.level.theme)) this._buildNeonDressing();       // r369
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
@@ -16414,6 +16416,51 @@ export class Track {
     }
     im.count = n;
     this.group.add(im);
+  }
+
+  /** r372 (owner: "It is not looking close... pay attention to the
+   *  details") — THE FOREST CARPET. In the reference the hills are FOREST
+   *  to the horizon; in the build the far field was bare amber with a
+   *  scatter. One InstancedMesh of two-cone trees seats a carpet on the
+   *  highland from just past the playable belt out to the haze, colours
+   *  rolled from the same species proportions the near wood uses, so the
+   *  wood you drive through continues to the skyline instead of stopping
+   *  at an invisible fence. Far scenery: no colliders (the near field's
+   *  trees and solids already own everything reachable at speed). */
+  _buildForestCarpet() {
+    const COUNT = 4200;   // r372b: 2600 read as dots on amber, not a carpet
+    const lo = new THREE.ConeGeometry(1.9, 3.4, 6); lo.translate(0, 2.4, 0);
+    const hi = new THREE.ConeGeometry(1.15, 2.6, 6); hi.translate(0, 4.6, 0);
+    // two draw calls (lower and upper cone), one matrix per tree in each —
+    // cheap enough that merging isn't worth a util this file doesn't have
+    const meshes = [lo, hi].map((g2) => new THREE.InstancedMesh(g2,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      COUNT));
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let n = 0;
+    for (let tries = 0; tries < COUNT * 3 && n < COUNT; tries++) {
+      const a2 = Math.random() * Math.PI * 2;
+      const r2 = 45 + Math.random() * Math.random() * 540;
+      const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
+      // 30, not 42: the old ring left a bare no-man's-land between the
+      // playable belt (out to ~85 u along the road) and the carpet start —
+      // exactly the empty amber band the owner's reference does not have
+      if (this._distToTrack(x, z) < 30) continue;
+      if (this._underwater && this._underwater(x, z)) continue;
+      const y = this.terrainHeight(x, z);
+      const sc = 1.1 + Math.random() * 1.6;
+      eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
+      pos.set(x, y - 0.3, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
+      m.compose(pos, q, scl);
+      const roll = Math.random();
+      if (roll < 0.55) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
+      else if (roll < 0.8) col.setHSL((0.985 + Math.random() * 0.05) % 1, 0.62, 0.26 + Math.random() * 0.08);
+      else col.setHSL(0.075 + Math.random() * 0.03, 0.7, 0.32 + Math.random() * 0.08);
+      for (const mesh of meshes) { mesh.setMatrixAt(n, m); mesh.setColorAt(n, col); }
+      n++;
+    }
+    for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
   }
 
   /** r369 (owner: "Iterate on the design richness") — DESERT DRESSING.
@@ -22464,6 +22511,13 @@ export class Track {
       bg.translate(tx, ty2, tz);
       return [bg, trunkMat];
     };
+    // r372 (owner: "Pay attention to the details"): the reference's conifer
+    // is a FIR — four spiky tiers stepping in, not two smooth cones. Same
+    // trunk, its own tier stack.
+    const firT1 = new THREE.ConeGeometry(2.05, 2.3, 7); firT1.translate(0, 2.6, 0);
+    const firT2 = new THREE.ConeGeometry(1.6, 2.1, 7); firT2.translate(0, 4.1, 0);
+    const firT3 = new THREE.ConeGeometry(1.15, 1.9, 7); firT3.translate(0, 5.5, 0);
+    const firT4 = new THREE.ConeGeometry(0.65, 1.7, 6); firT4.translate(0, 6.9, 0);
     const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
     oakTrunk.translate(0, 1.35, 0);
     const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
@@ -22505,6 +22559,9 @@ export class Track {
         kind: 'cecropia', rFac: 0.8, solidAt: 1.45, tint: 'canopy', tiers: 1 },
       treeFern: { parts: mkParts([fernTrunk, trunkMat], [[fernFrond, topMat]], null),
         kind: 'fern', rFac: 0.5, solidAt: null, tint: 'understorey', tiers: 1 },
+      fir: { parts: mkParts([trunkGeo, trunkMat],
+        [[firT1, lowMat], [firT2, lowMat], [firT3, lowMat], [firT4, topMat]], 8.0),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 4 },
       pineA: { parts: mkParts([trunkGeo, trunkMat], [[lowA, lowMat], [topA, topMat]], 7.35),
         kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 2 },
       pineB: { parts: mkParts([trunkGeo, trunkMat], [[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),

@@ -4171,6 +4171,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r372 — "PAY ATTENTION TO THE DETAILS" (the reference, third pass)
+
+The owner rejected r371 as not close. Root cause of the misjudgment was
+MINE: every "chase" probe frame this session was CAM_MODES[2] — which is
+TRAIL, 26 u up — while the owner plays CHASE, mode 3 at 11.5 u. From the
+real camera the differences were obvious:
+
+- **Forest to the horizon.** The far field was bare amber; the reference
+  carpets every hill. `_buildForestCarpet` (theme flag `forestCarpet`):
+  4200 instanced two-cone trees from ~45 u out to the haze, colours rolled
+  from the near wood's species proportions, clearance 30 u so no bare
+  no-man's-land ring survives between the playable belt and the carpet.
+  Far scenery, no colliders — everything reachable at speed already has
+  its own.
+- **The FIR silhouette** — four spiky stepped tiers, replacing the smooth
+  two-cone pine at the top of the autumnwood mix (0.34).
+- **Verge mass** — rockCount 460, tuftCount 1500 on autumnwood.
+- **Depth haze** — fogNear 190 → 130.
+
+Probe rule for future sessions, learned twice now: CAM=3 is the owner's
+camera. And a bare patch beside the road in ONE frame may be a grove
+CLEARING (they are deliberate); check a second vantage before tuning.
+
 ## r371 — LARCH GOLD 1:1 (owner: "Replicate this 1:1")
 
 Frame-to-frame against the reference, two gaps remained after r370:
