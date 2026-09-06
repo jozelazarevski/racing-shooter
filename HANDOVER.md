@@ -4171,6 +4171,42 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r368 — THE FOREST REACHES THE ROAD, THE TOWER LEAVES IT, THREE AGENTS LAND
+
+**"Add a lot more forest. The roads are all deserted."** Three stacked
+causes, each measured on PINE VALLEY: counts (second raise, seventeen
+themes — the 2x tracks had doubled the road the old numbers spread over);
+the grove pull (70% of every tree dragged 20+ u off the road); and belt
+geometry (a 70 u deep uniform band puts ~5% of trees in the first 10 u,
+and a 10 u belt start sat UNDER the accept gate's halfWidth+1.7 scale
+floor on halfWidth-9 worlds). Verge belts start at 12 u now, keep most of
+their trees out of the grove pull, and send four in ten to a dedicated
+[12, 22] near band. Measured after: 818 trees within 30 u of the line
+(was ~450), 269 within 16 u (was 130), no empty stretch.
+
+**The RED CENTRE tower (owner photo)** was the start gate's scaffold — on
+a start the lap crosses back past, the r253 outward walk has no clearing
+candidate and used to build the least-bad tower inside the other
+carriageway with its collider dropped. A tower whose best margin is under
+0.3 u is simply not built now; TOUR DE CORSE's documented 0.00 u grid-box
+scaffold retires with it.
+
+**Three parallel worktree agents merged**: the garage metallic re-skin
+(CSS-only, frozen HUD untouched); the roster albedo audit (ONE offender —
+deepwood computed a near-black #13280e floor, fixed in sqrt form; the
+audit's per-theme arithmetic is in its commit); winter chapter dressing
+(snowdrifts, raven flights, frozen ponds, iced boulders, ice shards,
+avalanche debris — all instanced, reachable mass solid). The audit merge
+also exposed that the r367 count edit had accidentally commented out
+trunkColor on 17 theme lines — repaired.
+
+Gate evidence at deploy: full 41-suite battery green; airace and traffic
+green twice each; final-integration one full green run (its sibling
+concurrent run failed only the dice-y "hard AI attacks a parked player"
+law); treeclear + nature green twice on the final tree. The traffic
+suite's wall-clock load sensitivity stands CONFIRMED — never run it
+beside anything.
+
 ## r367 — THICK FORESTS, HARVEST CONCEPT, AND THE BOARDS THAT AUDITED CLEAN
 
 **Thick forests (owner: "Add thick forests").** The autumnwood precedent —
