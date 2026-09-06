@@ -16485,7 +16485,7 @@ export class Track {
     // verge bare wherever the lap wandered far from (0,0). spot() with a
     // lateral band places uniformly along the whole lap; the origin-radial
     // form survives only for the horizon ring.
-    const ring = (geos, count, spot, margin, scMin, scRange) => {
+    const ring = (geos, count, spot, margin, scMin, scRange, paintFn = paint) => {
       const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
       let n = 0;
       for (let tries = 0; tries < count * 3 && n < count; tries++) {
@@ -16506,7 +16506,7 @@ export class Track {
         eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
         pos.set(x, y - 0.35, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
         m.compose(pos, q, scl);
-        paint(col);
+        paintFn(col);
         for (const mesh of meshes) { mesh.setMatrixAt(n, m); mesh.setColorAt(n, col); }
         n++;
       }
@@ -16532,8 +16532,39 @@ export class Track {
       return [lo, hi];
     };
     // VERGE WALL: the trees the chase camera actually lives beside — dense,
-    // large, starting just off the road edge, the whole way round the lap
-    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.2, 1.5);
+    // large, starting just off the road edge, the whole way round the lap.
+    // r377 (owner's forest mockup): scaled up to TOWER — the reference's
+    // lane runs under the canopy, not past shoulder-height cones
+    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9);
+    // r377 UNDERSTOREY, from the owner's mockup: the ground between the
+    // trunks is not bare — a fern layer fills the first metres off the
+    // lane, and moss pads green the verge. Non-solid, same as every
+    // carpet part; green regardless of theme palette (moss is moss).
+    // position-hashed jitter (duplicated seam verts displace identically —
+    // the same trap the r374 tree roughen documents)
+    const roughenC = (g2, amp) => {
+      const P = g2.attributes.position;
+      for (let i2 = 0; i2 < P.count; i2++) {
+        const x = P.getX(i2), y = P.getY(i2), z = P.getZ(i2);
+        const rr = Math.hypot(x, z);
+        if (rr < 1e-4) continue;
+        const t2 = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+        const j = 1 + ((t2 - Math.floor(t2)) - 0.5) * 2 * amp;
+        P.setXYZ(i2, x * j, y, z * j);
+      }
+      P.needsUpdate = true;
+      return g2;
+    };
+    const fernG = roughenC(new THREE.SphereGeometry(1.0, 8, 5), 0.22);
+    fernG.scale(1, 0.42, 1); fernG.translate(0, 0.28, 0);
+    const paintFern = (c2) =>
+      c2.setHSL(0.29 + Math.random() * 0.09, 0.45, 0.14 + Math.random() * 0.14);
+    ring([fernG], spec.fern ?? 3200, trackSpot(0.5, 24), 1.6, 0.5, 0.8, paintFern);
+    const mossG = new THREE.ConeGeometry(1.25, 0.3, 8, 1, true);
+    mossG.translate(0, 0.12, 0);
+    const paintMoss = (c2) =>
+      c2.setHSL(0.30 + Math.random() * 0.06, 0.5, 0.17 + Math.random() * 0.1);
+    ring([mossG], spec.moss ?? 1400, trackSpot(0.3, 16), 1.2, 0.7, 1.1, paintMoss);
     // mid-field: fills the ground between the wall and the horizon
     ring(twoCone(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —

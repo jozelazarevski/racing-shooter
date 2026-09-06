@@ -4171,6 +4171,23 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r377 — THE FOREST FLOOR (owner's mockup: their own r373 frame, re-imagined)
+
+The owner sent their 13:52 LARCH GOLD screenshot back as a lush concept
+render: canopy towering over the lane, fern understorey between the
+trunks, mossy rocks, mushrooms — and a fully redesigned HUD, which was NOT
+taken (the in-race HUD is frozen per the recording-E standing decision;
+same call as every asset board before it). World deltas taken, all inside
+_buildForestCarpet on CARPET_THEMES worlds, all non-solid: (1) verge-wall
+trees scaled up to tower (1.4-3.3x — the mockup's lane runs UNDER trees,
+not past shoulder-height cones); (2) a FERN layer — 3,200 flattened
+jittered mounds in the first ~24 u off the lane, green on every theme;
+(3) 1,400 moss pads hugging the road edge at 0.3-16 u. ring() grew an
+optional paintFn so understorey greens ride the same placer as the trees.
+Left for a later pass: moss CAPS on the rock scatter (the rockSnowCap
+machinery is the natural carrier) and any ground-palette greening —
+amber stays autumn's ground.
+
 ## r376 — FIVE-MINUTE LAPS (owner: "Expand the tracks to be around 5min drive each")
 
 ROUTE_SCALE 2 -> 4, sized from MEASUREMENT, not guessed: dbg-laptime (new
