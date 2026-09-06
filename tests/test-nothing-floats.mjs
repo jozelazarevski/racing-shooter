@@ -132,7 +132,12 @@ const KNOWN = {
   'SALINE SPRINT': { max: 30, gap: 5.5, why: 'the same coping strips, worst 4.39 u' },
   // VINE TRELLIS POSTS standing on the ploughed soil bank they are planted in
   // — the bank is one long Buffer mesh the 2 u column grid cannot stamp.
-  'VINEYARD VELOCE': { max: 14, gap: 4, why: 'vine trellis posts on their own soil bank, worst 2.09 u' },
+  // r380d: gap 4 -> 8. The 4 u tolerance was calibrated on the FLAT vineyard;
+  // the owner's 500 m vertical mandate (r378) rebuilt this world as terraced
+  // climb country, and a thin crop panel on a steep flank now chords up to
+  // ~5.6 u over the 10 u drawn cells — the same class the mandated alpine
+  // worlds carry at gap 8. Trellis-post counts unchanged.
+  'VINEYARD VELOCE': { max: 14, gap: 8, why: 'vine trellis posts on their own soil bank; mandate-era flank chords' },
 };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
