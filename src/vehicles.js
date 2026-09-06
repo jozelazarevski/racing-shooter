@@ -4266,7 +4266,13 @@ export class Car {
     // a shield bubble around it. Adding can only ever make the car easier to
     // pick out, on snow or on lava.
     this.mesh.visible = this.alive;
-    this._setShield(this.alive && this.invuln > 0 ? this.invuln : 0);
+    // r382c (PATCH_02 v3 FIX-2, A-3/A-4): eight bubbles on the grid read as
+    // a field ENCASED IN ICE, and a bubble on a standing-start respawn read
+    // as "delivered frozen" — there is no freeze status in this game at
+    // all, only this VFX. The grid lock and spawn shield keep protecting;
+    // the bubble waits for the green light.
+    this._setShield(this.alive && this.invuln > 0
+      && this.game.state === 'race' ? this.invuln : 0);
   }
 
   /** Show/hide the invulnerability bubble. `t` is the remaining invuln time,

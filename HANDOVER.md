@@ -4171,6 +4171,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r382 — PATCH_02 v3 FIX-1/2: THE RACE IS A RACE AGAIN
+
+FIX-1 (A-1/A-2, measured end to end): the rival LOOKAHEAD was denominated
+in SAMPLES — at ROUTE_SCALE 4 the doubled segLen doubled the minimum
+chord to ~37 m and the halved curvature values gutted the corner shrink,
+so the whole field swung wide on every curve. Census on HARVEST RUN
+(dbg-ailat, curve-bucketed): mean |lat| 1.06x half-width through corners
+BEFORE — outside wheels in the verge, R10's "single file in the ditch" —
+0.44x AFTER, straights 0.86 -> 0.34, zero off-road samples. Lookahead is
+METRES now (floored at the 18 m the old 5-sample minimum really was, curv
+term re-normalized to its RS-2 tuning point). airace: 19 PASS, and the
+racecraft got HEALTHIER (commits up, orphans 0, CANYON hits 9 -> 6 all
+launch-phase). Q11's floor now scales RS/2 (launch stagger is
+length-invariant; the clean field spreads 26-41 s on 210-240 s laps —
+a full-RS floor of 32 called that a rubber-band).
+
+FIX-2 (A-3/A-4/A-5): there is NO freeze status in this game — the owner's
+"encased in ice" was the spawn-shield BUBBLE, drawn on all 8 invulnerable
+cars during countdown, and "respawn delivers player frozen" was the same
+bubble on the 3.6b standing start. The bubble now waits for the green
+light; grid lock and spawn protection unchanged (probed: 8 invulnerable,
+0 bubbles, countdown). Grid spacing measured CLEAN (min pair 7.12 u,
+no overlap — R10's grid blob was launch driving, cured by FIX-1). A-5's
+six-car blob: §5.3 separation stands and post-fix pack laws are green
+(rivalPack 0 on CANYON).
+
 ## r380 — THE WORLD GROWS WITH THE LAP (owner's live session: void, sky garbage, stacked streets)
 
 Three owner screenshots in one evening, one root: scale-4 laps outgrew
