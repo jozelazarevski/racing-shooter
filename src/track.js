@@ -16592,9 +16592,22 @@ export class Track {
         if (this._underwater && this._underwater(x, z)) continue;
         const sc = scMin + Math.random() * scRange;
         const fr = 1.9 * sc;
-        let y = this.terrainHeight(x, z);
-        y = Math.min(y, this.terrainHeight(x + fr, z), this.terrainHeight(x - fr, z),
-          this.terrainHeight(x, z + fr), this.terrainHeight(x, z - fr));
+        // r378b: seat on the ground that is DRAWN, not the analytic field —
+        // the vertical mandate's slopes bend faster than the 10 u mesh cell,
+        // and the chord between vertices runs metres below the curve (the
+        // suite's own SUMMIT CLIMB history, back at 3-14 u under the
+        // mandate). _drawnGroundY reproduces the lattice exactly; outside
+        // the near patch the far mesh draws hill noise, so the fallback
+        // seats under BOTH candidate surfaces.
+        const seatAt = (sx, sz) => {
+          const dg = this._drawnGroundY(sx, sz);
+          if (dg !== null && dg !== undefined) return dg;
+          const a3 = this.terrainHeight(sx, sz);
+          return this._hillNoise ? Math.min(a3, this._hillNoise(sx, sz)) : a3;
+        };
+        let y = seatAt(x, z);
+        y = Math.min(y, seatAt(x + fr, z), seatAt(x - fr, z),
+          seatAt(x, z + fr), seatAt(x, z - fr));
         eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
         pos.set(x, y - 0.35, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
         m.compose(pos, q, scl);
