@@ -610,7 +610,12 @@ export const LEVELS = [
     // orchard keeps its grass in autumn; the stubble gold stays HARVEST
     // RUN's. Ground colours in sqrt form per the r365 product rule.
     tune: {
-      vineRows: { count: 70, hue: 0.115, hueVar: 0.075 },   // r366d: amber-green orchard rows
+      // r367b (owner concept render): a PATCHWORK — orchard amber-greens,
+      // still-green parcels, and standing gold wheat blocks between them
+      vineRows: { count: 70, crops: [
+        { hue: 0.115 }, { hue: 0.16 }, { hue: 0.24, lum: 0.15 },
+        { hue: 0.115 }, { hue: 0.125, sat: 0.68, lum: 0.30 },   // wheat gold
+      ] },
       stoneBridges: { count: 1 },
       terrainLow: '#a4bc7c', terrainHigh: '#bcd18f', terrainDirt: '#bca680',
       ground: {
@@ -16590,6 +16595,51 @@ export class Track {
       im.count = n;
       this.group.add(im);
     }
+    // r367b (owner concept render): WORKING MACHINES in the fields — a
+    // couple of voxel tractors parked mid-parcel, the way the concept has a
+    // rig standing in the wheat. Solid, far off the band, facing their work.
+    {
+      const bodyCols = [0xb03a24, 0x3a7a34, 0xc07818];
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x26221e, roughness: 1 });
+      const hubMat = new THREE.MeshStandardMaterial({ color: 0x8a8478, roughness: 0.8 });
+      for (let k = 0; k < 3; k++) {
+        const spot = this._trackSidePos(20, 70);
+        if (!spot || (this._inWater && this._inWater(spot.x, spot.z))) continue;
+        const y = this.terrainHeight(spot.x, spot.z);
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: bodyCols[(Math.random() * bodyCols.length) | 0], roughness: 0.7, flatShading: true,
+        });
+        const g = new THREE.Group();
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 2.3), bodyMat);
+        hull.position.y = 0.95;
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 1.0), bodyMat);
+        nose.position.set(0, 0.85, 1.55);
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.75, 0.9),
+          new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 0.5 }));
+        cab.position.set(0, 1.75, -0.35);
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.7, 5),
+          hubMat);
+        pipe.position.set(0.35, 1.6, 1.3);
+        hull.castShadow = cab.castShadow = true;
+        g.add(hull, nose, cab, pipe);
+        for (const [sx, sz, r2] of [[-0.75, -0.6, 0.62], [0.75, -0.6, 0.62],
+          [-0.7, 1.45, 0.38], [0.7, 1.45, 0.38]]) {
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(r2, r2, 0.34, 10), wheelMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(sx, r2, sz);
+          g.add(w);
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(r2 * 0.45, r2 * 0.45, 0.36, 8), hubMat);
+          hub.rotation.z = Math.PI / 2;
+          hub.position.set(sx, r2, sz);
+          g.add(hub);
+        }
+        g.position.set(spot.x, y, spot.z);
+        g.rotation.y = Math.random() * Math.PI * 2;
+        this.group.add(g);
+        this._addShadow(spot.x, spot.z, 1.9, y);
+        this.solids.push({ x: spot.x, z: spot.z, r: 1.5, y: y + 0.9, mat: 'metal' });
+      }
+    }
     // scarecrows — five, out in the fields
     {
       const poleMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 });
@@ -17178,12 +17228,18 @@ export class Track {
       // r366d (owner screenshot: a spring-green terraced mound in an autumn
       // world): the varietal hue obeys the WORLD now. Default is the summer
       // vineyard green every existing world planted; an autumn orchard asks
-      // for amber-green via T.vineRows.hue/hueVar.
-      const hue = (V.hue ?? 0.245) + Math.random() * (V.hueVar ?? 0.045); // parcel varietal
+      // for amber-green via T.vineRows.hue/hueVar. r367b (owner concept
+      // render): V.crops goes further — each PARCEL draws {hue, sat?, lum?}
+      // from a crop list, so harvest country reads as a patchwork of dark
+      // greens, pale greens and standing GOLD wheat instead of one crop.
+      const crop = V.crops ? V.crops[(Math.random() * V.crops.length) | 0] : null;
+      const hue = crop ? crop.hue + (Math.random() - 0.5) * 0.02
+        : (V.hue ?? 0.245) + Math.random() * (V.hueVar ?? 0.045); // parcel varietal
       let any = 0;
       for (let r = 0; r < rows; r++) {
         const off = (r - (rows - 1) / 2) * SPACING;
-        const sat = 0.5 + Math.random() * 0.14, lum = 0.17 + Math.random() * 0.06;
+        const sat = (crop && crop.sat != null ? crop.sat : 0.5) + Math.random() * 0.14;
+        const lum = (crop && crop.lum != null ? crop.lum : 0.17) + Math.random() * 0.06;
         for (let i = 0; i + 1 < path.length && vk < CAP; i++) {
           const ax = path[i][0] + nx[i] * off, az = path[i][1] + nz[i] * off;
           const ex = path[i + 1][0] + nx[i + 1] * off, ez = path[i + 1][1] + nz[i + 1] * off;
