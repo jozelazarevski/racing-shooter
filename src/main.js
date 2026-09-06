@@ -5011,7 +5011,10 @@ class Game {
             return `<span style="display:inline-block;margin:2px 10px 2px 0;opacity:.95">`
               + `🏆 ${cname} — P${tr.place}${car ? ` · ${car}` : ''}</span>`;
           }).join('');
-        shelf.innerHTML = `<div class="bay-head"><span>🏆 TROPHY SHELF</span></div>`
+        // the head's first <span> is the icon CHIP now (see .bay-head in the
+        // sheet), so the glyph rides alone in it and the name sits beside it —
+        // the same anatomy every bay header has, and the same rendered text
+        shelf.innerHTML = `<div class="bay-head"><span>🏆</span>TROPHY SHELF</div>`
           + `<div style="padding:6px 10px;font-size:13px">${cups}</div>`;
         host.appendChild(shelf);
       }
