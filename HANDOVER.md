@@ -4171,6 +4171,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r369 — DESIGN RICHNESS: THE DESERT LIVES, THE NIGHT GLOWS
+
+Owner: "Iterate on the design richness." Survey round first (chase frames
+across the untreated families): THE DUNE SERPENT ranked last — a bare
+ribbon over flat mustard — and NEON MARINA read as empty-dark (neon rails
+over a void). DRY LAGOON and RED CENTRE middling-monotone.
+
+- **groundTexture wind ripples** (a `ripples` pass, paired crest/trough
+  strokes wandering the tile) — the sand themes turn it on; the road
+  already had its own.
+- **Desert dressing** (dunes/desert/oasis/outback/savanna/canyon/ravine):
+  crescent dune banks along the verges (second cut — the first read as
+  pebbles from the driving seat), silver saltbush pairs, bleached longhorn
+  skulls and half-sunk ribcages, sandstone outcrop clusters (solid),
+  termite-mound spires on outback/savanna (big ones solid).
+- **Night dressing** (neon/undercity): 110 roadside light posts with
+  oversized neon heads and a coloured glow quad under each. The first cut
+  (56 posts, 0.5 u heads) vanished into the dark — one dot per frame,
+  measured on the same vantage; the law of this pass is that a light must
+  read as LIGHT.
+
+The remaining dunes emptiness at the survey vantage is the ROAD — very
+wide, very pale, on a crest with the sand falling away — not absent
+dressing; calibrate from the phone before touching the tuned surface.
+
 ## r368 — THE FOREST REACHES THE ROAD, THE TOWER LEAVES IT, THREE AGENTS LAND
 
 **"Add a lot more forest. The roads are all deserted."** Three stacked
