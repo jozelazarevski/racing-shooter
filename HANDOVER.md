@@ -4171,6 +4171,25 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r376 — FIVE-MINUTE LAPS (owner: "Expand the tracks to be around 5min drive each")
+
+ROUTE_SCALE 2 -> 4, sized from MEASUREMENT, not guessed: dbg-laptime (new
+tool, the airace expert stand-in driving one fixed-step lap) clocked the
+scale-2 laps at PINE VALLEY 105 s / DUST CANYON 72 s / SERPENTINA 140 s /
+LARCH GOLD 108 s — median ~107 s. The expert runs ~1.3-1.5x a human's
+pace, so doubling the lap puts the bot at ~3.6 min and the owner right
+around five (roster spread roughly 3.5-6.5 human minutes; per-world
+`routeScale` fine-tuning is the follow-up if specific worlds land wrong).
+
+Everything r340 made parametric flows through untouched: gate layouts
+repeat per scale unit (spacing keeps §7's metre caps), vehicle curvature
+thresholds divide by ROUTE_SCALE, the coast tune multiplies through, and
+segLen lands at 6.6-8.7 u with N still 900. Two things did need hands: the
+carpet's horizon ring now sizes itself from the lap's own bounding radius
+(a fixed 640 u ring would sit INSIDE a scale-4 lap that wanders past
+±900), and suite wall-clocks — airace's frame cap is already RS-scaled,
+so the battery simply runs longer; nothing was recalibrated blind.
+
 ## r375 — TWENTY TIMES THE TREES (owner: "Add 20x more trees")
 
 Delivered through the INSTANCED CARPET, not the solid belt. The solid

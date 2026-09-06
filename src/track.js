@@ -5097,7 +5097,14 @@ const N = 900;              // centerline samples
  *  route.js double with it so §7 spacing keeps its metre caps, and
  *  T.coast (the one absolute-coordinate tune) is scaled where T is
  *  assembled. */
-export const ROUTE_SCALE = 2;
+// r376 (owner: "Expand the tracks to be around 5min drive each"): 2 -> 4.
+// Measured with dbg-laptime (the airace expert stand-in, one lap, fixed
+// step) at scale 2: PINE VALLEY 105 s, DUST CANYON 72 s, SERPENTINA 140 s,
+// LARCH GOLD 108 s — median ~107 s. The expert runs ~1.3-1.5x quicker than
+// a human at the wheel, so 4x length puts the bot near 3.6 min and the
+// OWNER'S drive right around five. segLen lands at 6.6-8.7 u (N stays 900);
+// the gate layout repeats per scale unit so §7 spacing keeps its metre caps.
+export const ROUTE_SCALE = 4;
 /** Title-screen minimaps: the raw circuit control polygon for a theme. */
 export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
 
@@ -16531,9 +16538,17 @@ export class Track {
     ring(twoCone(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
     // margin 25 keeps an 18 u horizon-scale cone off the verge where the
-    // radial scatter happens to cross the lap
+    // radial scatter happens to cross the lap. r376: the radial extent
+    // follows the LAP'S footprint, not a constant — at ROUTE_SCALE 4 the
+    // route wanders past ±900 and a 640 u ring would sit inside it.
+    let maxR = 0;
+    for (let i = 0; i < this.N; i += 8) {
+      const c = this.center[i];
+      const rr = Math.hypot(c.x, c.z);
+      if (rr > maxR) maxR = rr;
+    }
     const fg = new THREE.ConeGeometry(1.8, 4.6, 5, 1, true); fg.translate(0, 2.3, 0);
-    ring([fg], spec.far ?? 24000, radialSpot(170, 640), 25, 1.3, 1.9);
+    ring([fg], spec.far ?? 24000, radialSpot(170, maxR + 450), 25, 1.3, 1.9);
   }
 
   /** r369 (owner: "Iterate on the design richness") — DESERT DRESSING.
