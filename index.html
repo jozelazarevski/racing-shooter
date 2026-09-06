@@ -43,6 +43,14 @@
     --line-strong:rgba(255,233,168,.38); --line:rgba(255,233,168,.3);
     --line-soft:rgba(255,233,168,.14);
     --gold-dim:#c9a86a; --cream:#ffe9a8;
+    /* the SHOP MATERIAL, from the owner's sprite-sheet mockup: warm brown
+       panels lit from the top, a desaturated metallic edge (the old --line
+       hairlines are gold; the mockup's borders read as brushed metal), and
+       the amber pair its price buttons are cast in. Menu chrome only — the
+       in-race HUD is frozen and keeps --panel/--edge untouched. */
+    --shop-hi:#3a3028; --shop-lo:#2c241c;
+    --metal:rgba(212,196,168,.38); --metal-soft:rgba(212,196,168,.16);
+    --price-hi:#ffc95e; --price-lo:#e8a83a;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   /* BLACK BEHIND THE CANVAS, NOT LIME. Anything the canvas does not cover —
@@ -534,7 +542,9 @@
   .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 5px;font-family:'Luckiest Guy';
     font-size:clamp(10px,2.7vw,15px);letter-spacing:.8px;white-space:nowrap;overflow:hidden;
     text-align:center;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
-    border:2px solid var(--line);border-bottom:none;background:rgba(24,16,6,.55);
+    /* the tab wall shares the panel's metal edge — a gold rim meeting a metal
+       one made the seam between tab row and panel read as two components */
+    border:2px solid var(--metal);border-bottom:none;background:rgba(24,16,6,.55);
     -webkit-tap-highlight-color:transparent}
   .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
     box-shadow:0 -3px 0 rgba(0,0,0,.15) inset}
@@ -624,8 +634,13 @@
      NOT backdrop-filter: this panel is up to 67 world cards tall and the
      scene behind it animates, so a blur layer would be re-sampled every
      frame on the phone this game is for. Opacity costs nothing. */
-  .menu-panel{margin-top:0;width:min(100%,660px);background:rgba(22,14,5,.96);
-    border:2px solid var(--line);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
+  .menu-panel{margin-top:0;width:min(100%,660px);
+    /* the mockup's panel brown, fully opaque — which is MORE than the .96 the
+       paragraph above demands, so the attract camera still cannot draw
+       through it. The inner shadow is the mockup's soft top-light. */
+    background:linear-gradient(180deg,var(--shop-hi),var(--shop-lo));
+    border:2px solid var(--metal);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.07),inset 0 0 28px rgba(0,0,0,.22);
     padding:12px 16px 16px;display:flex;flex-direction:column;align-items:center}
   .menu-panel.off{display:none}
   .panel-head{align-self:stretch;display:flex;align-items:center;gap:12px;
@@ -872,8 +887,13 @@
      give way when a chapter name gets long. */
   #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
     font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
-    padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
-    border:1px solid var(--line-soft)}
+    padding:5px 11px;border-radius:999px;
+    background:linear-gradient(180deg,var(--shop-hi),#241c14);
+    border:1px solid var(--price-lo);
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.1)}
+  /* the coin is DECORATION, painted by the sheet — the markup still says
+     CREDITS and the balance, so nothing that reads the element changes */
+  #topbar-cred::before{content:'🪙';margin-right:4px;font-size:11px}
   #topbar-cred b{font-family:'Luckiest Guy';font-size:13px;letter-spacing:.5px;
     color:var(--yellow);margin-left:3px;text-shadow:1px 1px 0 var(--ink)}
   /* the where-slot yields first when the bar is tight */
@@ -1060,7 +1080,10 @@
   .tyre-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
   .tyre-opt{min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;
     padding:8px 4px;border-radius:10px;cursor:pointer;font-family:inherit;
-    background:rgba(40,30,16,.5);border:1px solid rgba(255,212,0,.22);color:#c8b48c;font-size:15px}
+    background:linear-gradient(180deg,var(--shop-hi),var(--shop-lo));
+    border:1px solid var(--metal-soft);
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.06);
+    color:#c8b48c;font-size:15px}
   .tyre-opt b{font-size:10px;letter-spacing:1px}
   .tyre-opt i{font-style:normal;font-size:7.5px;letter-spacing:.4px;color:#8de89a;min-height:9px}
   .tyre-opt.on{background:rgba(255,212,0,.16);border-color:var(--yellow);color:var(--yellow)}
@@ -1328,8 +1351,9 @@
      floor. Wide screens keep the two-column layout, where there is room. */
   #build-preview{width:100%;display:flex;flex-direction:column;gap:8px;
     margin:4px 0 8px;padding:9px 10px;border-radius:var(--r-md);
-    border:1px solid var(--line-soft);
-    background:linear-gradient(180deg,rgba(60,40,16,.55),rgba(12,8,3,.5))}
+    border:1px solid var(--metal-soft);
+    background:linear-gradient(180deg,var(--shop-hi),#241c15);
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.06)}
   @media (min-width:620px){
     #build-preview{flex-direction:row;align-items:center;gap:12px}
     #build-preview .bp-shop{width:56%;flex:0 0 auto}
@@ -1423,14 +1447,22 @@
   .part-card.owned{border-color:rgba(141,232,154,.45)}
 
   #garage-bays{width:100%;display:flex;flex-direction:column;gap:8px}
-  .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
-    background:rgba(12,8,3,.4);padding:8px 9px 9px}
+  .bay{border:1px solid var(--metal-soft);border-radius:var(--r-md);
+    background:linear-gradient(180deg,var(--shop-hi),var(--shop-lo));
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.06),inset 0 0 18px rgba(0,0,0,.26);
+    padding:8px 9px 9px}
   .bay-head{display:flex;align-items:center;gap:7px;margin:0 0 7px;
     font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream);
     padding-bottom:5px;
     border-bottom:1px solid transparent;
     border-image:linear-gradient(90deg,var(--gold-dim),transparent 65%) 1}
-  .bay-head span:first-child{filter:drop-shadow(0 0 6px rgba(255,214,90,.45))}
+  /* the mockup's headers carry their glyph in a small CHIP on the left, not
+     a bare emoji — a sunken plate with a metal edge. Fixed square, so the
+     five bays' headers all start their names at the same x. */
+  .bay-head span:first-child{flex:none;display:inline-grid;place-items:center;
+    width:26px;height:26px;border-radius:7px;font-size:14px;
+    background:rgba(12,8,3,.55);border:1px solid var(--metal-soft);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.5),0 1px 0 rgba(255,240,200,.07)}
   .bay-msg{margin:6px 2px 0;padding:6px 8px;border-radius:7px;font-size:10.5px;
     line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
     background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
@@ -1439,8 +1471,8 @@
   .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
   .part-card{pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;
     align-items:center;gap:3px;padding:6px 5px 7px;border-radius:var(--r-sm);
-    border:2px solid var(--line);
-    background:linear-gradient(180deg,rgba(64,46,24,.6),rgba(24,16,8,.6));
+    border:2px solid var(--metal-soft);
+    background:linear-gradient(180deg,#453a2e,var(--shop-lo));
     font-family:'Baloo 2';color:var(--cream);text-align:center;
     -webkit-tap-highlight-color:transparent;transition:transform .1s}
   .part-card:active{transform:scale(.97)}
@@ -1465,8 +1497,12 @@
       animation:pc-shine 3.2s ease-in-out infinite}
     @keyframes pc-shine{0%,55%{left:-40%}85%,100%{left:120%}}
     .up-buy:not(:disabled):not(.maxed){animation:buy-pulse 2.4s ease-in-out infinite}
-    @keyframes buy-pulse{0%,100%{box-shadow:0 2px 0 var(--ink)}
-      50%{box-shadow:0 2px 0 var(--ink),0 0 12px rgba(255,214,90,.55)}}
+    /* the pulse animates box-shadow WHOLE, so every frame must restate the
+       button's bevel insets or the animation strips them for its duration */
+    @keyframes buy-pulse{0%,100%{box-shadow:0 2px 0 var(--ink),
+        inset 0 1px 0 rgba(255,246,214,.6),inset 0 -2px 0 rgba(122,74,18,.35)}
+      50%{box-shadow:0 2px 0 var(--ink),0 0 12px rgba(255,214,90,.55),
+        inset 0 1px 0 rgba(255,246,214,.6),inset 0 -2px 0 rgba(122,74,18,.35)}}
   }
 
   .part-card .pc-art{width:100%;max-width:132px;height:auto;
@@ -1485,7 +1521,11 @@
     padding:3px 7px;border-radius:6px;white-space:nowrap}
   .pc-act.fitted{color:var(--ink);background:var(--orange)}
   .pc-act.own{color:#8de89a;border:1px solid rgba(141,232,154,.5)}
-  .pc-act.buy{color:var(--yellow);border:1px solid rgba(255,212,0,.45)}
+  /* a PRICE is a button in the mockup — the amber plate with a soft bevel,
+     dark type — while FITTED/INSTALL/locked stay the quieter states they are */
+  .pc-act.buy{color:var(--ink);border:1px solid var(--ink);
+    background:linear-gradient(180deg,var(--price-hi),var(--price-lo));
+    box-shadow:0 1px 0 var(--ink),inset 0 1px 0 rgba(255,246,214,.6)}
   .pc-act.lock{color:var(--gold-dim);border:1px solid var(--line-soft)}
   .part-card .pc-sub{font-size:9px;line-height:1.3;color:#c8b48a}
   .part-card.blocked.earn .pc-sub{color:var(--amber);font-weight:700}
@@ -1495,7 +1535,9 @@
      bar and a price, exactly like a part. */
   .up-card{display:grid;grid-template-columns:30px 1fr auto;gap:3px 8px;align-items:center;
     margin-top:6px;padding:7px 9px;border-radius:var(--r-sm);
-    border:1px solid var(--line-soft);background:rgba(38,26,12,.4)}
+    border:1px solid var(--metal-soft);
+    background:linear-gradient(180deg,#352c22,var(--shop-lo));
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.05)}
   .up-card.maxed{opacity:.72}
   .up-card{grid-template-columns:46px 1fr auto}
   /* ONE COLUMN, ONE MATERIAL. Three of these ladders show a rendered part and
@@ -1512,7 +1554,10 @@
   .up-card .uc-nm{font-family:'Luckiest Guy';font-size:10.5px;letter-spacing:.6px;
     color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .up-card .uc-pips{display:flex;align-items:center;gap:3px}
-  .up-card .uc-pips b{width:13px;height:4px;border-radius:2px;background:var(--yellow)}
+  /* level pips in the price buttons' amber, not the HUD yellow — the mockup
+     keeps one metal for everything money touches */
+  .up-card .uc-pips b{width:13px;height:4px;border-radius:2px;
+    background:linear-gradient(180deg,var(--price-hi),var(--price-lo))}
   .up-card .uc-pips b.off{background:rgba(255,255,255,.16)}
   .up-card .uc-pips i{font-style:normal;margin-left:4px;font-size:8.5px;font-weight:800;
     letter-spacing:.8px;color:var(--gold-dim)}
@@ -1548,8 +1593,10 @@
   .shelf-wrap{position:relative;width:100%;margin-top:4px}
   .shelf-wrap::before,.shelf-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:22px;
     z-index:1;pointer-events:none}
-  .shelf-wrap::before{left:0;background:linear-gradient(90deg,rgba(24,16,6,.85),transparent)}
-  .shelf-wrap::after{right:0;background:linear-gradient(270deg,rgba(24,16,6,.85),transparent)}
+  /* the fades are painted in the panel's OWN brown — one shade off and the
+     shelf edges read as smudges on the new lighter material */
+  .shelf-wrap::before{left:0;background:linear-gradient(90deg,rgba(50,41,32,.88),transparent)}
+  .shelf-wrap::after{right:0;background:linear-gradient(270deg,rgba(50,41,32,.88),transparent)}
   #car-shop{display:flex;gap:10px;overflow-x:auto;width:100%;
     padding:4px 4px 10px;scrollbar-width:thin;scrollbar-color:rgba(255,212,0,.45) rgba(255,233,168,.08)}
   #car-shop::-webkit-scrollbar{height:7px}
@@ -1557,8 +1604,10 @@
   #car-shop::-webkit-scrollbar-track{background:rgba(255,233,168,.1);border-radius:4px}
   /* every card the same width + padding — the shelf reads as one row of equal tiles */
   .car-card{pointer-events:auto;cursor:pointer;flex:0 0 140px;width:140px;text-align:center;
-    padding:10px;border-radius:var(--r-md);border:2px solid var(--line);
-    background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
+    padding:10px;border-radius:var(--r-md);border:2px solid var(--metal-soft);
+    background:linear-gradient(180deg,#453a2e,var(--shop-lo));
+    box-shadow:inset 0 1px 0 rgba(255,240,200,.06);
+    -webkit-tap-highlight-color:transparent}
   .car-card .car-icon{width:96px;height:62px;object-fit:cover;display:block;margin:0 auto 4px;
     border-radius:4px;
     filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
@@ -1617,7 +1666,12 @@
   .up-row .pips .off{color:rgba(255,233,168,.25)}
   .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;font-size:12px;
     min-height:40px;width:100%;padding:0 8px;border-radius:var(--r-sm);border:2px solid var(--ink);
-    color:var(--ink);background:linear-gradient(180deg,#ffd400,#ff9d2e);box-shadow:0 2px 0 var(--ink);
+    color:var(--ink);
+    /* the mockup's price button: amber-to-gold with a soft bevel — a bright
+       top edge and a shaded foot — instead of the flat yellow-orange wash */
+    background:linear-gradient(180deg,var(--price-hi),var(--price-lo));
+    box-shadow:0 2px 0 var(--ink),inset 0 1px 0 rgba(255,246,214,.6),
+      inset 0 -2px 0 rgba(122,74,18,.35);
     -webkit-tap-highlight-color:transparent;white-space:nowrap}
   .up-buy:disabled{opacity:.4;cursor:not-allowed}
   .up-buy.maxed{background:#4dd06a}
@@ -1714,15 +1768,23 @@
   #start-btn{align-self:stretch;margin:24px -16px -16px;
     position:sticky;bottom:-16px;z-index:6;border-radius:0;border-left:none;
     border-right:none;border-bottom:none;
+    /* the mockup casts START in pure oranges with a bevelled face; the footer
+       placement itself stays — it was asked for by name ("move the start to
+       the tip of the screen") and the mockup does not overrule a layout ask
+       with a colour one. .btn's orange-to-red wash gives way to the sheet's
+       orange pair, and the bevel is the inset pair every priced button wears. */
+    background:linear-gradient(180deg,#ffb347,#ec5f16);
     /* the home-indicator strip on a notched phone is not tappable, so the
        label has to sit above it rather than under it */
     padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
-    box-shadow:0 -6px 18px rgba(0,0,0,.55);
+    box-shadow:0 -6px 18px rgba(0,0,0,.55),inset 0 2px 0 rgba(255,240,200,.35),
+      inset 0 -3px 0 rgba(0,0,0,.22);
     /* the wrong-tyre label carries its remedy on a second line, so the button
        has to honour the newline instead of collapsing it */
     white-space:pre-line;line-height:1.15}
   /* the lift-on-hover of .btn would peel a flush footer off its own edge */
-  #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55)}
+  #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55),
+    inset 0 2px 0 rgba(255,240,200,.35),inset 0 -3px 0 rgba(0,0,0,.22)}
 
   /* ---- START RACE, CHARGED --------------------------------------------
      Asked for as "make start race sparkly electric as in the screen". Three
@@ -1771,11 +1833,13 @@
   /* the charge at the edge — same amber the button is made of, so it reads as
      the button glowing rather than as a ring drawn around it */
   #start-btn{animation:startCharge 2.2s ease-in-out infinite}
+  /* every frame restates the bevel's bottom inset — the charge animates
+     box-shadow whole, and a frame without it flattens the face */
   @keyframes startCharge{
     0%,100%{box-shadow:0 -6px 18px rgba(0,0,0,.55),0 0 0 rgba(255,180,70,0),
-      inset 0 2px 0 rgba(255,240,200,.35)}
+      inset 0 2px 0 rgba(255,240,200,.35),inset 0 -3px 0 rgba(0,0,0,.22)}
     50%{box-shadow:0 -6px 22px rgba(0,0,0,.55),0 -2px 26px rgba(255,170,60,.55),
-      inset 0 2px 0 rgba(255,246,220,.6)}
+      inset 0 2px 0 rgba(255,246,220,.6),inset 0 -3px 0 rgba(0,0,0,.22)}
   }
   /* A BUTTON THAT CANNOT BE PRESSED MUST NOT LOOK CHARGED. The blocked state
      already recolours it; killing the animation is what stops it advertising. */
