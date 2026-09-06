@@ -4176,10 +4176,22 @@ world-for-world.
 Delivered through the INSTANCED CARPET, not the solid belt. The solid
 gameplay trees (treeCount) carry colliders, the accept gate, the
 tree-in-carriageway census and the AI clamps — 20x those is a physics and
-suite bill, not art. The carpet is pure GPU: _buildForestCarpet is now two
-LOD rings totalling ~40,000 trees per world (near ring 8,000 two-cone trees
-at 45-190 u; far ring 32,000 single 5-sided cones at 190-640 u, open-ended
-— nobody ever sees a base cap), four draw calls, roughly 450k tris. And it
+suite bill, not art. The carpet is pure GPU: _buildForestCarpet is now
+three LOD rings totalling ~47,000 trees per world, five draw calls,
+roughly 500k open-ended-cone tris.
+
+THE PART THAT ACTUALLY ANSWERED THE OWNER'S FRAME (r375b, live phone shot
+at 13:52 showing bare verges on r373): the near carpet FOLLOWS THE TRACK,
+not the world origin. The owner only ever looks out from the road, and
+origin-radial scatter left whole stretches of verge bare wherever the lap
+wandered far from (0,0). Rings now: VERGE WALL — 9,000 two-cone trees
+placed at random track samples, 1-38 u out from the LOCAL road edge
+(widthAt(i) + 2.5), the whole way round the lap; MID-FIELD — 14,000 more
+at 38-160 u out; HORIZON — 24,000 single 5-sided cones, origin-radial
+170-640 u. Every spot re-checks _nearestSample against ALL segments with
+the local width (a spot 3 u off this straight's edge can be mid-road on
+the switchback below), margins 3/20/25 by ring. Carpet trees are
+non-solid, same as the shipped larch/birch/poplar precedent. And it
 now runs on EVERY forested theme via CARPET_THEMES (forest, deepwood,
 autumnwood, harvestvale, flume, the alpine family, dolomiti, avalanche,
 snow, glacial, jungle, redwood, mountainsea), with a per-theme crown

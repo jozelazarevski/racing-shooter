@@ -16469,17 +16469,27 @@ export class Track {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
     const mat = () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
-    // ring: geometries share matrices; placement rejects the playable belt
-    // and water, and seats each tree on the LOWEST corner of its footprint
-    // (r373 — centre sampling hung downhill edges in the air)
-    const ring = (geos, count, r0, r1, scMin, scRange) => {
+    // ring: geometries share matrices; placement rejects the carriageway and
+    // water, and seats each tree on the LOWEST corner of its footprint
+    // (r373 — centre sampling hung downhill edges in the air).
+    // r375b (owner's live frame, 13:52): the near carpet MUST follow the
+    // TRACK, not radiate from the world origin — the owner only ever looks
+    // out from the road, and origin-radial scatter left whole stretches of
+    // verge bare wherever the lap wandered far from (0,0). spot() with a
+    // lateral band places uniformly along the whole lap; the origin-radial
+    // form survives only for the horizon ring.
+    const ring = (geos, count, spot, margin, scMin, scRange) => {
       const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
       let n = 0;
       for (let tries = 0; tries < count * 3 && n < count; tries++) {
-        const a2 = Math.random() * Math.PI * 2;
-        const r2 = r0 + Math.random() * Math.random() * (r1 - r0);
-        const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
-        if (this._distToTrack(x, z) < 30) continue;
+        const p2 = spot();
+        if (!p2) continue;
+        const x = p2.x, z = p2.z;
+        // re-check against ALL segments with the LOCAL width — a spot 3 u off
+        // this straight's edge can be mid-road on the switchback below it,
+        // and a fixed floor would push the wall off a narrow lane's verge
+        const s = this._nearestSample(x, z);
+        if (s.d < this.widthAt(s.i) + margin) continue;
         if (this._underwater && this._underwater(x, z)) continue;
         const sc = scMin + Math.random() * scRange;
         const fr = 1.9 * sc;
@@ -16495,13 +16505,35 @@ export class Track {
       }
       for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
     };
-    // near ring: the two-cone tree, bases AT the origin (r373)
-    const lo = new THREE.ConeGeometry(1.9, 3.4, 6, 1, true); lo.translate(0, 1.7, 0);
-    const hi = new THREE.ConeGeometry(1.15, 2.6, 6, 1, true); hi.translate(0, 3.9, 0);
-    ring([lo, hi], spec.near ?? 8000, 45, 190, 1.1, 1.6);
-    // far ring: one 5-sided cone, scaled up so it still reads at 600 u
+    const trackSpot = (pad0, pad1) => () => {
+      const i = (Math.random() * this.N) | 0;
+      const c = this.center[i], nv = this.nrm[i];
+      // pads are measured OUT FROM the local road edge, so the wall hugs a
+      // 5.6 u lane and a 9 u boulevard equally instead of using one constant
+      const edge = this.widthAt(i) + 2.5;
+      const lat = (edge + pad0 + Math.random() * (pad1 - pad0)) * (Math.random() < 0.5 ? -1 : 1);
+      return { x: c.x + nv.x * lat, z: c.z + nv.z * lat };
+    };
+    const radialSpot = (r0, r1) => () => {
+      const a2 = Math.random() * Math.PI * 2;
+      const r2 = r0 + Math.random() * Math.random() * (r1 - r0);
+      return { x: Math.cos(a2) * r2, z: Math.sin(a2) * r2 };
+    };
+    const twoCone = () => {
+      const lo = new THREE.ConeGeometry(1.9, 3.4, 6, 1, true); lo.translate(0, 1.7, 0);
+      const hi = new THREE.ConeGeometry(1.15, 2.6, 6, 1, true); hi.translate(0, 3.9, 0);
+      return [lo, hi];
+    };
+    // VERGE WALL: the trees the chase camera actually lives beside — dense,
+    // large, starting just off the road edge, the whole way round the lap
+    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.2, 1.5);
+    // mid-field: fills the ground between the wall and the horizon
+    ring(twoCone(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
+    // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
+    // margin 25 keeps an 18 u horizon-scale cone off the verge where the
+    // radial scatter happens to cross the lap
     const fg = new THREE.ConeGeometry(1.8, 4.6, 5, 1, true); fg.translate(0, 2.3, 0);
-    ring([fg], spec.far ?? 32000, 190, 640, 1.3, 1.9);
+    ring([fg], spec.far ?? 24000, radialSpot(170, 640), 25, 1.3, 1.9);
   }
 
   /** r369 (owner: "Iterate on the design richness") — DESERT DRESSING.
