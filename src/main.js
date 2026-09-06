@@ -11741,8 +11741,18 @@ class Game {
       // per-frame cost at ~a dozen circle tests; solids carry no height,
       // so a building-ish radius stands in for one (a 3 u+ solid is a
       // structure, not a bollard).
-      if (!this._camSolids || (this._camSolidsAge = (this._camSolidsAge ?? 0) + 1) > 12) {
+      // r381b (stagerules S5, IL VICOLO): the 12-frame cadence alone left a
+      // TELEPORTED car (a respawn, a suite placeAt) reading the PREVIOUS
+      // position's solids for up to 12 frames — the hut beside the new spot
+      // was invisible to the lift and the boom parked inside it. A jump away
+      // from where the cache was built rebuilds it immediately.
+      const _csAt = this._camSolidsAt;
+      const _csJumped = !_csAt
+        || (pp.x - _csAt.x) * (pp.x - _csAt.x) + (pp.z - _csAt.z) * (pp.z - _csAt.z) > 25 * 25;
+      if (!this._camSolids || _csJumped
+        || (this._camSolidsAge = (this._camSolidsAge ?? 0) + 1) > 12) {
         this._camSolidsAge = 0;
+        this._camSolidsAt = { x: pp.x, z: pp.z };
         const near = [];
         for (const sld of tk.solids ?? []) {
           // 3-20 u: buildings, huts, towers. Below is a bollard; above is
@@ -11811,9 +11821,27 @@ class Game {
       const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift + (lift > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
+        // r381b (stagerules S5, IL VICOLO): the pull-in asked only the
+        // TERRAIN, so on flat town ground it exited on the first check with
+        // the lens still parked inside a hut below its roofline — the
+        // building lift above and the cap fought to a draw INSIDE the wall.
+        // The pull-in now sees the same building tops the probe sees, so a
+        // capped boom walks in toward the car until it leaves the structure.
+        const gAt = (x, z) => {
+          let gh2 = tk.terrainHeight(x, z) + 2.2;
+          for (const sld of this._camSolids ?? []) {
+            const dxs = x - sld.x, dzs = z - sld.z;
+            if (dxs * dxs + dzs * dzs < sld.r * sld.r) {
+              const top = (sld.y ?? tk.terrainHeight(sld.x, sld.z))
+                + (sld.h ?? Math.min(14, sld.r * 1.6)) + 1.1;
+              if (top > gh2) gh2 = top;
+            }
+          }
+          return gh2;
+        };
         for (let k = 0; k < 6; k++) {
-          const g2 = tk.terrainHeight(cp.x, cp.z) + 2.2;
-          if (cp.y >= g2) break;                 // clear of the slope: done
+          const g2 = gAt(cp.x, cp.z);
+          if (cp.y >= g2) break;                 // clear of slope AND structures: done
           const ox = cp.x - pp.x, oz = cp.z - pp.z;
           if (Math.hypot(ox, oz) < 4) { cp.y = g2; break; }   // never in the car
           cp.x = pp.x + ox * 0.72;
@@ -11888,6 +11916,24 @@ class Game {
       if (this.camPos.distanceTo(p.pos) > boom * 2) {
         this.camPos.copy(targetPos);
         this.camLook.copy(targetLook);
+        // r381b (stagerules S5): the snap target is UN-PROBED — after a
+        // teleport (respawn, suite placeAt) the mode's nominal eye can sit
+        // inside a building, and the ground lift only sees it NEXT frame.
+        // Give the snapped eye the same floor the probe enforces, from the
+        // same solids cache (rebuilt this frame by the jump rule above).
+        const tk2 = this.track;
+        if (tk2?.terrainHeight) {
+          let gh2 = tk2.terrainHeight(this.camPos.x, this.camPos.z) + 2.2;
+          for (const sld of this._camSolids ?? []) {
+            const dxs = this.camPos.x - sld.x, dzs = this.camPos.z - sld.z;
+            if (dxs * dxs + dzs * dzs < sld.r * sld.r) {
+              const top = (sld.y ?? tk2.terrainHeight(sld.x, sld.z))
+                + (sld.h ?? Math.min(14, sld.r * 1.6)) + 1.1;
+              if (top > gh2) gh2 = top;
+            }
+          }
+          if (this.camPos.y < gh2) this.camPos.y = gh2;
+        }
       }
     }
     this._applyCamera(dt, speedZoom, M);
