@@ -10463,6 +10463,7 @@ export class Track {
     const steel = new THREE.MeshStandardMaterial({
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
+    const towered = new Set();   // r383: sides that built a full scaffold
     for (const side of [1, -1]) {
       // 12.5 u OFF SAMPLE 0 IS NOT 12.5 u OFF THE ROAD.
       //
@@ -10517,6 +10518,7 @@ export class Track {
       // missing scaffold is scenery, a scaffold in the road is a phone
       // report. 0.3 u is "genuinely clear", not "least bad".
       if (best.margin < 0.3) continue;
+      towered.add(side);
       const bx = best.px, bz = best.pz;
       // THE BRACES LEARN WHAT THE LEGS LEARNED (r253): where the lap curls
       // back past its own start line, the road under the tower is not the
@@ -10605,6 +10607,26 @@ export class Track {
       this._addShadow(bx, bz, 2.6, c.y);        // grounds the gantry legs
       // waving checkered flags on the towers
       this._checkerFlag(bx, y0 + 11.8 + towerLift, bz);
+    }
+    // r383 (PATCH_02 v3 FIX-3, B-6): the crossbar and banner build
+    // UNCONDITIONALLY while the scaffold towers bail wherever no clear
+    // ground exists — on GLACIER COL both bailed and the start gate hung as
+    // a floating checkered strip (R11 0:05, reproduced in /tmp/f3-gc1.png).
+    // A side that could not take a full tower gets a slim grounded POST at
+    // its own road edge instead: the arch always stands on both verges.
+    // Mesh-only (no collider) at the racing line's shoulder, same r167 rule
+    // every unclearable gantry piece follows.
+    for (const side of [1, -1]) {
+      if (towered.has(side)) continue;
+      const halfW0 = this.widthAt ? this.widthAt(0) : ROAD_HALF;
+      const px = c.x + n.x * (halfW0 + 1.6) * side;
+      const pz = c.z + n.z * (halfW0 + 1.6) * side;
+      const gy = Math.min(y0, this.terrainHeight(px, pz));
+      const postH = (y0 + 10.2) - gy;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, postH, 8), steel);
+      post.position.set(px, gy + postH / 2, pz);
+      post.castShadow = true;
+      this.group.add(post);
     }
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(26, 2.4, 0.5),
