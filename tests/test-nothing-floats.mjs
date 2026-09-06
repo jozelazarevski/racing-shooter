@@ -336,11 +336,21 @@ await page.evaluate(() => {
       // tyre stack or a kerb at road level is seated, not floating. 12 u is
       // the same reach `Track._seatY` uses, and it is inside the widest ribbon
       // fringe on the roster.
-      probe.x = p.cx; probe.z = p.cz; probe.y = 0;
+      // r378b, two mandate-era frame fixes: (1) resolve the leg UNDER the
+      // part (probe.y = base, useY on) — at a mandated crossing the legs
+      // differ by hundreds of units and the plan-nearest pick measured a
+      // summit parapet against the VALLEY leg (COTE D AZUR, a 382 u false
+      // float); (2) the band follows the LOCAL road width — road furniture
+      // (portal legs, rails) hugs widthAt + ~2, and the constant 12 left a
+      // wide road's own furniture outside its road (COL DE VERNAY, 13.6 u).
+      probe.x = p.cx; probe.z = p.cz; probe.y = p.y0;
       let gy = my;
-      if (t._distToTrack(p.cx, p.cz) < 12) {
-        const idx = t.nearestIndex(probe, null, false);
-        if (Number.isFinite(t.center[idx].y)) gy = Math.max(gy, t.center[idx].y);
+      {
+        const idx = t.nearestIndex(probe, null, true);
+        const w = t.widthAt?.(idx) ?? 9;
+        if (t._distToTrack(p.cx, p.cz) < w + 5
+          && Number.isFinite(t.center[idx].y)
+          && p.y0 >= t.center[idx].y - 1) gy = Math.max(gy, t.center[idx].y);
       }
       // A CHASM MAKES ITS OWN RIM LOOK LIKE IT IS FLYING — the same false
       // positive tool-road-census records: the gorge carve drops the ground
