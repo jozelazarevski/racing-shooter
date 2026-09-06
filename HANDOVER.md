@@ -4171,6 +4171,34 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r373 — THE CARPET SITS DOWN (nothing-floats repair on r372)
+
+r372's gate run had one red the deploy chain sailed past: nothing-floats
+LAW 3 on the two autumnwood worlds — 852 carpet cones on LARCH GOLD
+(worst 5.08 u) and 774 on MAPLE MILE (3.51 u) hanging over the ground.
+Two causes, both in _buildForestCarpet: (1) the cone geometries were
+translated so their BASES sat 0.7 u above the placement origin, and that
+offset scales with the tree — a 3.4x-tall carpet tree floated 2.4 u on
+dead-flat ground; (2) terrain was sampled only at the trunk, so a wide
+cone on a hillside hung its whole downhill edge in the air, which is
+where the 5 u worst case came from.
+
+Fix, r373: cones re-based at the origin (lo translate 2.4 -> 1.7, hi
+4.6 -> 3.9 — same silhouette, whole tree 0.7 u lower), and placement now
+seats each tree on the LOWEST of five terrain samples across its scaled
+footprint, minus 0.35 u. Uphill sides bury slightly — correct for a
+far-field carpet with no colliders.
+
+Also noted, not chased: one element-box Box(1,1,1) floats 1.43 u on
+LARCH GOLD — new since r365 (the ford/tune era), but a single sub-8
+part PASSES LAW 3 on its own (ARDENNES has carried one at 1.24 u since
+r361). On the list for the next dressing pass, not a gate.
+
+LESSON for the next session: the r372 deploy chain was a single `&&`
+string through `cat gate369.txt` — the cat succeeds whether the gates
+are green or not, so the chain deployed on a red. A gate file must be
+CHECKED (`grep -q "rc=1" && stop`), not displayed.
+
 ## r372 — "PAY ATTENTION TO THE DETAILS" (the reference, third pass)
 
 The owner rejected r371 as not close. Root cause of the misjudgment was

@@ -16429,8 +16429,10 @@ export class Track {
    *  trees and solids already own everything reachable at speed). */
   _buildForestCarpet() {
     const COUNT = 4200;   // r372b: 2600 read as dots on amber, not a carpet
-    const lo = new THREE.ConeGeometry(1.9, 3.4, 6); lo.translate(0, 2.4, 0);
-    const hi = new THREE.ConeGeometry(1.15, 2.6, 6); hi.translate(0, 4.6, 0);
+    // r373: bases AT the origin, not 0.7 u above it — the r372 offsets scaled
+    // with the tree and hung 850 cones over the ground (nothing-floats LAW 3)
+    const lo = new THREE.ConeGeometry(1.9, 3.4, 6); lo.translate(0, 1.7, 0);
+    const hi = new THREE.ConeGeometry(1.15, 2.6, 6); hi.translate(0, 3.9, 0);
     // two draw calls (lower and upper cone), one matrix per tree in each —
     // cheap enough that merging isn't worth a util this file doesn't have
     const meshes = [lo, hi].map((g2) => new THREE.InstancedMesh(g2,
@@ -16448,10 +16450,15 @@ export class Track {
       // exactly the empty amber band the owner's reference does not have
       if (this._distToTrack(x, z) < 30) continue;
       if (this._underwater && this._underwater(x, z)) continue;
-      const y = this.terrainHeight(x, z);
       const sc = 1.1 + Math.random() * 1.6;
+      // r373: seat on the LOWEST corner of the footprint, not the centre —
+      // a wide cone on a hillside hung its downhill edge 2 to 3 u in the air
+      const fr = 1.9 * sc;
+      let y = this.terrainHeight(x, z);
+      y = Math.min(y, this.terrainHeight(x + fr, z), this.terrainHeight(x - fr, z),
+        this.terrainHeight(x, z + fr), this.terrainHeight(x, z - fr));
       eu.set(0, Math.random() * Math.PI * 2, 0); q.setFromEuler(eu);
-      pos.set(x, y - 0.3, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
+      pos.set(x, y - 0.35, z); scl.set(sc, sc * (0.85 + Math.random() * 0.4), sc);
       m.compose(pos, q, scl);
       const roll = Math.random();
       if (roll < 0.55) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
