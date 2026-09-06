@@ -5027,7 +5027,16 @@ export class EnemyCar extends Car {
     // Lookahead shrinks with local curvature: a long chord across a tight arc
     // cuts the corner straight into the inside wall (pure-pursuit artifact).
     const curvHere = t.curvature[this.trackIndex];
-    const look = Math.max(5, Math.floor((6 + Math.abs(v) * 0.35) / (1 + 45 * curvHere)));
+    // r382 (PATCH_02 v3 FIX-1, measured): the lookahead was denominated in
+    // SAMPLES — at ROUTE_SCALE 4 the doubled segLen doubled the minimum
+    // chord to ~37 m, and the halved curvature values halved the corner
+    // shrink, so every rival swung wide on every curve (census: mean |lat|
+    // 1.06x half-width through corners, the R10 "single file in the ditch").
+    // Metres now, floored at the 18 m the r340-era 5-sample minimum really
+    // was; the curv term re-normalized to its RS-2 tuning point.
+    const lookM = Math.max(18,
+      (6 + Math.abs(v) * 0.35) / (1 + 45 * curvHere * ROUTE_SCALE / 2)) ;
+    const look = Math.max(2, Math.round(lookM / (t.segLen ?? 3)));
     const li = (this.trackIndex + look) % t.N;
     let targetLat = t._raceLine[li] + this.lane;
 
