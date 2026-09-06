@@ -4171,6 +4171,36 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r380 — THE WORLD GROWS WITH THE LAP (owner's live session: void, sky garbage, stacked streets)
+
+Three owner screenshots in one evening, one root: scale-4 laps outgrew
+every fixed-size world system. (1) VOID — LARCH GOLD's road rode over
+brown nothing: the ±1000 u near terrain patch (sized when "no circuit
+reaches past ~320 u") now follows each route's own footprint, as do the
+far-ring switch, the world skirt, and the _drawnGroundY lattice;
+nothing-floats finds the patch BY NAME and checks completeness against
+its own vertex count. (2) SKY GARBAGE — CITADEL BAY's horizon filled
+with wavy gradient bands: the skyline/mesa/city/dune rings stood at
+fixed 930-1280 u radii; all four now stand off the patch edge (xhs).
+(3) STREETS IN THE SKY — buildings hanging overhead with their shadows
+on the road: the 500 m mandate had bound the whole Mediterranean family;
+it now binds TERRACE AND FIELD country only (vineyard, olivecountry,
+medterrace, sanremo) — harbor towns keep their coastal profiles. Owner's
+"Tunel is needed here": surveyed all seven remaining mandated worlds —
+zero self-crossings, all switchback climbs, so the stacked-road gap
+cannot recur; nothing to bore. Plus: VINEYARD VELOCE's floats gap 4->8
+(calibrated pre-mandate), and the battery runner now starts the dev
+server if dead (a dead server read as 41 reds — measured).
+
+ALSO IN THIS DEPLOY (r381 work, tag stays r380 for the chain in flight):
+RALLY_PATCH_02 v3 saved as normative (R10+R11 evidence; C-4 lifts
+repair-only for world/track scope; falls now cost -1 hull with respawn
+per CLAUDE.md 3.4b; program tracked as tasks #80-#88), and the owner's
+lap rule — "Decide when track is 1 or 3 laps depending the length":
+laps under lapsShortTrackU (3000 u) race 3, longer race 1, level.laps
+wins (CLAUDE.md 6.1c; test-lap-count green; every current roster lap is
+5.9 km+, so defaults stay 1 until PART III adds short circuits).
+
 ## r379 — DRIFTS COST SPEED (owner: "When I drift I need to slow down significantly")
 
 The complaint was exact: drifting had NO forward tax. Three things
