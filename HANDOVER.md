@@ -33,6 +33,16 @@ there is no baseline to tune difficulty against. Measure that first; tuning
 before you have it is guessing. Rivals circulate 0.5-0.9 laps/30 s and never
 wreck (8/8 alive, every run).
 
+PARTIAL ANSWER (r363): a calibrated ROBOT baseline now exists —
+`tests/fixtures/robot-baseline-r363.json`, the airace expert stand-in at
+skill 0.94 racing full 3-lap races on one world per template. Best laps:
+PINE VALLEY 89.0 s, CANYON RUN 102.3 s, FROST PEAK 142.3 s, RED CENTRE RUN
+123.7 s, CAPO VELA 121.7 s, THE DUNE SERPENT 79.1 s (every world shows
+lap-over-lap improvement as the line settles, so lap 1 times carry launch
+and traffic). Robot finish ranks on those runs spread P1-P8, which is the
+field working. This is NOT the human number — it is a stable, reproducible
+anchor to measure drift against until the owner clocks a real lap.
+
 The theory that used to stand in for this measurement — "road furniture is the
 difficulty curve" — was killed in r199 and must not be rebuilt. The instance it
 named was a measurement artifact (see MEASUREMENT DISCIPLINE). What really does
@@ -4160,6 +4170,207 @@ at 1.5 u/s on the pristine base — the pace law, 4 u/s, is the shortcut
 detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
+
+## r367 — THICK FORESTS, HARVEST CONCEPT, AND THE BOARDS THAT AUDITED CLEAN
+
+**Thick forests (owner: "Add thick forests").** The autumnwood precedent —
+density, not distance — applied to seventeen forested themes (forest
+641→1400, deepwood 900→1600 with the belt pulled to the verge, jungle
+789→1350, the alpine family up ~1.6×). Bare-by-design worlds untouched.
+LARCH GOLD's "shade denser than the theme" override moved with the theme
+(1150 had silently become a THINNING after the theme passed it — the
+override trap to watch for whenever a theme number moves).
+
+**Harvest concept render** (golden-hour farmland over the CIDER LANE HUD):
+vineRows parcels draw from a per-world CROP list now — CIDER LANE is a
+patchwork of orchard greens and standing gold wheat — and three voxel
+tractors park mid-parcel on harvest worlds, solid. Deliberately NOT taken
+from the concept: wheel ruts (owner deleted them game-wide; an AI render's
+churned mud does not reopen a standing decision) and the HUD chrome
+(frozen).
+
+**The garage sprite sheet audited clean**: AUTO/compound chips with IDEAL
+HERE, the bay grouping (tyres/weapons/chassis), now→next lines, prices —
+all already shipped (r321/r356). The mockup had copied the game's own
+strings back at it. No change made; a metallic re-skin is available as a
+dedicated pass if the owner asks.
+
+**Suite recalibrations that rode along**: final-integration's FINAL LAP
+banner law binds only on multi-lap worlds (one-lap races have no boundary
+to announce); its ambient-particle law runs 1200 deterministic frames
+instead of a 20 s wall-clock sleep (it was measuring the rasteriser, and
+the thick forests slowed swiftshader enough to expose it); the roster boot
+sweep carries a 300 s default timeout for the same reason. airace races an
+unfinishable lap count (raceTime freezes at the robot's flag in a one-lap
+race and every later overtake event logs the same stamp). The traffic
+suite's wall-clock sensitivity is CONFIRMED, not fixed: it went red twice
+under concurrent load and green twice on a quiet machine with identical
+code — never run it beside anything.
+
+## r366 — MOUNTAIN VARIATIONS (owner asset board: peaks, scree, trails, strata)
+
+The third board in the series ("GAME WORLD ASSETS: MOUNTAIN VARIATIONS",
+legend A-E). Disposition against the engine:
+
+- **E PEAK VARIATIONS** — `horizonTexture` grew horizontal BANDS painted
+  over the altitude gradient, and `_buildHorizon` dresses each theme's
+  skyline by a `PEAK_STYLE` map: a snowline on the winter and high-alpine
+  ranges (snow/glacial/sheetice/avalanche/alpine/furka/tremola/pass), an
+  ember throat on the volcano, strata courses on canyon country
+  (canyon/ravine). Bands ride the same fog math as the rock under them.
+- **C COMPOSITE RANGES** — two new skyline sets join the six ("glaciated"
+  horn-off-one-crest, "broken tableland"), rotating per world id as before.
+- **A SCREE FORMATIONS** — `_buildScreeFans`: twelve fans of small broken
+  stone per mountain-family world, banked just off the verge and stretched
+  DOWNHILL along the sampled terrain gradient (dense at the head — the
+  shape of real scree, not a circle of pebbles). Visual only, ankle-high.
+- **B TRAILS & PASSES** — every tunnel bore gets a PORTAL FRAME: dark
+  timber posts and a lintel seated ABOVE the flared crown, so no new
+  geometry enters the driving or camera envelope; the two posts register
+  solids (Law of Solidity). The board's stepped trails/passes are the goat
+  peaks' carved routes, already shipped.
+- **D STRATA & ROCK FACES** — already largely in the engine: the hoodoos
+  carry per-drum strata tints and the mesa horizon exists; the new strata
+  peak bands extend the look to the standard horizon rings.
+
+The sheet before this one (the BRACKEN MOOR design-system poster) resolved
+to: HUD/typography/vehicles = the game's own frozen elements, world assets
+= r365b, plus one refinement — two-tone edge rails (weathered steel beam on
+dark timber posts) behind a new `edgeRailPostColor` theme knob; every
+non-autumn world's rails are bit-identical to before.
+
+Gates: the r365 chain (boot/nature/stagerules green pre-r366; traffic/
+airace/final-integration land on the full code), then a follow-up pass of
+boot + tunnels + nature + nothing-floats for the portal/scree/peak changes.
+Ships as one deploy with r364 and r365.
+
+## r365 — THE AUTUMN CHAPTER GETS ITS SEASON BACK (owner: "Autumn scenes need serious enrichment")
+
+Measured first: chase-camera frames of all five AUTUMN worlds (68-72) against
+PINE VALLEY with the same probe. The verdict was not "sparse" — it was
+ILLEGIBLE. The copper wood rendered as near-black maroon soup with only the
+road carrying light; HARVEST RUN's "open, gold" stubble read as black umber.
+
+**Root cause: the squared-pigment bug, again.** The outback theme documents
+it ("THE GROUND IS A PRODUCT, NOT A COLOUR"): the terrain material multiplies
+the ground texture by the per-vertex tint, so a palette written at full
+strength into BOTH renders as its own square. The three autumn themes did
+exactly that — ground.base #7d6236 × terrainLow #6a6234 ≈ #342610. All three
+now carry sqrt-form values (terrainLow/High/Dirt/Scree + ground.base), so the
+albedo that reaches the screen is the palette that was designed. The same
+product bug applied to the canopy (material colour × per-instance tint):
+foliageLow/Top and bushColor are sqrt-form now too. Before/after frames:
+night-and-day — the wood is amber, the harvest is gold, the moor is bracken
+over grey stone.
+
+**Then the furnishing (all instanced, all outside the 4 u band, everything
+solid registered in `solids`):**
+
+- **Autumn prop kits** (PROP_SPECS): the themes fell back to the generic
+  forest kit. New `pumpkin` prop type (squashed 9-segment sphere + stem,
+  smashable, 35 pts) — autumnwood and harvestvale scatter them by the verge;
+  mistfell gets a stone-country kit instead (no pumpkins on a moor).
+- **autumnwood**: 18 toadstool clusters (red/amber caps, ankle-high, visual)
+  through the tree belt; ~70 leaf drifts banked along the verges (shin-high
+  gold-to-rust mounds, drive-through by nature).
+- **harvestvale**: five pumpkin patches (22 gourds each) on the field strips,
+  six rows of corn stooks, five scarecrows (pole solids, 14-44 u out).
+- **mistfell**: twelve waymark cairns close by the road (stacked stones,
+  solid), a five-stone standing circle plus three outliers on the moor —
+  darkest tone on the world per §7.9, every one a collider.
+- **Rook flights** (all three themes): two flocks of eleven dark birds in a
+  slow banked circle over the course, holding height above the terrain
+  under them — driven from `Track.update()` beside the whales.
+
+`_autumnSpot(pad0, pad1)` is the shared placement helper: a spot pad0..pad1 u
+beyond the LOCAL road edge, `_distToTrack`-checked against the whole lap
+(the lesson of the r361 parapet and every placement bug before it).
+
+**r365b — the owner's asset board** ("Implement the design elements
+comprehensively", a five-part reference sheet) landed on top of the pass:
+
+- **A foliage**: new `maple` species — oak silhouette, a tint case that
+  ignores the theme's amber band and commits to deep red (hue wrapping
+  through 0). Weighted into the autumnwood (0.26) and harvestvale (0.12)
+  mixes.
+- **B cobblestone paths**: autumnwood roads are warm flagstone setts
+  (roadTexture `cobbles`), and roadTexture grew a painted `leaves` pass —
+  pointed-oval leaves with stems and shadows, edge-biased, same
+  costs-nothing trick as the tram rails. Dense on the wood path, moderate
+  chaff on the harvest lane, sparse bracken litter on the moor road.
+- **C loose leaf piles**: 30 flat instanced leaf patches per autumn world
+  at the road edge, shallow-stacked so a pile has depth.
+- **D rock formations**: nine boulder clusters per autumn world, boulders
+  walking off each other's shoulders, all colliders.
+- **E barriers**: `edgeRailColor: 0x4a3a2c` on all three themes — dark
+  timber post-and-rail.
+
+The chase-view A/B that gated the palette change: same framing on BRACKEN
+MOOR, old palette renders the moor beside the road as pure black, new
+palette as legible bracken with patch variation. The phone's live shot had
+looked fine because the LEAF SPECKLES in the ground texture resolve up
+close; from altitude (and at distance through the mip chain) the squared
+base dominated. The fix serves both views.
+
+Also in this change-set: test-airace races an unfinishable lap count — the
+one-lap race froze raceTime at the robot's flag mid-measurement, orphaning
+Q13's commits (21-62 per race) and jamming Q15's lap-boundary window open.
+Same class of fix as careersim CS3.
+
+Gates: nature / treeclear / droplip re-run on the enriched worlds, plus
+stagerules S4 (kicker fans) and nothing-floats for the new scatter. Ships
+with r364.
+
+## r364 — HIGH GROUND IS LEGAL, AND THE RACE IS ONE LAP (two owner asks)
+
+Owner, verbatim: "1. Don't reset me when I am off-road. 2. I don't need 3
+laps. Race is one lap only."
+
+**1. The cliff-top auto-return is deleted (CLAUDE.md 3.6d).** Root cause of
+"reset me when I am off-road" was NOT the stray/route rule (r345 already
+deleted that) but the PATCH_02 §3.4 cliff-top net in `vehicles.js`: player
+grounded 12 u above the tracked road, within 70 u XZ, with no road at own
+height within ±90 samples, for 2 s → free auto-return. Drive up any hill
+beside the road and two seconds later the game took the car. Deleted for the
+player, along with its `_cliffT` state, the `offmesh` telemetry pair and the
+dead `offmeshAutoReturnS` constant (driving.js + driving.json). The physical
+traps stand: under-terrain, wedge-under-throttle, bog-wreck, upside down,
+fatal falls. UNSTUCK is the only way off legal high ground and it is the
+player's to press. test-patch02 P2.6 is INVERTED: it stages the same rim
+perch the old gate staged and now demands 3 s of nothing happening, then
+proves the voluntary UNSTUCK still comes down (which also keeps P2.0's
+`unstuck` telemetry event alive).
+
+**2. One lap (CLAUDE.md 6.1b).** `LAPS` 3 → 1 in main.js; a world's own
+`laps:` declaration still wins (FALKEN RIDGE already raced 1). The sweep of
+lap-shaped content that came with it:
+
+- **The final lap's time was never recorded — on any lap count.**
+  `onPlayerLap` returned into `finishRace()` before the best-lap write, so a
+  3-lap race stamped laps 1-2 and dropped lap 3; a 1-lap race would have
+  stamped nothing, killing the results best-lap row, the lap record and the
+  PACE NOTE job. The stamp now lands before the finish branch.
+- **CLEAN LAP contract ladder** counted clean laps (1/2/3) — rungs 2-3
+  impossible in one lap. Now climbs by placement with the lap still clean:
+  clean lap / clean + top 3 / clean + win. Same prices, same resolve point
+  (live rank at the finish crossing IS the final place — everyone who beat
+  you is already over the line).
+- **SURE-FOOTED feat** "two laps without a scratch" → one clean lap.
+- **FLAWLESS START** copy "lead at the end of lap 1" → "lead the field
+  across the line" (mechanism unchanged; with one lap they are the same).
+- **test-lap-count** rebuilt: default 1, and the suite injects a synthetic
+  `laps: 2` onto one world mid-loop so the model-follows-world law still
+  discriminates instead of comparing a constant to itself.
+- **Avalanche chase worlds** release the wall when the FINAL lap starts —
+  which is now the whole race. Left as designed: the chase is the event.
+- **Economy note, recorded not retuned:** a race now pays roughly a third
+  of the old lap bonuses and passes a third as many pickups. If the career
+  starts feeling starved the knobs are the contract pays and
+  `career.firstClearCr`, but that is a measurement round, not a guess.
+
+Robot baseline fixture (tests/fixtures/robot-baseline-r363.json) stores
+per-LAP times, so it survives the change unread; per-RACE income measurements
+from r359/r363 are now stale by design.
 
 ## r363 — RESET MEANS RESET, AND POLE IS EARNED (two owner asks; ships with r362)
 

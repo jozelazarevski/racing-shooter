@@ -92,6 +92,8 @@ Open, in priority order. Each row is a repair of observed behaviour.
 
 **3.6c Missed gates, owner override (r345).** "Don't reset the car when I go off route." The player's missed-gate trigger of 3.6 (4.0 s grace -> return) is DELETED: leaving the route costs progress, never the car. The owed gate stays armed and driving back through it clears the debt; SOS remains the voluntary return. Rivals keep the missed-gate/off-course recovery (a parked rival is a bug); the physical-trap triggers (void, fall, water, stuck, upside down) stand for everyone.
 
+**3.6d Off-road high ground, owner override (r364).** "Don't reset me when I am off-road." The cliff-top auto-return (PATCH_02 §3.4: player grounded 12 m above the tracked road with no road at own height within reach for 2 s -> free return) is DELETED. Being off-road, however high, is never a fault for the player — 3.6c already ruled out the route trigger and this rules out the altitude one. The physical traps stand unchanged: under-terrain/void, wedged under held throttle, bogged on wrong tyres (a wreck), upside down, fatal falls, water. UNSTUCK remains the voluntary way back and is the only rescue off legal high ground.
+
 **3.4a Fatal drops, owner override (r320, recorded r330).** "Should be wrecked at this kind of falls" (phone report, PIKES PEAK shelf). Falls past the damper-priced free band WRECK the car (`fallWreckOver`); §3.4's return-at-apex with no hull change is superseded by that direct request. The under-12 m landing-damage shape and the water rule stand.
 
 **3.7 Landing assist.** For 300 ms after touchdown: lateral velocity blended toward heading at 80% per 100 ms, yaw rate clamped 60[deg]/s, steer honoured, handbrake cancels and preserves the slide.
@@ -146,6 +148,8 @@ No convergence, catch-up or slow-down toward any car within 10 s of a lap bounda
 
 **6.1 Position and laps.** Recording F shows the player's dot on the field strip pinned at 0% for the whole 34 s, including a gate crossing at 0:23, while the seven rival dots advance about 5% of a lap in the same time. The progress metric is not updating for the player, and the field as a whole is nearly stationary. progress = gatesPassed * 1000 + fraction along the current segment, recomputed every tick for every car; the strip and the position display read that value and nothing else (HUD appearance unchanged). Display order updates <= 2 Hz and only after the new order persists 1.0 s; ties by time of passage. Lap counter starts at 1. Start-line trigger inert until checkpoint 1 is passed this lap; no event, no message.
 
+**6.1b Race length, owner override (r364).** "I don't need 3 laps. Race is one lap only." The default lap count is 1 on every world; a world's own `laps` declaration still wins. Lap-shaped content is sized to the single lap: the CLEAN LAP contract ladder climbs by placement with a clean lap (rungs 2-3 were 2-3 clean laps and could never complete again), SURE-FOOTED asks for one clean lap, FLAWLESS START means leading across the line, and the final lap's time is recorded at the flag (it never was — the finish path returned before the best-lap write, on any lap count). Per-race score and credits shrink with the shorter race; recorded, not retuned, pending play.
+
 **6.2 Damage (holding).** amount = 0.9 * max(0, vN - 5), glancing < 20[deg] = 0, cap 45/hit and 60/s, both collider paths. Grid lock to GO + 1.5 s; AI targeting from GO + 4 s. Hull regen as shipped.
 
 **6.3 Nitro.** Bonus <= +40 km/h over gear top speed, 2.0 s, never granted by recovery, cut while off course. Ceiling derived per world: `nitroCeilingKmh = min(designSpeedKmh + 20, gearTop + 40)`; street template gives 160.
@@ -155,6 +159,8 @@ No convergence, catch-up or slow-down toward any car within 10 s of a lap bounda
 **6.5 Toasts and wet state (behaviour only).** Status types (WET TIRES, NITRO LOW, wet road) fire once per state change with a 10 s cooldown per type; sampling loops MUST NOT emit toasts. Root cause on Pikes Peak: WET TIRES fires on dry grass at 0:26 and on every road-to-grass transition, so the wet flag is being evaluated per surface sample. Wet is a stage-wide weather state plus the wet-tyre pickup timer, evaluated once per state change, never per surface. Appearance frozen.
 
 **6.5a Hull regen, recorded, not changed.** Regen is +3 hull/s starting 4 s after the last damage, cap 124 on this car. A -23 rock heals in 8 s; damage only matters in bursts. Left as shipped under the repair-only rule; flagged for a later balance pass.
+
+**6.5b Hull regen balance pass, closed by measurement (r363).** Three instrumented expert races (PINE VALLEY, CANYON RUN, FROST PEAK): damage intake 331/546/413 hull per race, regen healed back only 184/271/205 (~50%), minimum hull 0/0/29, three wrecks across the three races. The single-rock example of 6.5a is true but the aggregate is not: rival fire dominates intake and hull genuinely threatens, and the kit lock already prices hull on under-prepared cars (stock BRAWLER races PINE at 79 of 96). Regen stays as shipped; the "later balance pass" flag is retired.
 
 **6.6 Kills affect position.** A destroyed rival respawns at its last gate after a 4.0 s hold, so the shooter gains the places earned.
 

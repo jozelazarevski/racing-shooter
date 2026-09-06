@@ -128,11 +128,14 @@ const browser = await chromium.launch(LAUNCH);
         break;
       }
     }
-    return { maxY: +maxY.toFixed(2), finalLap: sawFinalLap, pitchFrames: pitchSeen, finished };
+    return { maxY: +maxY.toFixed(2), finalLap: sawFinalLap, lapsTotal: g.lapsTotal, pitchFrames: pitchSeen, finished };
   });
   const finished = info.finished;
   check('race finishes -> results screen', finished);
-  check('FINAL LAP banner shown', info.finalLap);
+  // r364: a ONE-lap race has no lap boundary, so no FINAL LAP banner exists
+  // to show — the law binds only when the world races 2+ laps
+  check('FINAL LAP banner shown (multi-lap worlds only)',
+    info.lapsTotal < 2 || info.finalLap, `lapsTotal=${info.lapsTotal}`);
   check('elevation ridden during lap (|y| max > 3)', info.maxY > 3, `maxY=${info.maxY}`);
   check('car pitches on grades', info.pitchFrames > 20, `pitchFrames=${info.pitchFrames}`);
   check('no page errors during race', errors.length === 0, errors.slice(0, 3).join(' | '));
@@ -169,7 +172,13 @@ const browser = await chromium.launch(LAUNCH);
     g.player.vel.set(0, 0, 0);
     const hp0 = g.player.health;
     const head0 = g.particles.head;
-    await new Promise(r => setTimeout(r, 20000));
+    // r367: deterministic frames, not wall clock. The thick-forest worlds
+    // render slowly under swiftshader, so a 20 s sleep counted whatever
+    // frames the rasteriser managed (68 spawns on a slow run, 181 on a fast
+    // one — the law was measuring the machine). 1200 fixed frames is the
+    // same 20 s of GAME time at any wall-clock speed.
+    g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+    for (let k = 0; k < 1200; k++) g.frame();
     return { hp0, hp1: g.player.health, headDelta: g.particles.head - head0 + (g.particles.head < head0 ? 6000 : 0), slam: g.__sawSlam };
   });
   // #63 repair: the law is that the pool ADVANCES while parked — 181 in 20 s
@@ -189,6 +198,9 @@ const browser = await chromium.launch(LAUNCH);
   await probe.close();
   for (const lvl of ids) {
     const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
+    // r367: the thick forests make a world build + first paint slow under
+    // swiftshader; playwright's default 30 s click timeout was the crash
+    page.setDefaultTimeout(300000);
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForFunction(() => window.__game, null, { timeout: 120000 });

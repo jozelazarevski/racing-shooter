@@ -58,11 +58,20 @@ const R = await page.evaluate(async () => {
   const frames = (n) => { for (let i = 0; i < n; i++) g._frameBody(); };
   // strand the car well off the road, stationary — the shape of being stuck
   const park = () => {
+    // r364: hold ONE spot on the lap. Keying the park off the LIVE
+    // trackIndex let the rescue ladder march the car forward (each rescue
+    // re-seats at the gate, rapid rescues +14 u further), which crossed the
+    // start line mid-test — harmless at 3 laps, but a ONE-lap race FINISHES
+    // on that crossing and a finished race rightly refuses the button. The
+    // law here is the free unlimited button, so the position is pinned.
+    p.trackIndex = 100;
+    p._rescueAhead = 0; p._lastRescueAt = -99;
+    p.lap = 1;
     const c = t.center[(p.trackIndex + 40) % t.N];
     const n = t.nrm[(p.trackIndex + 40) % t.N];
     p.pos.set(c.x + n.x * 34, c.y + 3, c.z + n.z * 34);
     p.vel.set(0, 0, 0); p.vy = 0;
-    p._wedgeT = 0; p._lostT = 0; p._cliffT = 0;
+    p._wedgeT = 0; p._lostT = 0;
     frames(3);
   };
   const offRoad = () => Math.abs(p.lateral ?? 0);

@@ -136,7 +136,6 @@ export const DRIVING = {
     playerTargetEarlyUntilS: 20,
     targetTokenRotateS: 6,
     rubberbandMaxPct: 8,
-    offmeshAutoReturnS: 2.0,
     landingAssistMs: 300,
     landingYawClampDps: 60,
     wallEscapeMaxKmh: 30,

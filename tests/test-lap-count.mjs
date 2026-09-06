@@ -1,7 +1,12 @@
 /* THE LAP COUNT BELONGS TO THE WORLD, NOT TO THE PAGE LOAD.
  *
- * Reported as a photograph of the HUD reading LAP 1/1 on a circuit that races
+ * Reported as a photograph of the HUD reading LAP 1/1 on a circuit that raced
  * three: "I see lap 1/1. Why?"
+ *
+ * r364, owner override: "Race is one lap only." The default is now 1, so the
+ * roster no longer discriminates the plumbing by itself — the suite injects a
+ * synthetic `laps: 2` onto one world mid-loop to keep the original law (the
+ * MODEL follows the WORLD across swaps, both directions) measurable.
  *
  * `lapsTotal` was set in the Game constructor and nowhere else, so it
  * described whichever world the page happened to BOOT on for the rest of the
@@ -24,7 +29,7 @@
 import { chromium } from 'playwright-core';
 
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const DEFAULT_LAPS = 3;
+const DEFAULT_LAPS = 1;
 
 let pass = 0, fail = 0;
 const ok = (cond, msg, extra = '') => {
@@ -48,19 +53,23 @@ await page.waitForFunction(() => window.__game?.track?.center && window.__game.p
 const swaps = await page.evaluate(async () => {
   const g = window.__game;
   const { LEVELS } = await import('./src/track.js');
-  const out = [{ name: g.level.name, declared: g.level.laps ?? 3, got: g.lapsTotal }];
-  // away from the 1-lap stage, back to it, and away again — a stuck value
-  // looks correct on any single leg of that
-  for (const id of [1, 21, 38, 6]) {
+  const out = [{ name: g.level.name, declared: g.level.laps ?? 1, got: g.lapsTotal }];
+  // one world is poked to declare 2 laps so the loop still proves the model
+  // FOLLOWS the declaration rather than happening to equal a constant
+  LEVELS.find((x) => x.id === 38).laps = 2;
+  // away from the default, onto the odd one out, and away again — a stuck
+  // value looks correct on any single leg of that
+  for (const id of [1, 38, 21, 6]) {
     g.state = 'title'; g.editScene = null;
     g.swapLevel(LEVELS.find((x) => x.id === id), true, null);
-    out.push({ name: g.level.name, declared: g.level.laps ?? 3, got: g.lapsTotal });
+    out.push({ name: g.level.name, declared: g.level.laps ?? 1, got: g.lapsTotal });
   }
+  delete LEVELS.find((x) => x.id === 38).laps;
   return out;
 });
 const wrong = swaps.filter((s) => s.declared !== s.got);
 ok(wrong.length === 0,
-  `every world races the lap count it declares (${swaps.length} swaps from a 1-lap boot)`,
+  `every world races the lap count it declares (${swaps.length} swaps incl. a declared 2-lap world)`,
   wrong.map((s) => `${s.name} wants ${s.declared} got ${s.got}`).join(', '));
 
 // ---- 2. and the HUD shows it, in a real race --------------------------------
@@ -70,7 +79,7 @@ const hud = await page.evaluate(async () => {
   const g = window.__game;
   const { LEVELS } = await import('./src/track.js');
   g.state = 'title'; g.editScene = null;
-  g.swapLevel(LEVELS.find((x) => x.id === 1), true, null);   // PINE VALLEY, 3 laps
+  g.swapLevel(LEVELS.find((x) => x.id === 1), true, null);   // PINE VALLEY, default laps
   g.resetRace();
   g.startRace();
   g.countdown = 0.01;
@@ -80,7 +89,7 @@ const hud = await page.evaluate(async () => {
     domLap: document.getElementById('lap')?.textContent };
 });
 ok(hud.domTotal === String(DEFAULT_LAPS),
-  `the HUD reads LAP n/${DEFAULT_LAPS} on ${hud.world} after a swap from the 1-lap stage`,
+  `the HUD reads LAP n/${DEFAULT_LAPS} on ${hud.world} after the swap chain`,
   `showed ${hud.domLap}/${hud.domTotal}, model ${hud.lapsTotal}, state ${hud.state}`);
 
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));

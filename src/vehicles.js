@@ -5928,30 +5928,15 @@ export class PlayerCar extends Car {
       const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
-      // PATCH_02 §3.4: ON TOP OF THE CANYON IS OFF THE COURSE. The stray rule
-      // measures XZ only, so a car thrown onto the rim DIRECTLY ABOVE the lap
-      // read as on-course and cruised the cliff tops at 199 for six seconds.
-      // Grounded, 12 u above the tracked road, with NO road at our own height
-      // within reach (stacked decks and overpasses are legal), for 2 s -> the
-      // same free auto-return the lost net uses. Race only: in roam the high
-      // ground is the destination (goat peaks), never a fault.
-      let cliffTop = false;
-      if (!g.freeRoam && !this.airborne && this === g.player) {
-        const t4 = g.track, N4 = t4.center.length;
-        const ci4 = t4.center[this.trackIndex];
-        if (ci4 && this.y - ci4.y > 12
-            && Math.hypot(this.pos.x - ci4.x, this.pos.z - ci4.z) < 70) {
-          cliffTop = true;
-          for (let q = -90; q <= 90; q += 3) {
-            const cq = t4.center[(this.trackIndex + q + N4) % N4];
-            if (Math.hypot(cq.x - this.pos.x, cq.z - this.pos.z) < 30
-                && Math.abs(cq.y - this.y) < 6) { cliffTop = false; break; }
-          }
-        }
-      }
-      if (cliffTop && !(this._cliffT > 0)) g.telemetry?.log('offmesh', { enter: true, speed: Math.round(Math.hypot(this.vel.x, this.vel.z)) });
-      else if (!cliffTop && (this._cliffT ?? 0) > 0) g.telemetry?.log('offmesh', { enter: false });
-      this._cliffT = cliffTop ? (this._cliffT ?? 0) + dt : 0;
+      // r364, owner override (extends §3.6c): "Don't reset me when I am
+      // off-road." The PATCH_02 §3.4 cliff-top rule that lived here — grounded
+      // 12 u above the tracked road with no road at reach for 2 s -> free
+      // auto-return — is DELETED for the player. It read as the game resetting
+      // you for driving off-road, which §3.6c already ruled out for the route
+      // and this rules out for altitude too. High ground is legal everywhere;
+      // only genuinely broken states are rescued: under the terrain (_lostT),
+      // wedged under throttle (_wedgeT), bogged on wrong rubber (a wreck),
+      // upside down, and fatal falls. The UNSTUCK button covers the rest.
       // WEDGED IS NOT WANDERING. The net above deliberately lets a player
       // drive anywhere — but a car photographed parked on a gorge face at
       // 0 km/h with the throttle held ("I still see this") is not exploring,
@@ -6097,10 +6082,9 @@ export class PlayerCar extends Car {
       this._unstuckReq = false;
       const spend = called && this.unstuckCool <= 0;
       const RT4 = DRIVING.route ?? {};
-      if (this._lostT > 2.5 || (this._cliffT ?? 0) > 2
+      if (this._lostT > 2.5
           || this._wedgeT > (RT4.stuckDetectS ?? 2.5) || spend) {
         this._lostT = 0;
-        this._cliffT = 0;
         this._wedgeT = 0;
         this._bogT = 0;      // a rescue is a successful trial: the clock resets
         if (spend) {
