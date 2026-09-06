@@ -3496,11 +3496,21 @@ const THEMES = {
     skyTop: '#4a7a9c', skyHorizon: '#c8d4bc', sunGlow: 0xf0e8b8,
     sunAz: 2.4, sunEl: 0.62,
     cloudCount: 6, cloudOpacity: 0.8,
-    terrainLow: '#41603a', terrainHigh: '#648250', terrainDirt: '#6a5c42',
-    terrainScree: '#5a5c48', hutGlow: 0.55,
+    // THE GROUND IS A PRODUCT, NOT A COLOUR (the r365 product rule; see
+    // outback). The terrain material multiplies the ground texture by the
+    // per-vertex colours, and this theme wrote its moss palette at full
+    // strength into BOTH — #4c6a3c x #41603a lands at #13280e, a near-black
+    // green darker than the measured-unplayable pre-fix farmland floor. The
+    // base is the square root of the designed moss tone and the vertex
+    // colours are the palette divided back out, so the albedo that reaches
+    // the screen IS the palette: base x terrainLow -> #41603a, x terrainHigh
+    // -> #648250, x terrainDirt -> #6a5c42, x terrainScree -> #5a5c48. The
+    // wood stays the dark one on the roster; it stops being an unlit one.
+    terrainLow: '#779578', terrainHigh: '#b7caa5', terrainDirt: '#c28f88',
+    terrainScree: '#a58f94', hutGlow: 0.55,
     skirtColor: '#4e4838',
     ground: {
-      base: '#4c6a3c',
+      base: '#8ba47c',
       bandLight: 'rgba(140,170,104,0.08)', bandDark: 'rgba(34,52,28,0.07)',
       patchA: 'rgba(70,90,44,0.25)', patchB: 'rgba(96,80,52,0.2)',
       speckA: 'rgba(90,110,70,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 120,
@@ -3513,7 +3523,11 @@ const THEMES = {
     },
     hillColor: 0x33512c, peakColor: 0x4e6a48,
     treeCount: 900, trunkColor: 0x5a4028,
-    foliageLow: 0x24522c, foliageTop: 0x36703c,
+    // Same product structure as the ground (the r365 product rule): the
+    // canopy material multiplies the per-instance HSL tint, and #24522c x a
+    // mid tint bottomed out at ~#041f05. Square roots of the designed crowns,
+    // so the tint block below still reads as the deep wood it describes.
+    foliageLow: 0x60916a, foliageTop: 0x75a97c,
     foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
     treeSnowCap: false,
     // THE CANOPY MUST CLOSE. At 12.5 u the stands began a clear three units
@@ -3523,7 +3537,8 @@ const THEMES = {
     // concentrates the same count into the band you actually drive through.
     treeBelt: [10.4, 52],
     tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
-    bushCount: 416, bushColor: 0x2c5c2c,
+    // bushColor x the bush tint is the same product (r365 rule): sqrt form.
+    bushCount: 416, bushColor: 0x6a996a,
     bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
     rockCount: 225, pebbleCount: 240, rockColor: 0x6e7264, rockSnowCap: false,
     flowerCount: 90, flowerColors: ['#ffffff', '#c8b0ff'],
