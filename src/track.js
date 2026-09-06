@@ -623,9 +623,16 @@ export const LEVELS = [
         rut: 'rgba(86,70,46,0.5)', rutCore: 'rgba(62,50,32,0.45)', tread: 'rgba(36,28,16,0.45)',
         stoneA: 'rgba(216,202,168,0.65)', stoneB: 'rgba(98,82,56,0.7)',
         fringe: [110, 150, 62], fringeVar: [36, 40, 24],
+        // measured on the first render: full-chroma stones read as CONFETTI
+        // from the driving camera. The reference tile's variety is in muted
+        // earth hues under one dusty finish — desaturated palette, bigger
+        // stones, darker mortar.
+        // v3: v1 read as confetti, v2 as dark brick. The reference sits
+        // between — warm dusty stones a shade lighter than the mortar shows
+        // through, and courses wide enough that a stone reads ~0.9 u.
         cobbles: {
-          stones: ['#b06a4a', '#8a92a0', '#c2a878', '#9a7a88', '#9a948c', '#a08058'],
-          mortar: 'rgba(58,50,40,0.8)', rows: 19, per: 30,
+          stones: ['#ab8066', '#948d8c', '#b39e7c', '#9d867e', '#9e9889', '#a8926e'],
+          mortar: 'rgba(52,45,36,0.85)', rows: 12, per: 18,
         },
         leaves: { count: 70, colors: ['#d8a838', '#c8862a', '#b8462a', '#e0c050'] },
       },
