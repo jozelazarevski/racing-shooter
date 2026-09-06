@@ -4171,6 +4171,20 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r379 — DRIFTS COST SPEED (owner: "When I drift I need to slow down significantly")
+
+The complaint was exact: drifting had NO forward tax. Three things
+conspired — the lateral scrub never touched forward speed, driftReward
+handed HALF of every scrubbed slide back as forward speed (a drift could
+exit FASTER than it entered), and the sliding drag ease capped drag at
+0.40. r379: (1) a slip-proportional forward scrub — with the handbrake
+held, forward speed pays driftForwardScrub (0.5/s at full slip, ~70 ->
+~40 km/h over a 1.5 s slide); a slide entered WITHOUT the button pays a
+reduced rate only past slip 0.55, so committed grip-cornering and the
+FT1-FT6 feel floor stay untouched; skipped airborne. (2) driftReward
+0.5 -> 0.15. Both constants live in driving.json AND the src/driving.js
+defaults. test-drift is the gate (phase D of the phased rollout).
+
 ## r378 — THE VERTICAL MANDATE (owner: passes >= 1200 m, olive/vine >= 500 m)
 
 "Mountain passes need to have at least 1200m climbing difference. Olive
