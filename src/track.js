@@ -6389,8 +6389,13 @@ const NEON_THEMES = new Set(['neon', 'undercity']);
 const ELEV_MANDATE = {
   alpine: 1200, pass: 1200, tremola: 1200, furka: 1200,
   avalanche: 1200, dolomiti: 1200,
+  // r380c (owner's CITADEL BAY shot — buildings hanging in the sky): the
+  // owner said "olive and VINE YARDS", and the first cut mandated the whole
+  // Mediterranean family — including the HARBOR TOWNS, whose street blocks
+  // then stacked 500 m over each other where route legs pass in plan. The
+  // mandate now binds only true terrace and field country; azur, liguria,
+  // aegean, brava and dalmatia keep their coastal town profiles.
   vineyard: 500, olivecountry: 500, medterrace: 500, sanremo: 500,
-  liguria: 500, aegean: 500, brava: 500, dalmatia: 500, azur: 500,
 };
 // r368: the winter chapter — the four themes that get the winter dressing
 // pass (the autumn r365/r366 treatment translated into snow and ice).
