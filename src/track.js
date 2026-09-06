@@ -561,6 +561,12 @@ export const LEVELS = [
       // r370 (owner reference render): a rocky stream winds beside the road
       // through the wood — the ford machinery carves the reach and banks
       fords: { count: 1 }, riverBank: { base: '#6a6252' },
+      // r370b ("Replicate this 1:1"): the reference is an INTIMATE lane —
+      // about 1.5 car widths — where the engine default is a boulevard.
+      // 0.62 is as narrow as an eight-car grid can honestly race (the
+      // mountain-template scale); everything downstream of widthAt scales
+      // with it, so the AI, rails and censuses follow.
+      roadWidth: 0.62,
       // A shade denser than the theme, because this is the showcase — the
       // theme moved to 1650 underneath this override (r367), so the number
       // moves with it; 1150 had started quietly THINNING the one world
@@ -22687,8 +22693,11 @@ export class Track {
             // autumn themes), so the target green is divided through a warm
             // material to survive the product. Green-band worlds hit the
             // r>g guard false and keep their exact old colours.
-            color.setHSL(0.315 + Math.random() * 0.04, 0.42 + Math.random() * 0.12,
-              0.2 + Math.random() * 0.09);
+            // r370b: one notch darker — the first target rendered lime
+            // against the reference's deep spruce (the top tier's material
+            // is the LIGHTER amber, so the crown tips ride brighter anyway)
+            color.setHSL(0.32 + Math.random() * 0.035, 0.46 + Math.random() * 0.12,
+              0.13 + Math.random() * 0.07);
             const M = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
             if (M.r > M.g) {
               color.setRGB(Math.min(1, color.r / Math.max(0.2, M.r)),

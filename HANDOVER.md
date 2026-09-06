@@ -4171,6 +4171,24 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r371 — LARCH GOLD 1:1 (owner: "Replicate this 1:1")
+
+Frame-to-frame against the reference, two gaps remained after r370:
+
+- **The lane.** The reference is intimate — ~1.5 car widths — where the
+  engine default is a 9-half boulevard. LARCH GOLD tunes `roadWidth: 0.62`
+  (11 u total, the mountain-template scale, as narrow as an eight-car grid
+  can honestly race). `T.roadWidth` is the one knob that scales widthAt and
+  therefore the ribbon, the AI's lateral clamps, rails and censuses
+  together. Ford index and river verified rebuilt at the new width.
+- **Spruce depth** — the conifer target dropped a notch (l 0.13-0.20):
+  the top crown tier rides the LIGHTER amber material, so the first target
+  read lime at the tips.
+
+What deliberately did NOT move for the reference: the eight-car grid (a
+true 1.5-width lane cannot race), and the painterly lighting — the phone
+GPU carries more of that than the headless probe shows.
+
 ## r370 — THE OWNER'S LARCH GOLD REFERENCE ("This is what I want to see")
 
 The reference render decodes to three gaps, all closed:
