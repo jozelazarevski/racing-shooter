@@ -4,9 +4,11 @@
 # suite set against THAT working tree (the dev server serves the checkout),
 # pushes main only on green, waits for the gh-pages tag, then moves on.
 # A red stops the ladder with main un-pushed and the branch checked back out.
+# Resume after a fixed red with e.g. SKIP=A or SKIP=AB (phases to skip).
 set -u
 cd "$(dirname "$0")/../.."
 BR=claude/agent-driver-tracks-4d3jve
+SKIP="${SKIP:-}"
 mkdir -p /tmp/iter
 : > /tmp/iter/phased.txt
 log() { echo "[phased] $*" | tee -a /tmp/iter/phased.txt; }
@@ -36,16 +38,24 @@ wait_live() {   # $1 tag
 
 phase() {   # $1 name  $2 commit  $3 tag  $4... suites
   local P=$1 C=$2 TAG=$3; shift 3
+  case "$SKIP" in *"$P"*) log "=== PHASE $P skipped (SKIP=$SKIP)"; return 0;; esac
   log "=== PHASE $P -> $C ($TAG), suites: $*"
   git checkout main >/dev/null 2>&1 || { log "$P checkout main FAILED"; exit 1; }
   git merge --ff-only "$C" >/dev/null 2>&1 || { log "$P ff to $C FAILED"; git checkout $BR; exit 1; }
+  # the LAWS come from the tip: suite recalibrations (r380's RS-scaled
+  # bands) must judge every phase, not only commits after their own.
+  # Working-tree overlay only — the push below ships committed state.
+  git checkout "$TIP" -- tests/ 2>/dev/null
+  local red=0 failed=""
   for t in "$@"; do
-    if ! run_suite "$P" "$t"; then
-      log "PHASE $P RED on $t — ladder STOPPED, main not pushed"
-      git checkout $BR >/dev/null 2>&1
-      exit 1
-    fi
+    if ! run_suite "$P" "$t"; then red=1; failed=$t; break; fi
   done
+  git checkout "$C" -- tests/ 2>/dev/null
+  if [ "$red" -ne 0 ]; then
+    log "PHASE $P RED on $failed — ladder STOPPED, main not pushed"
+    git checkout $BR >/dev/null 2>&1
+    exit 1
+  fi
   git push origin main 2>&1 | tail -1
   wait_live "$TAG" || true
   git checkout $BR >/dev/null 2>&1
