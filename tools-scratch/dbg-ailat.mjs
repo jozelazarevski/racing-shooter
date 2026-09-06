@@ -10,6 +10,7 @@ const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 p.setDefaultTimeout(300000);
 await p.goto(`${BASE}/?level=${process.env.LEVEL ?? 30}&go=1&unlockall=1`, { waitUntil: 'load' });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player);
+await p.evaluate(async () => { window.__RS = (await import('./src/track.js')).ROUTE_SCALE ?? 1; });
 const r = await p.evaluate((SECS2) => {
   const g = window.__game, t = g.track;
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
@@ -25,7 +26,7 @@ const r = await p.evaluate((SECS2) => {
       if (!e.alive) continue;
       const ns = t._nearestSample(e.pos.x, e.pos.z);
       const w = t.widthAt?.(ns.i) ?? 9;
-      const kind = g.route?.sectionKind?.(ns.i) ?? g.route?.kindAt?.(ns.i) ?? '?';
+      const kind = (t.curvature?.[ns.i] ?? 0) > 0.012 / ((window.__RS ?? 4)) ? 'curve' : 'straight';
       const b = buckets[kind] || (buckets[kind] = { n: 0, off: 0, sumR: 0, worst: 0 });
       b.n++;
       const ratio = ns.d / w;
