@@ -10384,6 +10384,16 @@ export class Track {
         if (!best || margin > best.margin) best = { px, pz, margin };
         if (margin >= 0.6) break;
       }
+      // r368 (owner photo, RED CENTRE RUN): A TOWER WITH NOWHERE TO STAND IS
+      // NOT BUILT. The walk above finds the least-bad spot, but on a start
+      // the lap crosses back past — RED CENTRE, TOUR DE CORSE — the least
+      // bad is still a scaffold standing in the other carriageway (measured
+      // 4 u off the crossing leg's centreline, cabin and flag and all), and
+      // dropping its collider only made it a body you drive THROUGH instead
+      // of into. The banner and the start lights still mark the line; a
+      // missing scaffold is scenery, a scaffold in the road is a phone
+      // report. 0.3 u is "genuinely clear", not "least bad".
+      if (best.margin < 0.3) continue;
       const bx = best.px, bz = best.pz;
       // THE BRACES LEARN WHAT THE LEGS LEARNED (r253): where the lap curls
       // back past its own start line, the road under the tower is not the
