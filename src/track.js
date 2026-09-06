@@ -22230,8 +22230,14 @@ export class Track {
     // to 930 u, because widening it to 240-450 u would otherwise push its
     // inner flank in to 675 u - inside the 705 u the old numbers left clear of
     // the drivable massif.
-    place(near, 9, 930, 140, 48, 36, 240, 210, 0.82);
-    place(far, 8, 1120, 160, 135, 60, 360, 300, 0.76);
+    // r381 (owner's CITADEL BAY shot — wavy band stripes across the sky):
+    // the rings stood at fixed 930-1280 u, sized when no route passed 320 u.
+    // A scale-4 lap carries the camera to ±1300 and the ring cones fill the
+    // frame at point-blank, their gradient bands reading as sky garbage.
+    // The rings now stand off the world's own patch edge.
+    const hs = Math.max(1, (this._patchHalf ?? 1000) / 1000);
+    place(near, 9, 930 * hs, 140 * hs, 48, 36, 240, 210, 0.82);
+    place(far, 8, 1120 * hs, 160 * hs, 135, 60, 360, 300, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -22305,9 +22311,10 @@ export class Track {
         new THREE.MeshStandardMaterial({ map: R.map, flatShading: true, roughness: 1 }),
         R.count
       );
+      const hs = Math.max(1, (this._patchHalf ?? 1000) / 1000);   // r381: rings stand off the patch edge
       for (let i = 0; i < R.count; i++) {
         const a = (i / R.count) * Math.PI * 2 + Math.random() * 0.2;
-        const r = R.r0 + Math.random() * R.rv;
+        const r = (R.r0 + Math.random() * R.rv) * hs;
         const w = R.w0 + Math.random() * R.wv;
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
@@ -22388,14 +22395,15 @@ export class Track {
       // the whole way up, and saying so keeps the one-rule law auditable
       this.solids.push({ x, z, r: w * 0.7, y: -4 + this._highland(x, z) + 1, h, mat: 'stone', prof: [1] });
     };
+    const hs = Math.max(1, (this._patchHalf ?? 1000) / 1000);   // r381: rings stand off the patch edge
     for (let i = 0; i < 42; i++) {
       const a = (i / 42) * Math.PI * 2 + Math.random() * 0.12;
-      const r = 680 + Math.random() * 130;
+      const r = (680 + Math.random() * 130) * hs;
       put(Math.cos(a) * r, Math.sin(a) * r, 36 + Math.random() * 48, 90 + Math.random() * 140);
     }
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.11;
-      const r = 890 + Math.random() * 160;
+      const r = (890 + Math.random() * 160) * hs;
       put(Math.cos(a) * r, Math.sin(a) * r, 60 + Math.random() * 60, 160 + Math.random() * 160);
     }
     for (const s of midSpecs) {
@@ -22415,15 +22423,16 @@ export class Track {
       const mc = this._clearOfRoad(x, z, w * 0.6);
       if (mc) specs.push({ x: mc.x, z: mc.z, w, h });
     };
+    const hs = Math.max(1, (this._patchHalf ?? 1000) / 1000);   // r381: rings stand off the patch edge
     for (let i = 0; i < 34; i++) {
       const a = (i / 34) * Math.PI * 2 + Math.random() * 0.15;
-      const r = 750 + Math.random() * 130;
+      const r = (750 + Math.random() * 130) * hs;
       push(Math.cos(a) * r, Math.sin(a) * r,
         110 + Math.random() * 130, 60 + Math.random() * 60);
     }
     for (let i = 0; i < 22; i++) {
       const a = (i / 22) * Math.PI * 2 + 0.13;
-      const r = 980 + Math.random() * 150;
+      const r = (980 + Math.random() * 150) * hs;
       push(Math.cos(a) * r, Math.sin(a) * r,
         160 + Math.random() * 170, 95 + Math.random() * 85);
     }
