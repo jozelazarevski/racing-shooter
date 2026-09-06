@@ -4171,6 +4171,42 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r367 — THICK FORESTS, HARVEST CONCEPT, AND THE BOARDS THAT AUDITED CLEAN
+
+**Thick forests (owner: "Add thick forests").** The autumnwood precedent —
+density, not distance — applied to seventeen forested themes (forest
+641→1400, deepwood 900→1600 with the belt pulled to the verge, jungle
+789→1350, the alpine family up ~1.6×). Bare-by-design worlds untouched.
+LARCH GOLD's "shade denser than the theme" override moved with the theme
+(1150 had silently become a THINNING after the theme passed it — the
+override trap to watch for whenever a theme number moves).
+
+**Harvest concept render** (golden-hour farmland over the CIDER LANE HUD):
+vineRows parcels draw from a per-world CROP list now — CIDER LANE is a
+patchwork of orchard greens and standing gold wheat — and three voxel
+tractors park mid-parcel on harvest worlds, solid. Deliberately NOT taken
+from the concept: wheel ruts (owner deleted them game-wide; an AI render's
+churned mud does not reopen a standing decision) and the HUD chrome
+(frozen).
+
+**The garage sprite sheet audited clean**: AUTO/compound chips with IDEAL
+HERE, the bay grouping (tyres/weapons/chassis), now→next lines, prices —
+all already shipped (r321/r356). The mockup had copied the game's own
+strings back at it. No change made; a metallic re-skin is available as a
+dedicated pass if the owner asks.
+
+**Suite recalibrations that rode along**: final-integration's FINAL LAP
+banner law binds only on multi-lap worlds (one-lap races have no boundary
+to announce); its ambient-particle law runs 1200 deterministic frames
+instead of a 20 s wall-clock sleep (it was measuring the rasteriser, and
+the thick forests slowed swiftshader enough to expose it); the roster boot
+sweep carries a 300 s default timeout for the same reason. airace races an
+unfinishable lap count (raceTime freezes at the robot's flag in a one-lap
+race and every later overtake event logs the same stamp). The traffic
+suite's wall-clock sensitivity is CONFIRMED, not fixed: it went red twice
+under concurrent load and green twice on a quiet machine with identical
+code — never run it beside anything.
+
 ## r366 — MOUNTAIN VARIATIONS (owner asset board: peaks, scree, trails, strata)
 
 The third board in the series ("GAME WORLD ASSETS: MOUNTAIN VARIATIONS",
