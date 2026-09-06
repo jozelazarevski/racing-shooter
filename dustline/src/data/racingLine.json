@@ -1,0 +1,7 @@
+{
+  "topSpeed": 44,
+  "corneringConfidence": 0.86,
+  "curvatureStride": 4,
+  "brakeDecel": 6.5,
+  "accel": 4.5
+}

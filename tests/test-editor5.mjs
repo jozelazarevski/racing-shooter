@@ -1,0 +1,719 @@
+/* THE EDITOR, WITH COMPLETE CONTROL.
+ *
+ * The tools this suite pins are the ones EDITOR.md used to list under "Not in
+ * this version", plus the ones that were missing from every tool at once:
+ *
+ *   NATURE. CLEAR AREA could take a wood away and nothing could plant one.
+ *   `edit.props` is authored trees and rocks, stamped by the builder into its
+ *   own instanced batches — so a hand-planted pine fells, a hand-placed
+ *   boulder stops a car, and both cost one draw call per part.
+ *
+ *   SELECT. Every tool could only ADD. Nothing could be picked up again: no
+ *   move, no exact scale, no delete, no duplicate. An object placed 30 u wrong
+ *   could only be erased with a brush that took its neighbours with it.
+ *
+ *   REDO. Undo was a one-way street, so overshooting it cost the work twice.
+ *
+ *   WATER LEVEL. A lake stood wherever the ground it was dug in happened to
+ *   be. Flooding a valley was not expressible.
+ *
+ *   THE DRAFT and SCENE CODES. Unsaved work lived only in the tab, and a scene
+ *   could not leave the device it was built on.
+ *
+ * Everything is driven through the real handlers.
+ */
+import { chromium } from 'playwright-core';
+
+const BASE = process.env.BASE ?? 'http://localhost:8901';
+
+let pass = 0, fail = 0;
+const ok = (cond, msg, extra = '') => {
+  if (cond) { pass++; console.log('PASS ', msg); }
+  else { fail++; console.log('FAIL ', msg, extra); }
+};
+
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 1100, height: 720 } });
+page.setDefaultTimeout(600000);
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e.message)));
+await page.goto(`${BASE}/?level=1&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
+await page.waitForFunction(() => window.__game?.track?.center && window.__game.player,
+  undefined, { timeout: 600000 });
+
+const R = await page.evaluate(async () => {
+  const g = window.__game;
+  const { WorldEditor, encodeSceneCode, decodeSceneCode } = await import('./src/editor.js');
+  const out = {};
+  const ed = new WorldEditor(g);
+  g.editor = ed;
+  ed.enter();
+  const t = () => g.track;
+  // a spot `d` units off the racing line at station `i` — well clear of the
+  // carriageway, so nothing here is testing the road clamps by accident
+  // wraps, so a station index past the end of the lap is a point on the lap
+  // rather than a crash three tests later
+  const off = (i, d) => {
+    const n = t().center.length;
+    const k = ((i % n) + n) % n;
+    const c = t().center[k], hd = t().headingAt(k);
+    return { x: c.x + Math.sin(hd) * d, z: c.z + Math.cos(hd) * d };
+  };
+
+  // ---- NATURE: one tree, then a copse ------------------------------------
+  ed._pickTool('nature');
+  ed.natureKind = 'pine';
+  ed.natureCount = 1;
+  const treeSpot = off(120, 55);
+  ed._natureAt(treeSpot);
+  out.propsAfterOne = ed.props.length;
+  out.propKind = ed.props[0] && ed.props[0].kind;
+
+  ed.natureCount = 12;
+  ed.radius = 45;
+  ed._natureAt(off(240, 70));
+  out.propsAfterCopse = ed.props.length;
+  // a scatter stays inside the brush it was painted with
+  const centre = off(240, 70);
+  out.copseInsideBrush = ed.props.slice(1)
+    .every((p) => Math.hypot(p.x - centre.x, p.z - centre.z) <= ed.radius + 1);
+  // ...and the whole copse is ONE undo, not twelve
+  ed._undo();
+  out.propsAfterCopseUndo = ed.props.length;
+  ed._redoStep();
+  out.propsAfterRedo = ed.props.length;
+
+  // ---- and the builder actually grows them --------------------------------
+  const treesBefore = t().trees.length;
+  await new Promise((res) => ed.apply(res));
+  out.treesGrew = g.track.trees.length - treesBefore;
+  let propMeshes = 0, propInstances = 0;
+  g.track.group.traverse((o) => {
+    if (o.isInstancedMesh && /^edit-prop-/.test(o.name || '')) {
+      propMeshes++; propInstances = Math.max(propInstances, o.count);
+    }
+  });
+  out.propMeshes = propMeshes;
+  out.propInstances = propInstances;
+  // an authored pine is a real tree in the world's own tree list
+  out.propIsTracked = g.track.trees.some(
+    (tr) => Math.hypot(tr.x - treeSpot.x, tr.z - treeSpot.z) < 1.5);
+
+  // ---- a BOULDER is solid, like the world's own ---------------------------
+  const rockSpot = off(300, 60);
+  ed.natureKind = 'boulder'; ed.natureCount = 1;
+  ed._natureAt(rockSpot);
+  await new Promise((res) => ed.apply(res));
+  out.rockIsSolid = g.track.solids.some(
+    (s) => Math.hypot(s.x - rockSpot.x, s.z - rockSpot.z) < 2 && s.mat === 'stone');
+
+  // ---- SELECT: pick it up, move it, size it, delete it --------------------
+  ed._pickTool('select');
+  ed.radius = 20;
+  ed._selectAt(treeSpot);
+  out.selType = ed.sel && ed.sel.kind;
+  out.selKind = ed.sel && ed.sel.preset;    // a plant's kind is its template name
+
+  // move it, through the same drag the mouse drives
+  const moveTo = off(122, 90);
+  // the same drag the pointer handler runs: move it, then hand the start
+  // point to _act so the history entry is a real before/after pair
+  {
+    const el = ed.sel.el;
+    const from = { el, x: el.x, z: el.z };
+    el.x = moveTo.x; el.z = moveTo.z;
+    const to = { x: el.x, z: el.z };
+    el.x = from.x; el.z = from.z;
+    ed._act('a move', () => { el.x = to.x; el.z = to.z; });
+    ed.sel.x = el.x; ed.sel.z = el.z;
+  }
+  out.movedTo = Math.round(Math.hypot(ed.props[0].x - treeSpot.x, ed.props[0].z - treeSpot.z));
+  ed._undo();
+  out.moveUndone = Math.round(Math.hypot(ed.props[0].x - treeSpot.x, ed.props[0].z - treeSpot.z));
+  ed._redoStep();
+
+  // duplicate, then delete the copy
+  ed._selectAt(moveTo);
+  const nBefore = ed.props.length;
+  ed._duplicateSelection();
+  out.dupAdded = ed.props.length - nBefore;
+  ed.deleteSelection();
+  out.delRemoved = nBefore === ed.props.length;
+
+  // ---- SELECT reaches a placed BUILDING too, and the sliders aim it -------
+  ed._pickTool('place'); ed.preset = 'chapel';
+  const houseSpot = off(400, 46);
+  ed._place(houseSpot);
+  ed._pickTool('select');
+  ed._selectAt(houseSpot);
+  out.selBuilding = ed.sel && ed.sel.kind === 'mine' && ed.sel.preset === 'chapel';
+  ed._applyToSelection('scale', 1.8);
+  ed._turnSelection(Math.PI / 2);
+  out.builtScale = ed.sel.el.scale;
+  out.builtRot = +ed.sel.el.rot.toFixed(3);
+
+  // ---- WHAT YOU BUILD IS VISIBLE NOW, NOT AFTER APPLY --------------------
+  {
+    const eV = new WorldEditor(g);
+    eV.enter();
+    const spot = off(660, 52);
+    eV._pickTool('place'); eV.preset = 'cottageA';
+    eV._place(spot);
+    // real geometry, standing before APPLY — not a wireframe stand-in
+    let meshes = 0, wires = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes++;
+      if (o.material && o.material.wireframe) wires++;
+    });
+    out.previewMeshes = meshes;
+    out.previewNoWireframe = wires === 0;
+    out.previewIsGroup = eV._ghosts.children.some((c) => c.userData.preview);
+
+    // and it is THE SAME building the rebuild will make: an authored
+    // placement seeds its look from its own position, so two previews of the
+    // same thing are identical down to the colour
+    const shape = (grp) => grp.children.map((m) =>
+      [m.position.x.toFixed(3), m.position.y.toFixed(3), m.position.z.toFixed(3),
+        m.scale.x.toFixed(3), m.scale.y.toFixed(3), m.scale.z.toFixed(3),
+        m.material.color.getHexString()].join(',')).join('|');
+    const a1 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    const a2 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    out.previewDeterministic = shape(a1) === shape(a2);
+    out.previewHasParts = a1.children.length > 1;
+    // a preset this build has never heard of degrades to a marker, not a throw
+    out.previewUnknownIsNull = g.track.previewElement('nonesuch', 0, 0) === null;
+    // ...and a plant previews the same way
+    const pv = g.track.previewProp('pine', spot.x + 30, spot.z, 0, 1);
+    out.previewPlant = pv && pv.children.length > 1;
+
+    // APPLY hands over to the batch: the preview goes, a footprint ring stays
+    await new Promise((res) => eV.apply(res));
+    let afterMeshes = 0, rings = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      afterMeshes++;
+      if (o.geometry && o.geometry.type === 'RingGeometry') rings++;
+    });
+    out.afterApplyMeshes = afterMeshes;
+    out.afterApplyRings = rings;
+    eV.exit();
+    eV.dispose();
+  }
+
+  // ---- an authored building keeps its look, whatever is placed near it ----
+  // The jitter used to come off the build's single seeded stream in call
+  // order, so adding one cottage restyled every cottage placed after it, and
+  // no preview outside the build could ever draw the same numbers.
+  {
+    const mk = async (extraFirst) => {
+      const e = new WorldEditor(g);
+      const at = off(680, 60);
+      if (extraFirst) { e.preset = 'barn'; e.tool = 'place'; e._place(off(690, 60)); }
+      e.preset = 'cottageB'; e.tool = 'place';
+      e._place(at);
+      await new Promise((res) => { g.editScene = e.buildPayload(); g.rebuildWorld(); res(); });
+      const found = (g.track.placedElements || []).find((q) => q.authored
+        && q.type === 'cottageB' && Math.hypot(q.x - at.x, q.z - at.z) < 1);
+      e.dispose();
+      return found ? +found.r.toFixed(4) : null;
+    };
+    const alone = await mk(false);
+    const withNeighbour = await mk(true);
+    out.styleAlone = alone;
+    out.styleWithNeighbour = withNeighbour;
+    out.styleStable = alone !== null && alone === withNeighbour;
+    g.editScene = null;
+    g.rebuildWorld();
+  }
+
+  // ---- RUN: a row is two taps, not twenty --------------------------------
+  {
+    const eR = new WorldEditor(g);
+    eR.enter();
+    eR._pickTool('place');
+    eR.preset = 'cottageA';
+    eR.lineMode = true;
+    eR.spacing = 25;
+    const p0 = off(800, 40), p1 = off(860, 40);
+    const runLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    // the first tap only arms it — nothing is placed yet, and it says so
+    eR._tapAtRunA = eR.elements.length;
+    eR._lineTap(p0);
+    out.runArmedPlaced = eR.elements.length;
+    out.runArmedMark = eR._lineGrp ? eR._lineGrp.children.length : 0;
+    out.runArmedSays = /tap the far end/i.test(eR.statusEl.textContent);
+    // the second tap lays the whole run
+    eR._lineTap(p1);
+    out.runCount = eR.elements.length;
+    out.runExpected = Math.floor(runLen / 25) + 1;
+    out.runAnchorGone = !eR._lineGrp || eR._lineGrp.children.length === 0;
+    // evenly spaced, and along the line
+    const gaps = [];
+    for (let i = 1; i < eR.elements.length; i++) {
+      const a = eR.elements[i - 1], b = eR.elements[i];
+      gaps.push(Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    out.runEven = gaps.every((d) => Math.abs(d - 25) < 0.01);
+    // rotation follows the run, so a row fronts the street it stands on
+    const ang = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    out.runAligned = eR.elements.every((e) => Math.abs(e.rot - ang) < 1e-6);
+    // the whole run is ONE undo, and it becomes the selection
+    out.runSelected = eR._selGroupEls().length === eR.elements.length;
+    eR._undo();
+    out.runUndone = eR.elements.length === 0;
+    eR._redoStep();
+    out.runRedone = eR.elements.length === out.runCount;
+
+    // ESC drops a half-made run instead of leaving it to ambush the next tap
+    eR._lineTap(off(900, 40));
+    out.runPending = !!eR._lineFrom;
+    eR._hotAct('esc');
+    out.runCancelled = !eR._lineFrom
+      && (!eR._lineGrp || eR._lineGrp.children.length === 0);
+    // and switching tool drops one too
+    eR._lineTap(off(900, 40));
+    eR._pickTool('nature');
+    out.runDroppedOnToolSwitch = !eR._lineFrom;
+
+    // NATURE runs the same way — an avenue of trees
+    eR.lineMode = true; eR.natureKind = 'slim'; eR.spacing = 12;
+    eR._lineTap(off(300, 34));
+    eR._lineTap(off(340, 34));
+    out.runPlants = eR.props.length;
+    out.runPlantsAreKind = eR.props.every((q) => q.kind === 'slim');
+
+    // a run too short to hold even two says so rather than placing nothing
+    eR.spacing = 90;
+    eR._lineTap(off(500, 30));
+    eR._lineTap(off(502, 30));
+    out.runTooShort = /too short/i.test(eR.statusEl.textContent);
+    eR.exit();
+    eR.dispose();
+  }
+
+  // ---- WATER: a level you can set ----------------------------------------
+  ed._pickTool('water'); ed.radius = 50;
+  const lakeSpot = off(520, 120);
+  ed._waterAt(lakeSpot);
+  out.lakes = ed.waters.length;
+  const y0 = ed.waters[0].y;
+  ed._pickTool('select');
+  ed._selectAt(lakeSpot);
+  out.selWater = ed.sel && ed.sel.kind === 'water';
+  // the inspector's own RAISE button, through the handler the DOM calls
+  ed._act('the water level', () => { ed.sel.ref.y += 2; });
+  out.lakeRose = +(ed.waters[0].y - y0).toFixed(2);
+  out.payloadCarriesLevel = ed.buildPayload().waters[0].y === ed.waters[0].y;
+  ed._undo();
+  out.lakeLevelUndone = ed.waters[0].y === y0;
+
+  // ---- the EDGE slider changes the shape of the brush, not just its size --
+  const probe = (hard) => {
+    const e2 = new WorldEditor(g);
+    e2.radius = 40; e2.strength = 10; e2.hardness = hard;
+    e2.tool = 'raise';
+    e2._dab({ x: 9000, z: 9000 });           // far from anything, pure geometry
+    const mid = e2.delta.at(9000 + 28, 9000);  // 70% of the way out
+    e2.dispose();
+    return +mid.toFixed(3);
+  };
+  out.softShoulder = probe(0);
+  out.hardShoulder = probe(100);
+
+  // ---- NOISE roughens: many small dabs, both signs ------------------------
+  const eN = new WorldEditor(g);
+  eN.tool = 'noise'; eN.radius = 40; eN.strength = 6;
+  eN._strokeFrom = 0;
+  for (let i = 0; i < 24; i++) eN._dab({ x: 9000, z: 9000 });
+  out.noiseDabs = eN.delta.dabs.length;
+  out.noiseBothWays = eN.delta.dabs.some((d) => d.dh > 0) && eN.delta.dabs.some((d) => d.dh < 0);
+  out.noiseIsFine = eN.delta.dabs.every((d) => d.r < 40);
+  eN._endStroke();
+  eN._undo();
+  out.noiseUndoneWhole = eN.delta.dabs.length;
+  eN.dispose();
+
+  // ---- SNAP puts things on a grid -----------------------------------------
+  const eS = new WorldEditor(g);
+  eS.snap = 10; eS.preset = 'shed'; eS.tool = 'place';
+  eS._place({ x: 123.4, z: -77.9 });
+  out.snapped = `${eS.elements[0].x},${eS.elements[0].z}`;
+  eS.dispose();
+
+  // ---- ERASE takes plants as well as buildings ----------------------------
+  ed._pickTool('erase'); ed.radius = 40;
+  const propsBeforeErase = ed.props.length;
+  ed._eraseAt({ x: ed.props[0].x, z: ed.props[0].z });
+  out.eraseTookProps = propsBeforeErase - ed.props.length;
+  ed._undo();
+  out.eraseUndone = ed.props.length === propsBeforeErase;
+
+  // ---- SAVE / LOAD carries the plants, and so does a CODE -----------------
+  const scene = ed.serialize();
+  out.sceneVersion = scene.v;
+  out.sceneHasProps = (scene.props || []).length;
+  const code = encodeSceneCode(scene);
+  const back = decodeSceneCode(code);
+  out.codeRoundTrip = JSON.stringify(back) === JSON.stringify(scene);
+  out.codeIsText = /^[A-Za-z0-9_-]+$/.test(code);
+  out.codeKb = +(code.length / 1024).toFixed(1);
+
+  const ed2 = new WorldEditor(g);
+  ed2.load(scene);
+  out.reloadedProps = ed2.props.length;
+  out.reloadedLakes = ed2.waters.length;
+  out.reloadedSame = JSON.stringify(ed2.serialize().props) === JSON.stringify(scene.props);
+  // a scene carrying a plant this build has never heard of still loads
+  ed2.load({ ...scene, props: [...(scene.props || []), { kind: 'nonesuch', x: 0, z: 0 }] });
+  out.unknownPropSkipped = ed2.props.every((p) => p.kind !== 'nonesuch');
+  ed2.dispose();
+
+  // ---- MORE THAN ONE: shift-tap, group move, nudge -----------------------
+  {
+    const eG = new WorldEditor(g);
+    eG.enter();
+    eG.tool = 'place'; eG.preset = 'shed';
+    const a = off(700, 40), b = off(706, 40), c = off(712, 40);
+    eG._place(a); eG._place(b); eG._place(c);
+    // An UNDO rebuilds the model from a snapshot, so every object reference
+    // taken before it is a corpse afterwards — by design, and the reason the
+    // editor drops its own selection on a restore. The test has to re-read the
+    // live objects the same way, by position in the list.
+    const E = (i) => eG.elements[i];
+    eG._pickTool('select');
+    eG.radius = 10;
+    eG._selectAt({ x: E(0).x, z: E(0).z });
+    out.gPrimary = eG.sel && eG.sel.el === E(0);
+    // shift-tap the other two on
+    eG._addToSelection({ x: E(1).x, z: E(1).z });
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+    out.gCount = eG._selGroupEls().length;
+    out.gMarks = eG._selGroup ? eG._selGroup.children.length : 0;
+    // shift-tapping one already in the group takes it back out
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+    out.gAfterToggle = eG._selGroupEls().length;
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+
+    // NUDGE moves every one of them by exactly the same amount
+    const bx = [E(0).x, E(1).x, E(2).x], bz = [E(0).z, E(1).z, E(2).z];
+    eG._nudgeSelection(10, 0);
+    out.gNudged = [E(0).x - bx[0], E(1).x - bx[1], E(2).x - bx[2]]
+      .every((d) => Math.abs(d - 10) < 1e-9)
+      && [E(0).z - bz[0], E(1).z - bz[1], E(2).z - bz[2]].every((d) => d === 0);
+    eG._undo();
+    out.gNudgeUndone = Math.abs(E(0).x - bx[0]) < 1e-9 && Math.abs(E(2).x - bx[2]) < 1e-9;
+    // the restore dropped the selection with the references it was made of
+    out.gUndoClearsGroup = eG._selGroupEls().length === 0;
+
+    // a group DRAG keeps the spacing between them
+    const regroup = () => {
+      eG.sel = { kind: 'mine', el: E(0), x: E(0).x, z: E(0).z,
+        rot: E(0).rot, scale: E(0).scale, preset: E(0).preset };
+      eG.also = [E(1), E(2)];
+    };
+    const gapBefore = Math.round(Math.hypot(E(2).x - E(0).x, E(2).z - E(0).z));
+    regroup();
+    const shift = { x: E(0).x + 40, z: E(0).z + 25 };
+    const dx = shift.x - E(0).x, dz = shift.z - E(0).z;
+    for (const q of eG.also) { q.x += dx; q.z += dz; }
+    E(0).x = shift.x; E(0).z = shift.z;
+    out.gGapKept = Math.round(Math.hypot(E(2).x - E(0).x, E(2).z - E(0).z)) === gapBefore;
+
+    // DUPLICATE copies the whole group, and the copies become the selection
+    const nBefore = eG.elements.length;
+    eG._duplicateSelection();
+    out.gDupAdded = eG.elements.length - nBefore;
+    out.gDupSelected = eG._selGroupEls().length;
+    out.gDupAreCopies = eG._selGroupEls().every((e) => eG.elements.indexOf(e) >= nBefore);
+    eG._undo();
+    out.gDupUndone = eG.elements.length === nBefore;
+
+    // DELETE takes the whole group
+    regroup();
+    eG.deleteSelection();
+    out.gDeleted = eG.elements.length === nBefore - 3;
+    eG._undo();
+    out.gDeleteUndone = eG.elements.length === nBefore;
+
+    // ONE selection panel, not two
+    out.oneSelPanel = !eG.root.querySelector('#ed-selsub')
+      && !!eG.root.querySelector('#ed-inspect');
+    out.inspectHasRotate = !!eG.root.querySelector('[data-act="turn"]');
+    eG.exit();
+    eG.dispose();
+  }
+
+  // ---- a CODE is untrusted text ------------------------------------------
+  // It arrives from another device, so it is the one input this tool has that
+  // it did not write itself: a name is text on a card, never markup, and a
+  // list that is not a list must not become a sculpt full of NaN.
+  const nasty = encodeSceneCode({ v: 2, base: 1,
+    name: '<img src=x onerror="window.__pwned=1">',
+    dabs: 'not-a-list', elements: 'nope', props: [{ kind: 'pine', x: 5, z: 5 }] });
+  ed._importCode(nasty);
+  out.pwned = !!window.__pwned;
+  // the honest test is whether an ELEMENT got built, not whether the string
+  // survives: innerHTML reads back the escaped form, which still spells
+  // "onerror=" and would pass a substring check while doing nothing
+  const mb = ed.root.querySelector('#ed-modal-body');
+  out.nastyMadeElement = !!mb.querySelector('img');
+  out.nastyShownAsText = mb.textContent.includes('<img src=x');
+  const savedNames = Object.keys(WorldEditor.list(g));
+  out.nastyName = savedNames.find((n) => n.includes('img src'));
+  const ed3 = new WorldEditor(g);
+  ed3.load(WorldEditor.list(g)[out.nastyName]);
+  out.badDabsIgnored = ed3.delta.length === 0 && ed3.elements.length === 0;
+  out.goodPropKept = ed3.props.length === 1;
+  ed3.dispose();
+  WorldEditor.remove(out.nastyName, g);
+  ed._closeModal();
+  out.junkRefused = (ed._importCode('this is not a code'),
+    ed.root.querySelector('#ed-status') ? true : true);
+  out.junkStatus = ed.statusEl.textContent;
+
+  // ---- THE DRAFT survives leaving ----------------------------------------
+  WorldEditor.clearDraft(g);
+  ed._pickTool('place'); ed.preset = 'barn';
+  ed._place(off(600, 50));
+  ed._saveDraftNow();                      // the flush the debounce timer does
+  const d = WorldEditor.draft(g);
+  out.draftExists = !!(d && d.scene && (d.scene.elements || []).length);
+  out.draftBase = d && d.scene.base;
+
+  // ---- CHECK finds a building standing in the road ------------------------
+  const eC = new WorldEditor(g);
+  eC.preset = 'chapel'; eC.tool = 'place';
+  eC._place({ x: t().center[300].x, z: t().center[300].z });   // dead on the racing line
+  eC._check();
+  out.checkText = eC.root.querySelector('#ed-modal-body').textContent;
+  eC.dispose();
+  const eOK = new WorldEditor(g);
+  eOK._check();
+  out.checkCleanText = eOK.root.querySelector('#ed-modal-body').textContent;
+  eOK.dispose();
+
+  // ---- the KEY MAP is real: every binding resolves ------------------------
+  const combo = (k, mod = false, shift = false) => WorldEditor._combo(
+    { key: k, ctrlKey: mod, metaKey: false, shiftKey: shift });
+  out.comboPlain = combo('q');
+  out.comboUndo = combo('z', true);
+  out.comboRedo = combo('z', true, true);
+  out.comboNamed = combo('Escape');
+  out.comboQuestion = combo('?', false, true);
+
+  // the tool rail carries every tool the new editor claims
+  const railTools = [...ed.root.querySelectorAll('.ed-tool')].map((b) => b.dataset.tool).sort();
+  out.railTools = railTools.join(',');
+  out.hasNature = railTools.includes('nature');
+  out.hasSelect = railTools.includes('select');
+  out.hasNoise = railTools.includes('noise');
+
+  ed.exit();
+  out.marksAfterExit = ['editor-ghosts', 'editor-zones', 'editor-route']
+    .reduce((n, nm) => {
+      const o = g.scene.getObjectByName(nm);
+      return n + (o && o.visible ? o.children.length : 0);
+    }, 0);
+  return out;
+});
+
+console.log('\n--- NATURE: the thing CLEAR AREA had no opposite for ---');
+ok(R.propsAfterOne === 1 && R.propKind === 'pine', 'one tap plants one tree',
+  `${R.propsAfterOne} ${R.propKind}`);
+ok(R.propsAfterCopse === 13, 'COUNT scatters a whole copse in one tap', R.propsAfterCopse);
+ok(R.copseInsideBrush, 'and every tree of it lands inside the brush');
+ok(R.propsAfterCopseUndo === 1, 'the copse is ONE undo, not twelve', R.propsAfterCopseUndo);
+ok(R.propsAfterRedo === 13, 'and REDO brings the whole copse back', R.propsAfterRedo);
+ok(R.treesGrew >= 13, 'the rebuilt world actually grows them', R.treesGrew);
+ok(R.propMeshes >= 2 && R.propMeshes <= 6,
+  'as a handful of instanced batches, not a mesh per tree', R.propMeshes);
+ok(R.propIsTracked, 'an authored tree is a real tree in the world\'s tree list');
+ok(R.rockIsSolid, 'an authored boulder registers as a stone solid');
+
+console.log('\n--- SELECT: pick it up again ---');
+ok(R.selType === 'mine' && R.selKind === 'pine',
+  'tapping a plant selects it, as one of mine', `${R.selType}/${R.selKind}`);
+ok(R.movedTo > 20, 'dragging it moves it', `${R.movedTo} u`);
+ok(R.moveUndone === 0, 'and the move undoes', `${R.moveUndone} u`);
+ok(R.dupAdded === 1, 'DUPLICATE makes one copy', R.dupAdded);
+ok(R.delRemoved, 'DELETE takes exactly the selection');
+ok(R.selBuilding, 'a placed building selects the same way');
+ok(R.builtScale === 1.8 && R.builtRot !== 0,
+  'and the SCALE / ROT controls aim the object already down',
+  `scale ${R.builtScale}, rot ${R.builtRot}`);
+
+console.log('\n--- what you build is visible NOW ---');
+ok(R.previewMeshes > 1,
+  'a placed building stands as real geometry before APPLY', `${R.previewMeshes} meshes`);
+ok(R.previewNoWireframe, 'and not as a wireframe stand-in');
+ok(R.previewIsGroup, 'drawn from the real template, as a group of real parts');
+ok(R.previewHasParts, 'which has more than one part to it');
+ok(R.previewDeterministic,
+  'two previews of the same placement are identical — the look is seeded by position');
+ok(R.styleStable,
+  'so a building keeps its look no matter what is placed before it',
+  `${R.styleAlone} vs ${R.styleWithNeighbour}`);
+ok(R.previewUnknownIsNull, 'an unknown preset previews as null, and gets a marker instead');
+ok(R.previewPlant, 'a plant previews the same way');
+ok(R.afterApplyRings > 0 && R.afterApplyMeshes === R.afterApplyRings,
+  'APPLY hands over to the batch: preview gone, footprint ring left',
+  `${R.afterApplyMeshes} meshes, ${R.afterApplyRings} rings`);
+
+console.log('\n--- RUN lays a row in two taps ---');
+ok(R.runArmedPlaced === 0, 'the first tap places nothing — it only anchors', R.runArmedPlaced);
+ok(R.runArmedMark === 1, 'and shows the anchor, so it does not look like a dud tap');
+ok(R.runArmedSays, 'and says what the second tap will do');
+ok(R.runCount === R.runExpected && R.runCount > 2,
+  'the second tap lays the whole run', `${R.runCount} of ${R.runExpected}`);
+ok(R.runAnchorGone, 'and the anchor marker goes with it');
+ok(R.runEven, 'every gap in the run is the SPACING');
+ok(R.runAligned, 'and each one is turned to face along the run');
+ok(R.runSelected, 'the run becomes the selection, so it can be nudged as one');
+ok(R.runUndone, 'the whole run is ONE undo');
+ok(R.runRedone, 'and it redoes');
+ok(R.runPending && R.runCancelled, 'ESC drops a half-made run');
+ok(R.runDroppedOnToolSwitch, 'and so does switching tool');
+ok(R.runPlants > 2 && R.runPlantsAreKind, 'NATURE runs an avenue the same way', R.runPlants);
+ok(R.runTooShort, 'a run shorter than one gap is refused with a reason');
+
+console.log('\n--- WATER has a level ---');
+ok(R.lakes === 1, 'the tool digs one lake', R.lakes);
+ok(R.selWater, 'and it can be selected');
+ok(R.lakeRose === 2, 'RAISE lifts the surface', R.lakeRose);
+ok(R.payloadCarriesLevel, 'the level reaches the builder');
+ok(R.lakeLevelUndone, 'and it undoes');
+
+console.log('\n--- the brush has a shape, not just a size ---');
+ok(R.hardShoulder > R.softShoulder * 1.15,
+  'EDGE=HARD holds the ground up further out than EDGE=SOFT',
+  `soft ${R.softShoulder} vs hard ${R.hardShoulder}`);
+ok(R.noiseDabs >= 20, 'NOISE lays a dab per pass', R.noiseDabs);
+ok(R.noiseBothWays, 'roughening goes both up and down');
+ok(R.noiseIsFine, 'in lumps smaller than the brush');
+ok(R.noiseUndoneWhole === 0, 'and the whole roughening is one undo', R.noiseUndoneWhole);
+ok(R.snapped === '120,-80', 'SNAP puts a placement on the grid', R.snapped);
+
+console.log('\n--- ERASE, SAVE, CODES and the DRAFT ---');
+ok(R.eraseTookProps > 0, 'ERASE removes plants as well as buildings', R.eraseTookProps);
+ok(R.eraseUndone, 'and that undoes too');
+ok(R.sceneVersion === 2, 'the scene format declares v2', R.sceneVersion);
+ok(R.sceneHasProps > 0, 'and carries the plants', R.sceneHasProps);
+ok(R.reloadedProps === R.sceneHasProps && R.reloadedSame,
+  'a saved scene reloads every plant exactly', `${R.reloadedProps}/${R.sceneHasProps}`);
+ok(R.reloadedLakes === 1, 'and its lakes', R.reloadedLakes);
+ok(R.unknownPropSkipped, 'a plant from a later palette is skipped, not fatal');
+ok(R.codeRoundTrip, 'a scene CODE round-trips byte for byte');
+ok(R.codeIsText, 'and is plain text you can paste anywhere');
+ok(R.codeKb < 24, 'a full scene code is small enough to paste', `${R.codeKb} kB`);
+ok(R.draftExists && R.draftBase === 1,
+  'unsaved work is written to a draft as you go', `base ${R.draftBase}`);
+
+console.log('\n--- more than one object at a time ---');
+ok(R.gPrimary, 'tapping picks a primary');
+ok(R.gCount === 3, 'shift-tap adds to the group', R.gCount);
+ok(R.gMarks >= 4, 'and every member of it is ringed', `${R.gMarks} marks`);
+ok(R.gAfterToggle === 2, 'shift-tapping a member again takes it out', R.gAfterToggle);
+ok(R.gNudged, 'an arrow key nudges the whole group by the same amount');
+ok(R.gNudgeUndone, 'and the nudge undoes as one step');
+ok(R.gUndoClearsGroup,
+  'an undo drops the selection, because a restore invalidates every reference');
+ok(R.gGapKept, 'a group drag keeps the spacing between them');
+ok(R.gDupAdded === 3, 'DUPLICATE copies every one of them', R.gDupAdded);
+ok(R.gDupSelected === 3 && R.gDupAreCopies,
+  'and the copies become the selection, so the next drag moves what you made');
+ok(R.gDupUndone, 'the whole duplication is one undo');
+ok(R.gDeleted, 'DELETE takes the whole group');
+ok(R.gDeleteUndone, 'and that undoes as one step too');
+ok(R.oneSelPanel, 'the selection is described in ONE panel, not two');
+ok(R.inspectHasRotate, 'and that panel carries ROTATE, DUPLICATE and DELETE');
+
+console.log('\n--- a pasted CODE is text, not markup ---');
+ok(R.pwned === false, 'a scene name cannot run script');
+ok(R.nastyMadeElement === false, 'the browser builds no element out of it');
+ok(R.nastyShownAsText, 'it is shown as the literal text it is');
+ok(!!R.nastyName, 'the scene still imports, under its literal name', R.nastyName);
+ok(R.badDabsIgnored, 'a list field that is not a list is dropped, not iterated');
+ok(R.goodPropKept, 'and the parts that ARE well formed still load');
+ok(/not a scene code/i.test(R.junkStatus),
+  'plain junk is refused with a reason', R.junkStatus);
+
+console.log('\n--- CHECK tells you before the car does ---');
+ok(/carriageway/i.test(R.checkText),
+  'a building in the road is reported', R.checkText.slice(0, 120));
+ok(/Nothing to report/i.test(R.checkCleanText),
+  'and a clean scene is called clean', R.checkCleanText.slice(0, 80));
+
+console.log('\n--- the keyboard, and the rail ---');
+ok(R.comboPlain === 'q' && R.comboUndo === 'mod+z' && R.comboRedo === 'mod+shift+z'
+  && R.comboNamed === 'escape' && R.comboQuestion === '?',
+  'every shape of shortcut resolves to the binding it is written as',
+  [R.comboPlain, R.comboUndo, R.comboRedo, R.comboNamed, R.comboQuestion].join(' '));
+ok(R.hasNature && R.hasSelect && R.hasNoise,
+  'the rail carries the new tools', R.railTools);
+ok(R.marksAfterExit === 0, 'and exit still takes every marker with it', R.marksAfterExit);
+
+// ---- and the keys are actually wired to the page ------------------------
+// `_combo` agreeing with the table proves the matcher; only a real keydown
+// proves the listener is bound, that a shortcut reaches the tool, and that
+// typing in a field is still typing.
+await page.evaluate(() => { window.__game.editor.enter(); });
+const press = async (k) => { await page.keyboard.press(k); await page.waitForTimeout(60); };
+const tool = () => page.evaluate(() => window.__game.editor.tool);
+await press('t');
+const afterT = await tool();
+await press('v');
+const afterV = await tool();
+await press('KeyS');
+const afterS = await tool();
+const nPlaced = await page.evaluate(() => {
+  const ed = window.__game.editor;
+  ed._pickTool('place'); ed.preset = 'shed';
+  const c = window.__game.track.center[500];
+  ed._place({ x: c.x + 60, z: c.z + 60 });
+  return ed.elements.length;                 // this scene already has some
+});
+await press('Control+z');
+const afterUndo = await page.evaluate(() => window.__game.editor.elements.length);
+await press('Control+Shift+z');
+const afterRedo = await page.evaluate(() => window.__game.editor.elements.length);
+await press('Shift+Slash');                       // '?'
+const helpOpen = await page.evaluate(() =>
+  window.__game.editor.root.querySelector('#ed-modal-title').textContent);
+await press('Escape');
+const helpShut = await page.evaluate(() =>
+  window.__game.editor.root.querySelector('#ed-modal').classList.contains('off'));
+// a shortcut letter typed into a field is a letter
+const typedStays = await page.evaluate(async () => {
+  const ed = window.__game.editor;
+  ed._pickTool('raise');
+  const box = ed.root.querySelector('#ed-modal-body');
+  ed._openScenes();
+  const ta = ed.root.querySelector('#ed-code');
+  ta.focus();
+  ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+  const out = ed.tool;
+  ed._closeModal();
+  void box;
+  return out;
+});
+
+console.log('\n--- the keys are bound to the page, not just to a table ---');
+ok(afterT === 'noise' && afterV === 'select' && afterS === 'nature',
+  'a keypress switches tool', `${afterT} ${afterV} ${afterS}`);
+ok(afterUndo === nPlaced - 1 && afterRedo === nPlaced,
+  'ctrl+Z and ctrl+shift+Z undo and redo',
+  `${nPlaced} -> ${afterUndo} -> ${afterRedo}`);
+ok(helpOpen === 'KEYS', 'and ? opens the key list', helpOpen);
+ok(helpShut, 'and ESC closes it');
+ok(typedStays === 'raise',
+  'a shortcut letter typed into a text field stays a letter', typedStays);
+
+console.log('\n--- and it does all that without throwing ---');
+ok(errors.length === 0, 'no page errors across the whole session',
+  errors.slice(0, 4).join(' | '));
+
+await browser.close();
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
