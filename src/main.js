@@ -10,7 +10,7 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
-import { loadDrivingOverrides, nitroCeilingKmh, stageTemplate } from './driving.js';
+import { DRIVING, loadDrivingOverrides, nitroCeilingKmh, stageTemplate } from './driving.js';
 import { runStageValidator } from './stagecheck.js';
 import { installRally } from './telemetry.js';
 import { Route } from './route.js';
@@ -1699,8 +1699,11 @@ class Game {
     this.fovKick = 0;     // camera punch on the same impacts
     this.audio = new AudioEngine();
     this.input = new Input();
-    // a point-to-point stage (FURKA) races ONE long lap; circuits race 3
-    this.lapsTotal = this.level?.laps ?? LAPS;
+    // r381 (owner: "Decide when track is 1 or 3 laps depending the length"):
+    // lap count follows the TRACK — a short circuit races 3 laps, a long
+    // stage races 1, and a world's own `laps` declaration still wins (the
+    // r364 one-lap override becomes the long-track half of this rule).
+    this.lapsTotal = this._lapsForTrack();
     this.contractPool = CONTRACT_POOL; // exposed for the headless suites
 
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
@@ -2390,6 +2393,17 @@ class Game {
    *  So the edits now travel WITH the request. Passing nothing means the
    *  shipped world, which is what every ordinary track-list click wants, and
    *  a caller has to ask for edits explicitly to get them. */
+  /** r381 (owner): laps follow track length — a lap under lapsShortTrackU
+   *  (driving.json, 3000 u) races 3 laps, anything longer races 1. A world's
+   *  own `laps` declaration always wins, and with no track yet (early
+   *  constructor paths) the long-track answer stands in. */
+  _lapsForTrack() {
+    if (this.level?.laps != null) return this.level.laps;
+    const len = this.track?.length;
+    if (!Number.isFinite(len)) return LAPS;
+    return len < (DRIVING.lapsShortTrackU ?? 3000) ? 3 : LAPS;
+  }
+
   swapLevel(level, force = false, scene = null) {
     if (!level || this.state === 'race' || this.state === 'countdown') return false;
     const same = this.level && this.level.id === level.id;
@@ -2437,6 +2451,10 @@ class Game {
     this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
+    // r381: the lap count reads the track's LENGTH, so it can only be
+    // final once the new track exists — the assignment above this teardown
+    // ran against the OLD world
+    this.lapsTotal = this._lapsForTrack();
     this._applyTheme();
     this._buildRoute();   // CORRIDOR: rebuilt with the world it threads
     this._applyTyreClass();          // a new world can be a new tyre demand

@@ -218,5 +218,6 @@
     ],
     "firstClearCr": 600
   },
-  "driftForwardScrub": 0.5
+  "driftForwardScrub": 0.5,
+  "lapsShortTrackU": 3000
 }
