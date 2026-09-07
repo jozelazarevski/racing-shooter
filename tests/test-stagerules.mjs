@@ -171,20 +171,32 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
     };
     const ws = []; for (let i = 0; i < N; i++) ws.push(t.widthAt(i));
     const wBase = [...ws].sort((a, b) => a - b)[Math.floor(N * 0.5)];
-    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0;
+    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0, minR = 1e9;
     for (let i = 0; i < N; i++) {
       wMin = Math.min(wMin, ws[i]);
       wStep = Math.max(wStep, Math.abs(ws[(i + 1) % N] - ws[i]));
-      if (rad(i) < 25) { hairN++; if (ws[i] < wBase * 1.19) flareBad++; }
+      const R = rad(i);
+      minR = Math.min(minR, R);
+      if (R < 25) {
+        hairN++;
+        // the flare owed here is capped by the fold law: the inner edge
+        // keeps >= 6 u of radius, so at R 16-17 the road cannot lawfully
+        // reach 1.19x base. 0.45 covers the taper limiter's shave.
+        const owed = Math.min(wBase * 1.19, Math.max(wBase, R - 6)) - 0.45;
+        if (ws[i] < owed) flareBad++;
+      }
     }
     return { wMin: +wMin.toFixed(2), wStep: +wStep.toFixed(2), hairN, flareBad,
-      wBase: +wBase.toFixed(2) };
+      wBase: +wBase.toFixed(2), minR: +minR.toFixed(1) };
   });
   ok(H.wMin >= 3.0, `HRD-3 [${tag}] half-width floor 3.0 u`, `min ${H.wMin}`);
   ok(H.wStep <= 0.6, `HRD-4 [${tag}] width tapers, never steps`, `max step ${H.wStep} u/station`);
   ok(H.flareBad === 0,
-    `HRD-2 [${tag}] hairpin stations (true R<25) carry >= 1.19x base width`,
-    `${H.hairN} hairpin station(s), ${H.flareBad} unflared, base ${H.wBase} u`);
+    `HRD-2 [${tag}] hairpin stations (true R<25) carry the owed flare`,
+    `${H.hairN} hairpin station(s), ${H.flareBad} under-flared, base ${H.wBase} u`);
+  ok(H.minR >= 15.5,
+    `HRD-7 [${tag}] the road never turns tighter than it is wide (R floor)`,
+    `min circumcircle R ${H.minR} u`);
   ok(errors.length === 0, `HRD [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
   await p.close();
 }

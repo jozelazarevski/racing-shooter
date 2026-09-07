@@ -4171,6 +4171,61 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r394 — HRD: THE ROAD IS WIDE AT THE HAIRPIN AND NEVER TIGHTER THAN IT IS WIDE
+
+Owner, four directives in one evening, all recorded verbatim in CLAUDE.md
+§7A: "This road needs widening. It is strange. Apply scanning across the
+game. Add HRD Rules" (read as HaRD rules — binding, gate-enforced), the
+mid-road fence RULE (already r393), "there is always a mountain range
+from one of the sides of the road. No road floats or is on a ridge"
+(HRD-5/6, queued as r395 with the owner's reference frame), and
+"Iterate x70" (the running program).
+
+What shipped here, one system (route/width geometry), each step measured:
+
+- HRD-2 THE HAIRPIN FLARES. _buildWidthProfile grows any station whose
+  circumcircle radius (real points, ±6 — never t.curvature) reads under
+  45 u, up to +55% at R<=16, eased over 12 stations, capped so the INNER
+  edge keeps 6 u of radius, then run through a 0.35 u/station taper
+  limiter (HRD-4). It lands in the one width profile every consumer
+  reads, and the scatter belts already grow/reject by widthAt, so
+  nothing plants on the new aprons. GLACIER hairpins now carry 13.6 u
+  half-width against base 9; CANYON RUN is byte-identical (zero flare).
+- THE CURVATURE ARRAY TELLS THE TRUTH. Its divisor was 16xsegLen —
+  wherever the kink pass bunched stations, curvature understated ~3x,
+  and the AI corner-speed table (v ~ 1/sqrt(c)) targeted ~1.7x lawful
+  speed at exactly the hairpins: the ancient "rivals drive off at
+  hairpins" class. Now divided by the walked arc; uniform worlds
+  unchanged by construction.
+- HRD-7 STATIONS ARE UNIFORM AGAIN, so the kink cap means one radius
+  everywhere. The kink pass bunches the stations it moves (1.7 u runs
+  against 5.7 nominal), and at 1.7 u a 20°/station cap is a legal R4.9 —
+  GLACIER's authored 19-25 m hairpins carried relaxation-damaged
+  stations at R7 on an 18 u carriageway. A ribbon wider than its turn
+  radius FOLDS: the stacked quads are the owner's photographed dark V
+  seam, and the ground read crossing the stack is the reported car
+  jumping. The processed polyline is now RE-RESAMPLED to true uniform
+  arc length (plus arcLengthDivisions 4096 at the spline, whose default
+  200 was ~25 u per table entry). GLACIER minR 7 -> 16; CLIFF KNOT's
+  phantom hairpin stations vanish. Two failed attempts are in the code
+  comments so nobody retries them: a midpoint-pull radius pass
+  (collapses fans, R->5.3) and a radius-based kink limit (its own pulls
+  shrink its own limit, R->1.4).
+- THE APEX READ OBEYS THE SLOPE LAW. Even healed, a car cutting deep
+  inside a fan defeats every centreline parameterization (chord and
+  Voronoi-cell forms both traced 1.3-2.7 station leaps on 0.24 u of
+  movement — ledger note in fracIndexAt). So the vehicle's ground read
+  carries a rises-only slew guard at planar speed x tan(~35°): lawful
+  crests sit exactly at the cap, drops pass instantly (a gorge lip must
+  go ballistic), glitches smear over frames. trackIndex also advances
+  at most ±1/station per grounded frame (physics crosses 0.17/frame at
+  top speed). GLACIER worst grounded frame step 0.22 u, zero jolt
+  spots; PINE/DUST 0.06.
+- THE GATE GREW HRD TEETH: stagerules now checks width floor 3.0,
+  taper-not-steps 0.6, fold-aware owed flare, and the R-floor 15.5 on
+  GLACIER, CLIFF KNOT and IL VICOLO (whose owner-directed 3.04 lane
+  calibrated the floor).
+
 ## r393 — THE ASSET-SHEET FOREST
 
 The owner shipped a design sheet ("FOREST BIOME ASSET LIBRARY") and three

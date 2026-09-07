@@ -3018,7 +3018,30 @@ export class Car {
     // useY = grounded only: airborne, this.pos.y is a jump arc that matches
     // no station in particular, and height would bias the pick toward
     // whichever one happens to be that high right now (see nearestIndex).
-    this.trackIndex = t.nearestIndex(this.pos, this.trackIndex, !this.airborne);
+    {
+      const ni = t.nearestIndex(this.pos, this.trackIndex, !this.airborne);
+      // r394: grounded, the tracked station may not LEAP. Near a hairpin's
+      // centre of curvature every fan station is almost equidistant, so the
+      // nearest-sample argmin jitters several stations per frame and the
+      // interpolated road height snaps by their summed rise (measured 1.1 u
+      // pops at GLACIER's apex after the geometry itself was healed). A car
+      // physically crosses well under one station per frame, so clamping
+      // the grounded advance to ±3 is pure hysteresis, not lag; airborne
+      // and teleport paths (placeAt/respawn set trackIndex directly) keep
+      // the instant pick.
+      const n9 = t.center.length || 1;
+      if (!this.airborne && n9 > 8) {
+        // ±1, not ±3: at 216 km/h a car crosses 0.17 station per frame, so
+        // even ±1 is six times faster than physics — while ±3 still let the
+        // argmin walk 3 stations of rise into a single frame (measured 1.1 u
+        // with ±3 at the same apex). nearestIndex's own ±30 hint window
+        // already bounds catch-up after off-road excursions.
+        let dd = (((ni - this.trackIndex) % n9) + n9) % n9;
+        if (dd > n9 / 2) dd -= n9;
+        this.trackIndex = dd > 1 ? (this.trackIndex + 1) % n9
+          : dd < -1 ? (this.trackIndex - 1 + n9) % n9 : ni;
+      } else this.trackIndex = ni;
+    }
     this.lateral = t.lateralOffset(this.pos, this.trackIndex);
     this.wallGrind = Math.max(0, this.wallGrind - dt);
     // There are no fences any more — the world is open and off-road slowness
@@ -3749,9 +3772,28 @@ export class Car {
     // crosses a step every three frames, and the jump detector below — which
     // differentiates this value twice — was reading those steps as crests.
     // See Track.groundHeightAtPos.
-    const roadY = t.groundHeightAtPos
+    let roadY = t.groundHeightAtPos
       ? t.groundHeightAtPos(this.pos, this.trackIndex, this.lateral)
       : t.groundHeightAt(this.trackIndex, this.lateral);
+    // r394 SLOPE-LAW SLEW GUARD. Deep inside a hairpin fan the centreline
+    // parameterization is multi-valued (the cells collapse toward the
+    // pivot) and the continuous read above can still step by a station's
+    // rise in one frame — every parameterization tried leapt there (see the
+    // fracIndexAt ledger note). Ground, however, obeys the slope law: it
+    // cannot rise faster under a moving car than the steepest lawful grade,
+    // so the read is slewed at planar speed x tan(~35°) + a floor for
+    // near-standstill settles. Lawful crests sit exactly at the cap and are
+    // never clipped; only coordinate glitches get smeared over a few
+    // frames. Reset while airborne so a landing reads fresh ground.
+    // RISES ONLY: a downward step must read instantly — a car crossing a
+    // gorge lip or a drop edge goes ballistic off the real edge, and a
+    // slewed descent would have it drive down a phantom ramp instead.
+    if (!this.airborne && this._roadYPrev !== undefined) {
+      const cap = Math.max(0.22,
+        Math.hypot(this.vel.x, this.vel.z) * dt * 0.75);
+      if (roadY > this._roadYPrev + cap) roadY = this._roadYPrev + cap;
+    }
+    this._roadYPrev = this.airborne ? undefined : roadY;
     let gY;
     if (offRoad) {
       const terr = t.terrainHeight(this.pos.x, this.pos.z);

@@ -6809,6 +6809,19 @@ export class Track {
       pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'
     );
+    // r394: the arc-length table `getPointAt` maps through defaults to 200
+    // divisions — ~25 u per table entry on a mandate-era lap — so "equally
+    // spaced" stations actually bunched to 1.7 u through hairpins and
+    // stretched to 6+ u after them. Every uniform-spacing assumption
+    // downstream (segLen maths, the curvature divisor, the kink cap's
+    // degrees-per-station meaning) then broke exactly at the hairpins:
+    // measured on GLACIER COL, authored 19-25 m hairpins carried
+    // relaxation-damaged stations at R 7-13 on an 18 u carriageway, folding
+    // the ribbon's inner edge (the photographed V seam) and snapping the
+    // ground read 2.6 u in a frame (the reported jumping/shaking). 4096
+    // table entries put a division every ~1.4 u and the samples land where
+    // the arc really is.
+    this.curve.arcLengthDivisions = 4096;
     this.N = N;
     this.center = [];
     this.tan = [];
@@ -6893,6 +6906,49 @@ export class Track {
         const tg = this.tan[i];
         tg.set(p2.x - p0.x, 0, p2.z - p0.z).normalize();
         this.nrm[i].set(tg.z, 0, -tg.x);
+      }
+    }
+    // r394 HRD-7 — STATIONS ARE RETURNED TO TRUE UNIFORM SPACING. The kink
+    // pass above pulls stations chord-ward, so wherever it executes a cusp
+    // it also BUNCHES the stations it moved (runs of 1.7 u against the
+    // 5.7 u nominal, measured across GLACIER's hairpin fans). Every
+    // uniform-spacing assumption downstream — the segLen maths, the
+    // curvature divisor, and the kink cap's own meaning (20°/station is
+    // R >= 16 at 5.7 u runs but R >= 4.9 at 1.7 u, so re-relaxing bunched
+    // stations could legally fold a hairpin tighter than the road is wide;
+    // the folded inner edge is the owner's photographed V seam, and the
+    // ground read crossing that height stack is the reported jumping) —
+    // broke exactly at hairpins. Two failed fixes are recorded for the
+    // ledger: a midpoint-pull radius pass (collapses fans, R 7 -> 5.3) and
+    // a radius-based kink limit (its own pulls shrink its own limit,
+    // R -> 1.4). The correct repair is to RE-RESAMPLE the processed
+    // polyline to uniform arc length: bunching from any source dies, the
+    // shape stays (chord error at R16/5.7 u spacing is 0.24 u), and the
+    // 20° cap means the same radius floor at every station again.
+    {
+      const cum = new Float64Array(N + 1);
+      for (let i = 0; i < N; i++) {
+        const a = this.center[i], b = this.center[(i + 1) % N];
+        cum[i + 1] = cum[i] + Math.hypot(b.x - a.x, b.z - a.z);
+      }
+      const total = cum[N];
+      if (total > 1) {
+        const out = [];
+        let j = 0;
+        for (let i = 0; i < N; i++) {
+          const s = (i / N) * total;
+          while (j < N - 1 && cum[j + 1] < s) j++;
+          const seg = Math.max(1e-6, cum[j + 1] - cum[j]);
+          const f = Math.max(0, Math.min(1, (s - cum[j]) / seg));
+          const a = this.center[j], b = this.center[(j + 1) % N];
+          out.push([a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f]);
+        }
+        for (let i = 0; i < N; i++) { this.center[i].x = out[i][0]; this.center[i].z = out[i][1]; }
+        for (let i = 0; i < N; i++) {
+          const p0 = this.center[(i - 1 + N) % N], p2 = this.center[(i + 1) % N];
+          this.tan[i].set(p2.x - p0.x, 0, p2.z - p0.z).normalize();
+          this.nrm[i].set(this.tan[i].z, 0, -this.tan[i].x);
+        }
       }
     }
     // v1.5 §11.1 (r310) — THE LINE LIVES ON A STRAIGHT. The generator put
@@ -7092,11 +7148,28 @@ export class Track {
     }
 
     // curvature per sample (radians of heading change per world unit)
+    //
+    // r394: divided by the WALKED ARC, not 16*segLen. Station spacing is not
+    // uniform — the kink relaxation and the warp move stations after the
+    // arc-length resample, bunching hairpin runs to ~1.7 u against the 5.7 u
+    // nominal — so the fixed divisor understated curvature by the bunching
+    // factor exactly where it matters most. Measured on GLACIER COL: the
+    // array reported ZERO stations under R30 on a lap whose true minimum
+    // radius is 7 u with 52 hairpin stations, and the AI corner-speed table
+    // (v ~ 1/sqrt(curvature)) was therefore targeting ~1.7x the lawful speed
+    // at exactly those hairpins — the long-standing "rivals drive off at
+    // hairpins" class. On uniformly spaced worlds the walked arc IS
+    // 16*segLen, so nothing changes there.
     this.curvature = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const a = this.tan[(i - 8 + N) % N];
       const b = this.tan[(i + 8) % N];
-      this.curvature[i] = Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)) / (16 * this.segLen);
+      let arc = 0;
+      for (let k = -8; k < 8; k++) {
+        const p = this.center[(i + k + N) % N], q = this.center[(i + k + 1 + N) % N];
+        arc += Math.hypot(q.x - p.x, q.z - p.z);
+      }
+      this.curvature[i] = Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)) / Math.max(1, arc);
     }
 
     // ---- width-variation: per-sample drivable half-width (pinch sections) ----
@@ -7412,6 +7485,68 @@ export class Track {
     const wide = this.T.roadWidth ?? 1;
     const HALF = ROAD_HALF * wide;
     this._width = new Float32Array(N).fill(HALF);
+    // r394 HRD-2 (owner: "This road needs widening"; CLAUDE.md §7A): a
+    // hairpin FLARES like a real pass. True radius comes from the arc-true
+    // curvature above (1/c); anything under R45 gains width, up to +55% at
+    // R<=16. The flare target is eased in and out over 12 stations so the
+    // profile tapers instead of stepping (HRD-4), and it lands HERE — in the
+    // one profile every consumer reads — so the ribbon, the AI clamp, the
+    // fence anchors and the scenery rejections all move out together (the
+    // scatter belts already grow by widthAt - ROAD_HALF and reject inside
+    // widthAt + 1, so nothing plants on the apron).
+    this._flare9 = new Float32Array(N);
+    {
+      // The radius metric is the circumcircle of real centreline points ±6 —
+      // the SAME metric the HRD gate check uses — because the ±8-tangent
+      // curvature array smooths short cusps: measured on GLACIER, 12 of its
+      // 52 true hairpin stations (circumcircle R 18-23) read R>=45 through
+      // the array and got no flare at all.
+      const radAt = (i) => {
+        const a = this.center[(i - 6 + N) % N], b = this.center[i], c = this.center[(i + 6) % N];
+        const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+        const cross = abx * bcz - abz * bcx;
+        if (Math.abs(cross) < 1e-6) return 1e9;
+        const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz),
+          ac = Math.hypot(c.x - a.x, c.z - a.z);
+        return (ab * bc * ac) / (2 * Math.abs(cross));
+      };
+      const fl = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        const R = radAt(i);
+        if (R < 45) fl[i] = THREE.MathUtils.smoothstep(45 - R, 0, 29);
+      }
+      for (let i = 0; i < N; i++) {
+        if (fl[i] <= 0) continue;
+        for (let k = -12; k <= 12; k++) {
+          const j = (i + k + N) % N;
+          const v = fl[i] * (1 - Math.abs(k) / 12);
+          if (v > this._flare9[j]) this._flare9[j] = v;
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        if (this._flare9[i] > 0) {
+          // capped so the INNER edge keeps at least 6 u of radius — a flare
+          // past that folds the ribbon at the apex, which is the exact
+          // geometry HRD-7 outlaws for the base width
+          const cap = Math.max(HALF, radAt(i) - 6);
+          this._width[i] = Math.max(this._width[i],
+            Math.min(cap, HALF * (1 + 0.55 * this._flare9[i])));
+        }
+      }
+      // HRD-4: wherever the fold cap bites mid-flare it can leave a step
+      // between neighbours; a two-direction limiter shaves the higher side
+      // down to a 0.35 u/station taper (only ever reducing, so the fold cap
+      // is never re-violated)
+      for (let dir = 0; dir < 2; dir++) {
+        for (let k = 1; k <= N; k++) {
+          const i = dir ? (N - k + N) % N : k % N;
+          const p = dir ? (i + 1) % N : (i - 1 + N) % N;
+          if (this._width[i] > this._width[p] + 0.35) {
+            this._width[i] = this._width[p] + 0.35;
+          }
+        }
+      }
+    }
     this._narrowSecs = [];
     const T = this.T;
     const themeKey = (this.level && this.level.theme) || 'forest';
@@ -7790,18 +7925,25 @@ export class Track {
     // The tangent is unit length, so this projection is in metres. Clamped to
     // one segment either side — beyond that the caller's index hint was simply
     // wrong, and extrapolating a bad hint is worse than sitting on the sample.
+    // Tangent projection over the LOCAL run to the station being
+    // interpolated toward — never the nominal segLen: with the global
+    // divisor the frac reached only run/segLen by the time the car arrived
+    // at the next sample wherever stations ran short, so every index
+    // handoff stepped the road height by the leftover rise (measured up to
+    // 3.19 u per frame at GLACIER's then-bunched hairpins).
+    //
+    // Ledger note, r394: two "more correct" forms were tried and REVERTED —
+    // a chord-projection parameter and a Voronoi boundary-plane cell
+    // coordinate (with and without cell walking). Deep inside a hairpin fan
+    // the cells collapse toward the pivot and every centreline
+    // parameterization becomes multi-valued; the traced coordinate leapt
+    // 1.3-2.7 stations on 0.24 u of car movement whichever form computed
+    // it. The residual apex discontinuity is therefore handled where the
+    // read becomes MOTION instead: the vehicle's ground read carries a
+    // slope-law slew guard (vehicles.js), whose cap equals the steepest
+    // lawful grade so real crests are never clipped.
     const t = this.tan[a];
     const proj = (pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z;
-    // Divide by the LOCAL run to the sample being interpolated toward, never
-    // the nominal segLen. Station spacing is NOT uniform: the kink relaxation
-    // and the warp move stations after the arc-length resample, and at a
-    // hairpin stack the runs bunch to 1.7 u against a 5.7 u nominal. With the
-    // global divisor the frac reached only run/segLen (~0.3) by the time the
-    // car arrived at the next sample, so every index handoff STEPPED the
-    // interpolated road height by the remaining 0.7 of the inter-station rise
-    // — differentiated by the suspension, that is the reported "jumping and
-    // shaking" (measured 0.36-3.19 u frame steps at GLACIER's bunched
-    // stations; smooth-spaced worlds never showed it).
     const j = proj >= 0 ? (a + 1) % n : (a - 1 + n) % n;
     const run = Math.max(0.1, Math.hypot(
       this.center[j].x - this.center[a].x, this.center[j].z - this.center[a].z));
