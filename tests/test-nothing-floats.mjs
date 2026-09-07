@@ -459,7 +459,12 @@ const ctrl = await page.evaluate(async ({ MINGAP }) => {
   let victim = null;
   t.group.traverse((o) => {
     if (!o.isInstancedMesh || o.count < 50) return;
-    if (o.name) return;
+    // r392: the carpet named itself 'carpet-foliage' (corridor census), which
+    // silently removed the control's usual victim — the pick fell through to
+    // the grass-tuft PLANES, a class the seat scan cannot see, and the
+    // control went red on its own blindness. The carpet is still exactly the
+    // densest liftable scatter this control wants.
+    if (o.name && o.name !== 'carpet-foliage') return;
     if ((t.trees ?? []).some((r) => Array.isArray(r.parts) && r.parts.includes(o))) return;
     if (!victim || o.count > victim.count) victim = o;
   });
