@@ -57,9 +57,25 @@ const R = await p.evaluate(() => {
     if (score > best) { best = score; stage = i; }
   }
   // the runs measure the LAW, not the rock lottery: colliders come out for
-  // the staged physics and go straight back (test-shortcut's own doctrine)
-  const kept = { o: t.obstacles, s: t.solids, b: t.barriers, tr: t.trees };
-  t.obstacles = []; t.solids = []; t.barriers = []; t.trees = [];
+  // the staged physics and go straight back (test-shortcut's own doctrine).
+  // r394: the VERGE lottery comes out too — a 110 km/h drift arc needs ~15 u
+  // of lateral room, more than any 9 u road has, so whether the tail of the
+  // arc lands on tarmac or grass was decided by where the stage scorer
+  // happened to land (the r394 uniform re-resample re-rolled it and the arc
+  // scrubbed 76 -> 43 km/h on grass in ten frames). The tyre law being
+  // measured does not change with the verge, so the road is widened for the
+  // staged runs and restored after.
+  // ...and the TRUNK lottery: bisected frame-by-frame, the r394 failure was
+  // a FIX-5 trunk capsule (t.camTreesNear — trunks bypass t.trees, the
+  // same lesson test-shortcut's rig learned) that the uniform re-resample
+  // moved into the 110 arc's tail ~11 u off the stage: the deflection keeps
+  // exactly 60% of approach speed, and 73 x 0.6 = the measured 43. Water
+  // and puddles come out too, under the same doctrine.
+  const kept = { o: t.obstacles, s: t.solids, b: t.barriers, tr: t.trees,
+    w: t._width, wa: t.waterAt, pu: t.puddles, ctn: t.camTreesNear };
+  t.obstacles = []; t.solids = []; t.barriers = []; t.trees = []; t.puddles = [];
+  t.waterAt = null; t.camTreesNear = null;
+  if (t._width) t._width = new Float32Array(N).fill(30);
   const run = (drift, kmh0) => {
     pl.placeAt(stage, 0, true);
     const v0 = kmh0 / 3.6;
@@ -83,6 +99,8 @@ const R = await p.evaluate(() => {
   };
   const out = { d70: run(true, 70), p70: run(false, 70), d110: run(true, 110) };
   t.obstacles = kept.o; t.solids = kept.s; t.barriers = kept.b; t.trees = kept.tr;
+  t.waterAt = kept.wa; t.puddles = kept.pu; t.camTreesNear = kept.ctn;
+  if (kept.w) t._width = kept.w;
   return out;
 });
 ok(R.d70.turn > 90, 'a 2 s handbrake drift at 70 km/h actually TURNS the car (>90°)',

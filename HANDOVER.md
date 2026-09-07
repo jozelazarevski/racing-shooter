@@ -4244,6 +4244,30 @@ arc UVs check.
   GLACIER, CLIFF KNOT and IL VICOLO (whose owner-directed 3.04 lane
   calibrated the floor).
 
+The blocking gate then earned its keep three times on this build, every
+red a real find:
+
+- floats: an ALPENRING river-bank reed 15.18 u over the drawn carve
+  (bank dressing seated on terrainHeight where the bed bends faster
+  than the 10 u lattice; the re-resample re-threaded the fords and
+  re-rolled the spot). Reeds and stream boulders now seat on
+  _drawnGroundY. 15.18 -> 1.69, roster sweep green.
+- drift: the 110 km/h FT case exited 33 vs the r392 worktree baseline's
+  55. Bisected frame-by-frame to a ONE-FRAME 73 -> 43 cut = the FIX-5
+  trunk deflection's exact 0.6 keep-factor: a verge tree the resample
+  moved into the arc's tail, reached through t.camTreesNear, which
+  bypasses the t.trees strip (test-shortcut's old lesson). The drift
+  rig now strips trunks, water and puddles and widens the road for the
+  staged runs — it measures the tyre law, not the verge lottery.
+  Exits 56, 6/6.
+- on-road LAW 6: two sub-1 u barrier bites. AERODROME's 40 u straight
+  bridge parapet CHORDED into a bent approach — parapets are now
+  segmented per two stations, each at its own normal, lateral following
+  local width. OLIVE CROSSING's 21 u deck rail swung an END into its
+  own curving deck — rails now step outward until both endpoints clear
+  every leg, falling to the junction-marker path only if +2.4 u cannot
+  clear. Both worlds and SERPENTINA measure clean on all laws.
+
 ## r393 — THE ASSET-SHEET FOREST
 
 The owner shipped a design sheet ("FOREST BIOME ASSET LIBRARY") and three

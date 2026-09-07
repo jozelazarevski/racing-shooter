@@ -18340,23 +18340,31 @@ export class Track {
       }
       const g = new THREE.Group();
       for (const side of [1, -1]) {
-        // parapet walls the length of the span
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
-        const a = this.center[(i - span + N) % N], b2 = this.center[(i + span) % N];
-        const mxx = (a.x + b2.x) / 2, mzz = (a.z + b2.z) / 2;
-        const yaw = this.headingAt(i);
-        const nn = this.nrm[i];
-        wall.scale.set(1.1, 1.6, span * 2 * this.segLen);
-        wall.position.set(mxx + nn.x * 10.6 * side, this.center[i].y + 0.6, mzz + nn.z * 10.6 * side);
-        wall.rotation.y = yaw;
-        wall.castShadow = true;
-        g.add(wall);
-        // A 40 u PARAPET IS NOT A 1.4 u DOT. This registered one circle at
-        // the middle of the whole span, which is why the bridge wall in the
-        // player's screenshot could be driven straight into and over. The
-        // barrier runs the full span at its real thickness and height.
-        this._barrier(wall.position.x, wall.position.z, Math.sin(yaw), Math.cos(yaw),
-          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6, 'stone', true);
+        // A 40 u PARAPET IS NOT A 1.4 u DOT — and it is not a 40 u CHORD
+        // either. One straight wall spanning the whole bridge cut inside the
+        // corridor wherever the span bends (AERODROME measured a 0.86 u bite
+        // at a parapet END after the r394 re-resample bent the approach), so
+        // the parapet is SEGMENTED per two samples, each piece at its own
+        // station's normal, its lateral following the local width (HRD-1)
+        // plus a chord-sag allowance. Every piece keeps its own full-length
+        // barrier at real thickness and height.
+        for (let jj = -span; jj < span; jj += 2) {
+          const j2 = (i + jj + N) % N;
+          const c2 = this.center[j2], n2 = this.nrm[j2];
+          const yaw2 = this.headingAt(j2);
+          const sagP = Math.min(2.5,
+            0.5 * Math.pow(this.segLen + 0.2, 2) * (this.curvature[j2] ?? 0));
+          const latP = Math.max(10.6, this.widthAt(j2) + 0.55 + 0.8 + sagP);
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
+          wall.scale.set(1.1, 1.6, 2 * this.segLen + 0.4);
+          wall.position.set(c2.x + n2.x * latP * side, this.center[i].y + 0.6,
+            c2.z + n2.z * latP * side);
+          wall.rotation.y = yaw2;
+          wall.castShadow = true;
+          g.add(wall);
+          this._barrier(wall.position.x, wall.position.z, Math.sin(yaw2), Math.cos(yaw2),
+            2 * this.segLen + 0.8, 1.1, this.center[i].y - 0.2, 1.6, 'stone', true);
+        }
         // arch faces: two masonry blocks descending under the deck
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
@@ -18385,7 +18393,7 @@ export class Track {
           if (this._pierInRoad(px, pz, c.y - 0.1)) continue;
           const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
           pier.position.set(px, c.y - 4.6, pz);
-          pier.rotation.y = yaw;
+          pier.rotation.y = this.headingAt(j);
           g.add(pier);
         }
       }
@@ -18543,8 +18551,33 @@ export class Track {
         const j = (o.up + sN + N) % N;
         const c = this.center[j], n = this.nrm[j];
         for (const side of [1, -1]) {
-          const rx = c.x + n.x * 10.2 * side, rz = c.z + n.z * 10.2 * side;
-          if (railBlocked(rx, rz, c.y, j, o.half)) {
+          // r394 HRD-1: the rail's lateral follows the LOCAL width (the road
+          // is no longer a constant 9), plus a chord-sag allowance — an 11.7 u
+          // straight piece on a curving deck bows into the corridor by
+          // hl²·curvature/2 (OLIVE CROSSING measured a 0.68 u bite from
+          // exactly this after the r394 re-resample bent the deck slightly).
+          // ...and the piece's ENDPOINTS answer for their reach — a straight
+          // 2·segLen rail on a bending deck swings its ENDS toward the
+          // carriageway (OLIVE CROSSING measured a 0.61 u bite at a rail end
+          // while its midpoint cleared; the r393 fence lesson — a reach is
+          // checked at its extremes). The rail steps OUTWARD until both ends
+          // clear every leg (its own deck included); only if no offset within
+          // +2.4 u clears does it fall to the junction-marker path, the same
+          // rule railBlocked already applies.
+          let rx = 0, rz = 0, endBites9 = true;
+          for (const extra9 of [0, 0.8, 1.6, 2.4]) {
+            const latR9 = Math.max(10.2, this.widthAt(j) + 0.35 + 0.8) + extra9;
+            rx = c.x + n.x * latR9 * side; rz = c.z + n.z * latR9 * side;
+            endBites9 = false;
+            for (const s9 of [-1, -0.5, 0.5, 1]) {
+              const ex = rx + this.tan[j].x * (this.segLen + 0.4) * s9;
+              const ez = rz + this.tan[j].z * (this.segLen + 0.4) * s9;
+              const ns9 = this._nearestSample(ex, ez);
+              if (ns9.d - 0.35 < this.widthAt(ns9.i) + 0.45) { endBites9 = true; break; }
+            }
+            if (!endBites9) break;
+          }
+          if (endBites9 || railBlocked(rx, rz, c.y, j, o.half)) {
             // A JUNCTION MOUTH IS STILL AN EDGE.
             //
             // The rail is withheld here because it would stand in ANOTHER
