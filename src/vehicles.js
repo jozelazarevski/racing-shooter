@@ -3497,7 +3497,15 @@ export class Car {
       for (const tr of t.trees) {
         if (tr.dead) continue;
         const dx = this.pos.x - tr.x, dz = this.pos.z - tr.z;
-        const rr = tr.r + 1.7;
+        // MASTER FIX-5 (r388): THE CANOPY IS NOT A COLLIDER. tr.r is the
+        // crown radius, and colliding on it bounced cars off foliage two
+        // metres from the wood (R10's "cone colliders act as ramps" family).
+        // A SOLID tree collides on its TRUNK — a 0.35 x scale capsule — and
+        // the crown is drive-under scenery. Yielding trees keep the crown
+        // radius: brushing a sapling's foliage at speed is what smashes it.
+        const grown0 = (tr.s ?? 1) >= 1.0 && tr.kind !== 'cactus' && tr.kind !== 'snag';
+        const solid0 = tr.solid === true || grown0;
+        const rr = (solid0 ? 0.35 * (tr.s ?? 1) : tr.r) + 1.35;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
         // REAL-WORLD RULE: any full-grown trunk is solid, whatever species -
@@ -3521,15 +3529,61 @@ export class Car {
             // through the same angle-of-attack rule as stone — recording B
             // paid 33 hull for a 145 km/h brush past a trunk. Compute the
             // share of speed into the trunk BEFORE the bounce edits vel.
+            const vApp9 = Math.hypot(this.vel.x, this.vel.z);
             const square = THREE.MathUtils.clamp(
-              -vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
+              -vn / Math.max(3, vApp9), 0, 1);
             this.vel.x -= nx * vn * 1.05;
             this.vel.z -= nz * vn * 1.05;
+            // MASTER FIX-5 (r388): a trunk hit at pace DEFLECTS at −40%
+            // speed rather than stopping dead — the trunk is 0.7 u of wood,
+            // not a wall; the debris/damage path still prices the hit. Below
+            // 60 km/h the old full stop stands (a parking nudge should park).
+            if (!yields && vApp9 >= 16.7) {
+              const kept = Math.hypot(this.vel.x, this.vel.z);
+              const want9 = vApp9 * 0.6;
+              if (kept < want9 && kept > 0.1) {
+                this.vel.x *= want9 / kept;
+                this.vel.z *= want9 / kept;
+              }
+            }
             if (!yields && this.wallGrind <= 0) {
               this.wallGrind = square < 0.55 ? 0.55 : 0.18;
               gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz, square);
             }
           }
+        }
+        break;
+      }
+    }
+    // MASTER FIX-5 / WR-7.6 (r388): THE CARPET HAS TRUNKS TOO. The verge
+    // forest is pure paint with no records in t.trees, so a car drove
+    // clean through standing wood — R10's ghost-forest family. Player-only,
+    // through the same 24 u cell hash the camera's foliage guard reads;
+    // trunk capsules only (crowns stay drive-under), physics push + a
+    // grind, no damage event — the stop itself is the correction.
+    if (this === gm.player && t.camTreesNear && !this.airborne) {
+      for (const tr of t.camTreesNear(this.pos.x, this.pos.z)) {
+        const trunkR = 0.35 * (tr.r / 1.9);
+        const rr = trunkR + 1.35;
+        const dx = this.pos.x - tr.x, dz = this.pos.z - tr.z;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        if (this.pos.y > tr.top + 1 || this.pos.y < tr.top - 11) continue;
+        const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+        const nx = dx / d, nz = dz / d;
+        this.pos.x = tr.x + nx * rr;
+        this.pos.z = tr.z + nz * rr;
+        const vn = this.vel.x * nx + this.vel.z * nz;
+        if (vn < 0) {
+          const vApp9 = Math.hypot(this.vel.x, this.vel.z);
+          this.vel.x -= nx * vn * 1.05;
+          this.vel.z -= nz * vn * 1.05;
+          const kept = Math.hypot(this.vel.x, this.vel.z);
+          const want9 = vApp9 * 0.6;
+          if (vApp9 >= 16.7 && kept < want9 && kept > 0.1) {
+            this.vel.x *= want9 / kept;
+            this.vel.z *= want9 / kept;
+          }
+          if (this.wallGrind <= 0) this.wallGrind = 0.3;
         }
         break;
       }
