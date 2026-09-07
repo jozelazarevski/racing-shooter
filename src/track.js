@@ -7486,14 +7486,16 @@ export class Track {
     const HALF = ROAD_HALF * wide;
     this._width = new Float32Array(N).fill(HALF);
     // r394 HRD-2 (owner: "This road needs widening"; CLAUDE.md §7A): a
-    // hairpin FLARES like a real pass. True radius comes from the arc-true
-    // curvature above (1/c); anything under R45 gains width, up to +55% at
-    // R<=16. The flare target is eased in and out over 12 stations so the
-    // profile tapers instead of stepping (HRD-4), and it lands HERE — in the
-    // one profile every consumer reads — so the ribbon, the AI clamp, the
-    // fence anchors and the scenery rejections all move out together (the
-    // scatter belts already grow by widthAt - ROAD_HALF and reject inside
-    // widthAt + 1, so nothing plants on the apron).
+    // hairpin FLARES like a real pass — bounded by W-CURVE-01.2, which caps
+    // width through a sharp curve at +/-30% of the approach width (the
+    // first cut used +55% and was brought to +28% the same evening when the
+    // owner's W-CURVE-01 landed). Anything under R45 gains width, eased in
+    // and out over 12 stations so the profile tapers instead of stepping
+    // (HRD-4), and it lands HERE — in the one profile every consumer reads
+    // — so the ribbon, the AI clamp, the fence anchors and the scenery
+    // rejections all move out together (the scatter belts already grow by
+    // widthAt - ROAD_HALF and reject inside widthAt + 1, so nothing plants
+    // on the apron).
     this._flare9 = new Float32Array(N);
     {
       // The radius metric is the circumcircle of real centreline points ±6 —
@@ -7530,7 +7532,7 @@ export class Track {
           // geometry HRD-7 outlaws for the base width
           const cap = Math.max(HALF, radAt(i) - 6);
           this._width[i] = Math.max(this._width[i],
-            Math.min(cap, HALF * (1 + 0.55 * this._flare9[i])));
+            Math.min(cap, HALF * (1 + 0.28 * this._flare9[i])));
         }
       }
       // HRD-4: wherever the fold cap bites mid-flare it can leave a step

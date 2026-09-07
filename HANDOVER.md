@@ -4185,12 +4185,30 @@ What shipped here, one system (route/width geometry), each step measured:
 
 - HRD-2 THE HAIRPIN FLARES. _buildWidthProfile grows any station whose
   circumcircle radius (real points, ±6 — never t.curvature) reads under
-  45 u, up to +55% at R<=16, eased over 12 stations, capped so the INNER
+  45 u, up to +28% at R<=16, eased over 12 stations, capped so the INNER
   edge keeps 6 u of radius, then run through a 0.35 u/station taper
-  limiter (HRD-4). It lands in the one width profile every consumer
-  reads, and the scatter belts already grow/reject by widthAt, so
-  nothing plants on the new aprons. GLACIER hairpins now carry 13.6 u
-  half-width against base 9; CANYON RUN is byte-identical (zero flare).
+  limiter (HRD-4). +28%, not the first cut's +55%: the owner's
+  W-CURVE-01 landed the same evening and binds width through a sharp
+  curve to +/-30% of the approach width. It lands in the one width
+  profile every consumer reads, and the scatter belts already
+  grow/reject by widthAt, so nothing plants on the new aprons. GLACIER
+  hairpins now carry 11.5 u half-width against base 9; CANYON RUN is
+  byte-identical (zero flare).
+
+Same evening, the owner REPLACED RALLY_MASTER_SPEC.md whole-document
+(its own C-01 amendment rule) — v2: HUD freeze H-01..03, track T-01..05
+(2x length, >=12 curves, <=400 m straights, grade-continuous speed),
+containment W-EDGE-01 (mountain edge on narrow roads, <=8 m lateral,
+gaps <=15 m) + W-CURVE-01 (sharp curves: width tolerance, bounded
+edges, continuous grounded drop-side barriers with <=8 m gaps, solid
+apex, arc-following UVs, 2-8° banking on gradient, hairpin R >= 9),
+scenery S-01..05, vegetation V-01..02, validators VAL-01..03. Standalone
+copy RALLY_W_CURVE_01.md. And HRD-5 was SCOPED by directive: "there can
+be field roads. That is fine. This should apply in steep mountains" —
+recorded in CLAUDE.md §7A; r395's flank builder binds steep-mountain
+terrain and the W-EDGE-01 classes, not flat field country. New debts
+queued from W-CURVE-01: drop-side barrier continuity, curve banking,
+arc UVs check.
 - THE CURVATURE ARRAY TELLS THE TRUTH. Its divisor was 16xsegLen —
   wherever the kink pass bunched stations, curvature understated ~3x,
   and the AI corner-speed table (v ~ 1/sqrt(c)) targeted ~1.7x lawful
