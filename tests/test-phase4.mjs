@@ -76,7 +76,7 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
       const h = t.headingAt(i), pt = t.pointAt(i, lat);
       const dx = Math.sin(h), dz = Math.cos(h);
       let worst = 0, prev = lat === 0 ? t.groundHeightAt(i, 0) : t.terrainHeight(pt.x, pt.z);
-      for (let s = 1; s <= 5; s++) {
+      for (let s = 1; s <= 3; s++) {
         const y2 = lat === 0
           ? t.groundHeightAt((i + Math.round(s * 20 / Math.max(1, Math.hypot(
               t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z)))) % N, 0)
@@ -86,16 +86,50 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
       }
       return worst;
     };
-    const flattest = (lat) => {
-      let best = 220, bg = Infinity;
-      for (let i = 0; i < N; i += 10) {
-        const w = runwayGrade(i, lat);
-        if (w < bg) { bg = w; best = i; }
+    // r391: the carpet trunks are colliders now (MASTER FIX-5), so a runway
+    // through a verge grove measures tree threshing, not the surface law —
+    // GLACIER COL's flattest lat-14 grass line carried 67 trunk encounters
+    // in 100 u and read 31%. The rebuilt pass still HAS flat, un-treed
+    // 60 u corridors (start plateau, lat ±9-12, <=4% grade), so the search
+    // now walks both verges at several offsets and prices trees at their
+    // real collision radius instead of assuming one fixed shoulder.
+    const treesOn = (i, lat) => {
+      if (lat === 0 || !t.camTreesNear) return 0;
+      const h = t.headingAt(i), pt = t.pointAt(i, lat);
+      const dx = Math.sin(h), dz = Math.cos(h);
+      let n = 0;
+      for (let s = 0; s <= 60; s += 5) {
+        for (const tr of t.camTreesNear(pt.x + dx * s, pt.z + dz * s)) {
+          if (Math.hypot(tr.x - (pt.x + dx * s), tr.z - (pt.z + dz * s)) < 1.8) n++;
+        }
+      }
+      return n;
+    };
+    const flattest = (latAsk) => {
+      if (latAsk === 0) {
+        let best = 220, bg = Infinity;
+        for (let i = 0; i < N; i += 10) {
+          const w = runwayGrade(i, 0);
+          if (w < bg) { bg = w; best = i; }
+        }
+        return { idx: best, lat: 0 };
+      }
+      let best = { idx: 220, lat: latAsk }, bg = Infinity;
+      for (let i = 0; i < N; i += 5) {
+        // the run must START and STAY off-road: the classifier is
+        // |lateral| > widthAt + 1, and the grid apron widens the road, so a
+        // lat-9 corridor by the start line is carriageway (PINE read 100%)
+        const wHere = t.widthAt?.(i) ?? 5;
+        for (const lat of [9, 12, 16, 20, -9, -12, -16, -20]) {
+          if (Math.abs(lat) < wHere + 3) continue;
+          const w = runwayGrade(i, lat) + treesOn(i, lat) * 0.03;
+          if (w < bg) { bg = w; best = { idx: i, lat }; }
+        }
       }
       return best;
     };
-    const run = (lat) => {
-      const idx = flattest(lat);
+    const run = (latAsk) => {
+      const { idx, lat } = flattest(latAsk);
       const place = (sp) => {
         c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
         const pt = t.pointAt(idx, lat);

@@ -461,7 +461,10 @@ export const LEVELS = [
       valleyWalls: { h: 64, run: 130 },
     } },
   { id: 66, name: 'GLACIER COL', theme: 'furka', region: 'ALPINE PASSES',
-    cost: 38, fresh: true, route: 'panorama',
+    // r391 (MASTER §5.4 stage one): rebuilt on its own COMPOSED route —
+    // panorama measured 0.6 corners/km with a 2 km straight against §4's
+    // >= 7/km and 300 m; RAZORBACK and the reverse copy keep panorama.
+    cost: 38, fresh: true, route: 'glaciercol',
     // r327: GLACIER COL keeps the shape UNMODIFIED — it is recording B's
     // evidence world and the F7 grass-bound fixture, and the anchor copy of
     // a shared shape is chosen for being an anchor, not for id order.
@@ -2220,6 +2223,78 @@ const CIRCUITS = {
     [-110, 62], [-165, 74], [-215, 58], [-243, 20], [-240, -12],
   ],
 };
+
+/** r391 (RALLY_MASTER_SPEC §4) — THE ROUTE COMPOSER. §4 asks geometry the
+ *  hand-sketched polygons cannot reach by nudging (GLACIER COL measured 0.6
+ *  corners/km against the >= 7 target, zero hairpins, a 2 km straight): a
+ *  stage is now COMPOSED from a corner grammar — straights `{s}` and arcs
+ *  `{c: [radius, arcDeg, dir]}` walked by a turtle at authored (pre-
+ *  ROUTE_SCALE) units. The composer closes the loop itself: a final sweeper
+ *  brings the net heading to ±360°, and the last fifth of the walk blends
+ *  onto the start point (Catmull's centripetal fit smooths the seam). Any
+ *  future §5.4 rebuild is a new grammar, not a new hand plot. */
+function composeRoute(segs) {
+  const pts = [];
+  let x = 0, z = 0, h = 0, turn = 0;
+  const emit = () => pts.push([x, z]);
+  emit();
+  const arc = (R, deg, dir) => {
+    const a = deg * Math.PI / 180;
+    // emission density: never more than 20° of arc between control points —
+    // a 170° hairpin on 2 points is a sweep once Catmull rounds it (measured:
+    // every authored R5 hairpin read back as R30+ "medium")
+    const n = Math.max(3, Math.round((R * a) / 7), Math.ceil(deg / 20));
+    for (let i = 0; i < n; i++) {
+      h += dir * a / n;
+      const step = R * a / n;
+      x += Math.sin(h) * step; z += Math.cos(h) * step;
+      emit();
+    }
+    turn += dir * deg;
+  };
+  for (const sg of segs) {
+    if (sg.s) {
+      const n = Math.max(1, Math.round(sg.s / 9));
+      for (let i = 0; i < n; i++) { x += Math.sin(h) * (sg.s / n); z += Math.cos(h) * (sg.s / n); emit(); }
+    } else arc(sg.c[0], sg.c[1], sg.c[2]);
+  }
+  // heading closure: one wide sweeper carries whatever turn is still owed
+  const owe = (turn >= 0 ? 360 : -360) - turn;
+  if (Math.abs(owe) > 4) arc(34, Math.abs(owe), Math.sign(owe));
+  // position closure: distribute the error over the WHOLE loop as a gentle
+  // shear — a tail-only blend flattened the last fifth into a fake 2 km
+  // straight (measured). Radii drift a hair; corners survive.
+  const M = pts.length;
+  const ex = pts[0][0] - x, ez = pts[0][1] - z;
+  for (let i = 0; i < M; i++) {
+    const t = i / (M - 1);
+    pts[i][0] += ex * t; pts[i][1] += ez * t;
+  }
+  pts.pop();
+  return pts;
+}
+
+// GLACIER COL (r391, MASTER §5.4 stage one): a Swiss-pass lap — valley
+// sweepers, a three-hairpin climb stack, a ramp of mediums, the ridge, a
+// second stack to the col, a chicaned crest, and an alternating descent
+// home. Authored to land 4.5-5.5 km at ROUTE_SCALE 4 with §4's corner
+// classes; verified by tools-scratch/dbg-tdmetrics.mjs, not by eye.
+CIRCUITS.glaciercol = composeRoute([
+  { s: 40 }, { c: [40, 70, 1] }, { s: 25 }, { c: [34, 60, -1] }, { s: 30 },
+  { c: [44, 50, 1] }, { s: 20 }, { c: [9, 45, -1] }, { c: [9, 45, 1] }, { s: 35 },
+  { c: [12, 80, 1] }, { s: 14 }, { c: [3.2, 205, -1] }, { s: 16 }, { c: [3.2, 205, 1] },
+  { s: 16 }, { c: [3.2, 205, -1] }, { s: 12 }, { c: [12, 70, 1] },
+  { s: 28 }, { c: [11, 90, -1] }, { s: 18 }, { c: [13, 85, 1] }, { s: 22 },
+  { c: [9, 100, -1] }, { s: 18 },
+  { c: [36, 55, 1] }, { s: 30 }, { c: [30, 50, -1] }, { s: 24 },
+  { c: [10, 40, 1] }, { c: [10, 40, -1] }, { s: 26 }, { c: [38, 45, 1] },
+  { s: 14 }, { c: [3.5, 210, -1] }, { s: 15 }, { c: [3.5, 210, 1] }, { s: 12 },
+  { c: [14, 70, -1] }, { s: 20 }, { c: [16, 60, 1] }, { s: 24 },
+  { c: [10, 95, -1] }, { s: 14 }, { c: [9, 90, 1] }, { s: 16 },
+  { c: [11, 85, -1] }, { s: 18 }, { c: [13, 75, 1] }, { s: 20 },
+  { c: [34, 65, -1] }, { s: 30 }, { c: [40, 55, 1] }, { s: 28 },
+  { c: [30, 60, -1] }, { s: 30 }, { c: [36, 50, 1] }, { s: 25 },
+]);
 
 // Every color and density knob per theme. `fogColor…sunIntensity` are exposed
 // to main.js via `track.theme`; the rest is internal art direction.
@@ -6704,12 +6779,17 @@ export class Track {
           per += Math.hypot(b9[0] - a9[0], b9[1] - a9[1]);
         }
         per *= ROUTE_SCALE;
-        // 2*mand/len is only the AVERAGE ramp grade: the mandate block's
-        // C1 triangle spends a=0.16 of each ramp easing in and out, so its
-        // constant mid-section runs 1/(1-a) steeper than the average
-        // (measured: budget 0.20 delivered p50 0.23 without this factor)
-        const needLen = 2 * mand9 / 0.20 / (1 - 0.16);
-        this._gradeStretch = Math.min(2.6, Math.max(1, needLen / Math.max(1, per)));
+        // r391 (RALLY_MASTER_SPEC WR-2.1 + §4, recorded in CLAUDE.md): the
+        // MANDATE COMPRESSES TO THE GRADE-LAWFUL RANGE instead of stretching
+        // the lap to fit it. §4 pins laps at 4.5-5.5 km and WR-2.1 pins
+        // grades at 4-12%, and a lap that climbs AND descends H at grade g
+        // needs 2H/g of road — so 12% at 5.5 km carries ~330 m, not 1200.
+        // The lap stretches only up to §4's own 4.5 km floor; whatever range
+        // that length lawfully carries is the range the world gets (WR-8's
+        // bands are relative to the stage's own max, so summits stay snowy).
+        this._gradeStretch = Math.min(1.35, Math.max(1, 4500 / Math.max(1, per)));
+        const lawful9 = per * this._gradeStretch * (0.12 / 2) * (1 - 0.16);
+        this._mandLawful = Math.min(mand9, lawful9);
       }
     }
     // the coast line was scaled by ROUTE_SCALE where T was assembled; a
@@ -6773,7 +6853,13 @@ export class Track {
     // cusps was running before the cusps were made.
     this._applyRouteWarp(edit);
     {
-      const MAX_TURN = (13 * Math.PI) / 180;
+      // r391 (MASTER §4): 13° per station silently FLOORED every corner at
+      // ~R28 at mandate-era segLens — the composed GLACIER hairpins authored
+      // at 20 m read back 31 m however tight the grammar went. The cap
+      // exists to kill hand-sketch CUSPS (21-60° stations), not hairpins: a
+      // legal 18 m hairpin at a 5.7 m station is 18°, so the cap sits just
+      // above that and still executes every cusp it was written for.
+      const MAX_TURN = (20 * Math.PI) / 180;
       const moved = new Uint8Array(N);
       // The budget was 80, which is ample for the hand-drawn Vs this was
       // written for — a warped lap needs far more, because a warp cusp is
@@ -6864,7 +6950,9 @@ export class Track {
     // the coast lift, so a sea-side olive world still keeps its corniche
     // freeboard on top of the climb.
     {
-      const mand = T.minElevRange ?? ELEV_MANDATE[level && level.theme];
+      // r391: the route block above compressed the raw mandate to what
+      // WR-2.1's grades lawfully carry at this lap's length
+      const mand = this._mandLawful ?? T.minElevRange ?? ELEV_MANDATE[level && level.theme];
       if (mand) {
         let lo = Infinity, hi = -Infinity;
         for (let i = 0; i < N; i++) {
@@ -6901,6 +6989,48 @@ export class Track {
             }
           }
         }
+      }
+    }
+    // r391 (MASTER WR-2.1): THE GRADE LAW IS A FILTER, NOT A HOPE. The
+    // octave texture spikes station grades to 48% wherever it likes (the
+    // 0.45 damp only ran when the mandate stretch did, and the compressed
+    // mandate now skips that block whenever the natural range suffices).
+    // On mandate-class worlds the profile is slope-limited directly: 13%
+    // per station on the legs, 6% through anything tighter than R40 — a
+    // switchback flattens in the turn, the climb banks on the legs. Scoped
+    // to mandate worlds because gorge decks and kickers elsewhere are
+    // INTENTIONALLY steeper than any road law.
+    if (this._mandLawful) {
+      // The limit is priced per STATION RUN, not the nominal spacing: through
+      // a hairpin the resampled points bunch to under 1 u apart, and a limit
+      // priced at the 5.7 u nominal run let 0.34 m of rise stand over a 0.6 m
+      // step — a 57% grade the filter called legal (measured max 0.72).
+      const lim9 = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        const j = (i + 1) % N;
+        const run9 = Math.max(0.1, Math.hypot(
+          this.center[j].x - this.center[i].x, this.center[j].z - this.center[i].z));
+        const h0 = this.headingAt(i), h1 = this.headingAt(j);
+        let dtn = h1 - h0;
+        while (dtn > Math.PI) dtn -= 2 * Math.PI;
+        while (dtn < -Math.PI) dtn += 2 * Math.PI;
+        const R9 = Math.abs(dtn) < 1e-4 ? 1e9 : run9 / Math.abs(dtn);
+        lim9[i] = (R9 < 40 ? 0.06 : 0.13) * run9;
+      }
+      for (let pass9 = 0; pass9 < 6000; pass9++) {
+        let bad9 = 0;
+        for (let i = 0; i < N; i++) {
+          const j = (i + 1) % N;
+          const lim = lim9[i];
+          const dy = this.center[j].y - this.center[i].y;
+          if (Math.abs(dy) > lim) {
+            const ex = (Math.abs(dy) - lim) / 2 * Math.sign(dy);
+            this.center[j].y -= ex;
+            this.center[i].y += ex;
+            bad9++;
+          }
+        }
+        if (!bad9) break;
       }
     }
     // THE SCULPT MOVES THE ROAD TOO.
