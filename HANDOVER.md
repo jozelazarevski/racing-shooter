@@ -4207,9 +4207,40 @@ the owner at each round, then landed in one pass:
   Math.random) — the same build measured 70% and 54% across loads. A
   seeded-placement pass would make the pick stable; noted, not built.
 
+Two more owner reports landed in the same build:
+
+- "Remove the fence from the middle of the road. RULE: nothing stands at
+  the middle of the road." The GLACIER hairpin fence was
+  `_buildGuardFence` anchoring bays at a stale fixed theme lateral while
+  the local road is wider: 33 of 54 bays stood INSIDE the 9 u
+  carriageway. The anchor is now `max(themeLat, widthAt(i) + 1.8)` and a
+  bay is skipped when ANY point of its 5.4 u reach on either heading
+  axis lands within the road width of ANY leg of the lap (the cross-leg
+  family again: skirts r392, cliff caps before that, now fences).
+  Measured 9 bodies in the corridor → 0; the mislabeled GLACIER
+  "hero-bridge cable" pin in test-nothing-on-road is deleted, not
+  re-priced. The owner's sentence is recorded as a standing RULE.
+- "Cars are jumping and shaking while Driving." Measured with a probe
+  (tools-scratch/dbg-shake.mjs): smooth worlds sit at 0.04-0.06 u worst
+  grounded frame step; GLACIER jolted 0.36-3.19 u at its bunched hairpin
+  stations. Root cause was NOT the fold legs (a nearestIndex
+  same-height preference — kept as hysteresis — moved the number only
+  3.19→2.82): `fracIndexAt` divided the tangent projection by the
+  GLOBAL segLen (5.7 u), but station spacing is not uniform — the kink
+  relaxation and the warp move stations after the arc-length resample,
+  bunching hairpin runs to 1.7 u. The frac reached only ~0.3 by the
+  time the car arrived at the next station, so every index handoff
+  STEPPED the interpolated road height by the leftover 0.7 of the rise;
+  the suspension differentiates that into the reported shake. The
+  divisor is now the LOCAL run to the station being interpolated
+  toward. GLACIER worst step 3.19 → 0.20, jolt spots 12 → 0, references
+  unchanged (0.04/0.06). The static-walk probe that separated "surface
+  is smooth, the READ of it is not" is tools-scratch/dbg-surf258.mjs.
+
 Verified: boot 7/7, PORTO GRANDE p95 3.5 ms (the whole redesign is
 triangle-free at range), screenshots on PINE VALLEY, LARCH GOLD, MAPLE
-MILE. Deployed after the full blocking gate.
+MILE, shake probe green on GLACIER/PINE/DUST. Deployed after the full
+blocking gate.
 
 ## r392 — THE GATE IS WIRED, AND KILLS LAND BEHIND YOU (MASTER step 0 + FIX-8b)
 

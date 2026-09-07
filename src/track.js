@@ -7608,11 +7608,25 @@ export class Track {
       }
       hint = best; bd = Infinity;
     }
+    // r393 (owner: "cars are jumping and shaking"): at a bunched hairpin
+    // stack the two sides of the fold sit 8-12 samples apart — inside this
+    // window — with the opposite side sometimes XZ-CLOSER by about as much
+    // as its dy² penalty, so a grounded car's index flip-flopped legs and
+    // its ground snapped 0.4-3.2 u per frame (measured at GLACIER COL
+    // stations 162-273). A grounded car cannot STEP that: when useY is on,
+    // candidates beyond a climbable 2.5 u of the car's own height are
+    // rejected outright whenever any climbable candidate exists; the
+    // unrestricted answer stands only if nothing climbable is in reach.
+    let bestG = -1, bdG = Infinity;
     for (let k = -30; k <= 30; k++) {
       const i = (hint + k + N) % N;
       const d = d2(i);
       if (d < bd) { bd = d; best = i; }
+      if (useY && Math.abs(pos.y - this.center[i].y) <= 2.5 && d < bdG) {
+        bdG = d; bestG = i;
+      }
     }
+    if (useY && bestG >= 0) { best = bestG; bd = bdG; }
     // HEIGHT CANNOT BREAK A TIE THE WINDOW NEVER OFFERED. useY penalises the
     // wrong leg once both candidates are IN the +-30 window — but the two
     // legs of a crossing sit >=40 apart by construction, so a hint seeded on
@@ -7773,14 +7787,25 @@ export class Track {
     const n = this.center.length;
     if (!n) return 0;
     const a = ((i % n) + n) % n;
-    // The tangent is unit length, so this projection is in metres; over the
-    // segment length it is the interpolation parameter. Clamped to one segment
-    // either side — beyond that the caller's index hint was simply wrong, and
-    // extrapolating a bad hint is worse than sitting on the sample.
+    // The tangent is unit length, so this projection is in metres. Clamped to
+    // one segment either side — beyond that the caller's index hint was simply
+    // wrong, and extrapolating a bad hint is worse than sitting on the sample.
     const t = this.tan[a];
-    const f = ((pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z)
-            / (this.segLen > 0 ? this.segLen : 1);
-    return a + Math.max(-1, Math.min(1, f));
+    const proj = (pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z;
+    // Divide by the LOCAL run to the sample being interpolated toward, never
+    // the nominal segLen. Station spacing is NOT uniform: the kink relaxation
+    // and the warp move stations after the arc-length resample, and at a
+    // hairpin stack the runs bunch to 1.7 u against a 5.7 u nominal. With the
+    // global divisor the frac reached only run/segLen (~0.3) by the time the
+    // car arrived at the next sample, so every index handoff STEPPED the
+    // interpolated road height by the remaining 0.7 of the inter-station rise
+    // — differentiated by the suspension, that is the reported "jumping and
+    // shaking" (measured 0.36-3.19 u frame steps at GLACIER's bunched
+    // stations; smooth-spaced worlds never showed it).
+    const j = proj >= 0 ? (a + 1) % n : (a - 1 + n) % n;
+    const run = Math.max(0.1, Math.hypot(
+      this.center[j].x - this.center[a].x, this.center[j].z - this.center[a].z));
+    return a + Math.max(-1, Math.min(1, proj / run));
   }
 
   /** Road height at a fractional sample index — the continuous form of
