@@ -16725,7 +16725,7 @@ export class Track {
         // in this.trees, so the camera's foliage guard could not see them.
         // Registered position + canopy radius + top height, camera-side only.
         if (reg) (this.camTrees ??= []).push({
-          x, z, r: 1.9 * sc, top: y - 0.35 + 5.2 * scl.y });
+          x, z, r: 1.9 * sc, top: y - 0.35 + 6.3 * scl.y });
         n++;
       }
       for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
@@ -16744,22 +16744,9 @@ export class Track {
       const r2 = r0 + Math.random() * Math.random() * (r1 - r0);
       return { x: Math.cos(a2) * r2, z: Math.sin(a2) * r2 };
     };
-    const twoCone = () => {
-      const lo = new THREE.ConeGeometry(1.9, 3.4, 6, 1, true); lo.translate(0, 1.7, 0);
-      const hi = new THREE.ConeGeometry(1.15, 2.6, 6, 1, true); hi.translate(0, 3.9, 0);
-      return [lo, hi];
-    };
-    // VERGE WALL: the trees the chase camera actually lives beside — dense,
-    // large, starting just off the road edge, the whole way round the lap.
-    // r377 (owner's forest mockup): scaled up to TOWER — the reference's
-    // lane runs under the canopy, not past shoulder-height cones
-    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
-    // r377 UNDERSTOREY, from the owner's mockup: the ground between the
-    // trunks is not bare — a fern layer fills the first metres off the
-    // lane, and moss pads green the verge. Non-solid, same as every
-    // carpet part; green regardless of theme palette (moss is moss).
     // position-hashed jitter (duplicated seam verts displace identically —
-    // the same trap the r374 tree roughen documents)
+    // the same trap the r374 tree roughen documents). Hoisted above the
+    // tree tiers in r386: the closure ran before this const existed.
     const roughenC = (g2, amp) => {
       const P = g2.attributes.position;
       for (let i2 = 0; i2 < P.count; i2++) {
@@ -16773,6 +16760,36 @@ export class Track {
       P.needsUpdate = true;
       return g2;
     };
+    // r386 (owner: "Make the trees high poly", with a second mockup): the
+    // verge wall was still 6-sided pyramids — the r374 high-poly pass only
+    // touched gameplay trees, and the carpet is what the camera actually
+    // drives beside. Three roughened tiers now, with height segments so the
+    // profile wobbles along the trunk, not just at the rim; the jitter is
+    // BAKED into the shared geometry (position-hash, so tier seams agree)
+    // and costs nothing per instance. ~41 tris/tree here vs 12 before.
+    // Roughen BEFORE translate — the hash reads positions.
+    const twoCone = () => {
+      const lo = roughenC(new THREE.ConeGeometry(1.9, 3.4, 9, 2, true), 0.13); lo.translate(0, 1.7, 0);
+      const hi = roughenC(new THREE.ConeGeometry(1.2, 2.6, 8, 2, true), 0.13); hi.translate(0, 3.9, 0);
+      const tip = roughenC(new THREE.ConeGeometry(0.62, 1.7, 6, 1, true), 0.10); tip.translate(0, 5.5, 0);
+      return [lo, hi, tip];
+    };
+    // the mid-field ring is 14,000 instances at 38-160 u — it gets facet
+    // relief too, on a lighter budget (~15 tris)
+    const twoConeMid = () => {
+      const lo = roughenC(new THREE.ConeGeometry(1.9, 3.6, 8, 1, true), 0.12); lo.translate(0, 1.8, 0);
+      const hi = roughenC(new THREE.ConeGeometry(1.1, 2.5, 7, 1, true), 0.12); hi.translate(0, 4.1, 0);
+      return [lo, hi];
+    };
+    // VERGE WALL: the trees the chase camera actually lives beside — dense,
+    // large, starting just off the road edge, the whole way round the lap.
+    // r377 (owner's forest mockup): scaled up to TOWER — the reference's
+    // lane runs under the canopy, not past shoulder-height cones
+    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
+    // r377 UNDERSTOREY, from the owner's mockup: the ground between the
+    // trunks is not bare — a fern layer fills the first metres off the
+    // lane, and moss pads green the verge. Non-solid, same as every
+    // carpet part; green regardless of theme palette (moss is moss).
     const fernG = roughenC(new THREE.SphereGeometry(1.0, 8, 5), 0.22);
     fernG.scale(1, 0.42, 1); fernG.translate(0, 0.28, 0);
     const paintFern = (c2) =>
@@ -16784,7 +16801,7 @@ export class Track {
       c2.setHSL(0.30 + Math.random() * 0.06, 0.5, 0.17 + Math.random() * 0.1);
     ring([mossG], spec.moss ?? 1400, trackSpot(0.3, 16), 1.2, 0.7, 1.1, paintMoss);
     // mid-field: fills the ground between the wall and the horizon
-    ring(twoCone(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
+    ring(twoConeMid(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
     // margin 25 keeps an 18 u horizon-scale cone off the verge where the
     // radial scatter happens to cross the lap. r376: the radial extent
@@ -16796,7 +16813,7 @@ export class Track {
       const rr = Math.hypot(c.x, c.z);
       if (rr > maxR) maxR = rr;
     }
-    const fg = new THREE.ConeGeometry(1.8, 4.6, 5, 1, true); fg.translate(0, 2.3, 0);
+    const fg = roughenC(new THREE.ConeGeometry(1.8, 4.6, 6, 1, true), 0.15); fg.translate(0, 2.3, 0);
     ring([fg], spec.far ?? 24000, radialSpot(170, maxR + 450), 25, 1.3, 1.9);
   }
 
