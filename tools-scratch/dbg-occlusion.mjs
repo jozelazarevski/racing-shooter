@@ -52,20 +52,24 @@ await p.evaluate((CAM) => {
   };
 }, CAM);
 let hidden = 0, low = 0, n = 0;
-for (let s = 0; s < 46; s++) {
+for (let s = 0; s < 30; s++) {
   const st = await p.evaluate((STEP) => window.__driveStep(STEP), STEP);
-  const count = await p.evaluate(async () => {
-    const cv = window.__game.renderer.domElement;
+  const shot = await p.screenshot();
+  const count = await p.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + b64;
+    await img.decode();
     const c2 = document.createElement('canvas');
-    c2.width = 480; c2.height = 854;
-    c2.getContext('2d').drawImage(cv, 0, 0);
-    const d = c2.getContext('2d').getImageData(0, 0, 480, 854).data;
+    c2.width = img.width; c2.height = img.height;
+    const ctx = c2.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c2.width, c2.height).data;
     let mag = 0;
     for (let i = 0; i < d.length; i += 4) {
       if (d[i] > 170 && d[i + 2] > 170 && d[i + 1] < 110) mag++;
     }
     return mag;
-  });
+  }, shot.toString('base64'));
   n++;
   if (count === 0) hidden++;
   else if (count < 40) low++;
