@@ -1652,20 +1652,20 @@ class Game {
     // film grade: gentle saturation + contrast lift and a soft vignette —
     // runs pre-OutputPass (linear space), so it grades under the tone map
     this.grade = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 }, uAber: { value: 0.0006 } },
+      // RALLY_MASTER_SPEC WR-4.2 (r388): chromatic aberration DISABLED
+      // game-wide — the radial fringe (uAber 0.0006) is Citadel Bay's
+      // "chromatic fringing" evidence, and on 1-2 px phone edges it reads
+      // as blur, not lens character. Deleted, not zeroed.
+      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: /* glsl */ `
-        uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon, uAber; varying vec2 vUv;
+        uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon; varying vec2 vUv;
         void main() {
           vec2 q = vUv - 0.5;
           float r2 = dot(q, q);
-          // subtle radial chromatic fringe, only toward the frame edges
-          vec2 off = q * r2 * uAber * 12.0;
           vec4 c = texture2D(tDiffuse, vUv);
-          c.r = texture2D(tDiffuse, vUv - off).r;
-          c.b = texture2D(tDiffuse, vUv + off).b;
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
           c.rgb = mix(vec3(l), c.rgb, uSat);
           c.rgb = (c.rgb - 0.5) * uCon + 0.5;
