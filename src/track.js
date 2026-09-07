@@ -10366,6 +10366,29 @@ export class Track {
           idx.push(a, c, b, b, c, d);
         }
       }
+      // r392 (owner: "too many gourges around the game" — the flat green
+      // shards on the deck, R11's "green shards over road"): at a
+      // switchback stack the apron of ONE leg drapes across the leg beside
+      // it and surfaces through that carriageway — measured 80 vertices up
+      // to 22 u ABOVE the deck around GLACIER COL's hairpins. Same law as
+      // the cliff caps: NOT ACROSS ANOTHER LEG OF THE LAP. Any skirt vertex
+      // that lands inside a different leg's carriageway is tucked below
+      // that deck.
+      for (let i = 0; i <= N; i++) {
+        const j = i % N;
+        for (let r = 0; r < rows; r++) {
+          const o = (i * rows + r) * 3;
+          const s = this._nearestSample(verts[o], verts[o + 2]);
+          // "its own leg" means nearby AND at its own height: the opposite
+          // side of a CLIMBING hairpin is 8-12 samples away but 2-4 u
+          // lower, and the higher side's apron crossed its deck
+          if (this._circDist(j, s.i) <= 10
+            && Math.abs(this.center[s.i].y - this.center[j].y) < 0.5) continue;
+          if (s.d > this.widthAt(s.i) + 1.2) continue;         // clear of that deck
+          const cap = this.center[s.i].y - 0.5;
+          if (verts[o + 1] > cap) verts[o + 1] = cap;
+        }
+      }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
       geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
