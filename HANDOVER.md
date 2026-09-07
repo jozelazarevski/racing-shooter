@@ -4171,6 +4171,46 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r386 — HIGH-POLY CARPET: THE FOREST THE CAMERA LIVES BESIDE GROWS FACETS
+
+Owner, twice, latest with a mockup: "Make the trees high poly." The r374
+pass sculpted the GAMEPLAY trees; the carpet — 47k instances, the verge
+wall in every frame — was still 6-sided pyramid pairs. The verge ring is
+now three roughened tiers (9/8/6 radial segments, height segments so the
+profile wobbles along the trunk, a tip cone for the layered-fir
+silhouette; ~41 tris/tree vs 12), the mid ring a lighter roughened pair,
+the horizon cone roughened at 6 sides. All jitter is BAKED into the
+shared instanced geometry via the position-hash roughenC — tier seams
+agree, per-instance cost zero. roughenC hoisted above the tree tiers
+(the closure ran before the const existed — TDZ). Carpet bill ~400k ->
+~670k tris, spent where the lens is. camTrees canopy tops follow the new
+tip (6.3 x scaleY).
+
+## r385 — PATCH_02 v3 FIX-6/PART III: THE MANDATE BUYS LENGTH, NOT WALLS
+
+The load-bearing find of the iterate round: a lap that must climb AND
+descend its ELEV_MANDATE cannot average less than 2*mand/length of
+grade, whatever the profile does. GLACIER COL at 5.5 km and 1200 m
+measured a MEDIAN road grade of 50% with 81% of the lap over 30% — the
+a=0.16 ramp cap in the mandate block was geometrically unsatisfiable,
+the honest climb law parked the F7 grass car at 4 km/h beside a wall,
+and R11's climb evidence (139->201 uphill reading as "no slope physics")
+is this geometry, not the powertrain. Mandated worlds now stretch their
+control polygon until the climb fits a 0.20 grade budget (corrected by
+the S-curve's 1/(1-a) mid-ramp factor); the gate layout repeats by the
+true factor (track._gradeStretch) so §7.7 spacing holds; the coast line
+scales with the lap. Measured after: p50 0.19, ~0% over 30% on all
+mandated worlds; GLACIER COL is a 13.3 km / 1200 m pass, bot lap 335 s
+(the 500 m terrace worlds already fit and stretch by 1 — VINEYARD's
+p50 14% was the control). test-phase4's F7 probe now searches each
+world for the flattest runway per surface instead of hardcoding index
+220 — F7 binds on FLAT surface by its own words, and index 220 is now
+mid-climb. All four F7 checks green, including the two reds that
+predate this build (PINE VALLEY's 54% was grade contamination too).
+Note: bot 335 s puts the owner's GLACIER drive near 7 min against the
+"about 5 min" ask — the 1200 m mandate binds harder than the lap-time
+one; flagged rather than silently traded.
+
 ## r384 — PATCH_02 v3 FIX-4: THE CAMERA ANSWERS FOR THE PLAYER, EVERYWHERE
 
 C-A (60% of R10's portrait frame untextured gray): raycasting the dead
