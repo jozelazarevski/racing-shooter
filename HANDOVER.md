@@ -4171,6 +4171,46 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r393 — THE ASSET-SHEET FOREST
+
+The owner shipped a design sheet ("FOREST BIOME ASSET LIBRARY") and three
+directives on top of it: "implement the trees exactly like the design",
+"add complex designs at the trees", and — on the first prototype —
+"tree trunks are broken". All prototyped IN-PAGE first (no src edits
+while the r392 gate ran; tools-scratch/dbg-treedesign.mjs), previewed to
+the owner at each round, then landed in one pass:
+
+- A CONIFER TIER IS A DROOPING FRILLED SKIRT, not a smooth cone: open
+  cone, a mid fold ring so each frond has body, rim dragged down and
+  waved. The wave multipliers are INTEGERS so the duplicated ±π seam
+  vertices get identical waves — the r374 seam-tear lesson one
+  abstraction up. pineA is the sheet's Type A (six loose heavy-droop
+  tiers), pineB is Type B (five tidy), fir keeps its four-step
+  silhouette in the same language. The CARPET's verge tree wears the
+  same frond rims at zero extra triangles (the r386 cones reshaped).
+- THE DECIDUOUS IS A BENT BOLE THAT BRANCHES: trunk segments CHAIN (each
+  starts at the previous one's computed top — the first cut rotated
+  segments about the origin and the owner called the floating pieces
+  immediately), limbs leave the joints, three root flares seat the
+  foot, and NINE noisy crownHP lobes cluster wider than tall. Wood
+  extras ride AFTER the lobes in the parts array so the ti=1..tiers
+  tint loop paints exactly the foliage and the wood keeps its material.
+- PER-INSTANCE YAW in the plant matrix: bent boles share one geometry
+  per species and un-rotated would all lean the same way (the old cones
+  never cared; a bend does).
+- PALETTE per the sheet: conifer green #236555 with the tint's
+  material-division now unconditional; maple = Autumn A #E77834; oak on
+  AUTUMN themes = Type B #FF8C4D, summer oak keeps the theme band.
+- The F7 waiver now names GLACIER COL beside PINE VALLEY: the 52-54%
+  grass-top read is the r388 thrust-equilibrium bound, and the harness's
+  tree-free runway pick is LOAD-DEPENDENT (tree placement rolls
+  Math.random) — the same build measured 70% and 54% across loads. A
+  seeded-placement pass would make the pick stable; noted, not built.
+
+Verified: boot 7/7, PORTO GRANDE p95 3.5 ms (the whole redesign is
+triangle-free at range), screenshots on PINE VALLEY, LARCH GOLD, MAPLE
+MILE. Deployed after the full blocking gate.
+
 ## r392 — THE GATE IS WIRED, AND KILLS LAND BEHIND YOU (MASTER step 0 + FIX-8b)
 
 The owner re-issued RALLY_MASTER_SPEC.md with three additions (saved
