@@ -4171,6 +4171,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r388 — MASTER SPEC LANDS: THE SLOPE LAW BINDS, FREEZE HAS ONE SEMANTIC
+
+RALLY_MASTER_SPEC.md (repo root) is now the normative document,
+superseding RALLY_PATCH_02.md; the one geometric conflict (1200 m
+mandates vs WR-2.1's 4-12% grades at §4's 5.5 km laps) is recorded in
+CLAUDE.md — the newer, higher-authority spec wins and ELEV_MANDATE
+compresses to the grade-lawful range in the §5.4 rebuilds.
+
+FIX-6 (§5.2, before any rebuild): top speed pays 2.5x the grade on-road
+(−25% at 10%; the old 0.55 divisor priced it at −3.4%, which is R11's
+whole climb complaint), downhill +15% at 10%; the engine's own share is
+2.5x the grade FADING IN WITH SPEED — grade prices power, which binds at
+pace, and the first cut (full −35% on the engine, unpriced against the
+g·sinθ pull it stacks with) parked the F7 grass car nose-first against a
+20° micro-bank at 0.5 km/h forever. Surface rows road/grass/sand/snow
+per the spec table with a 0.4 s blend; the tyre swings the row across
+F7's band; drag normalized so grass keeps the tuned dragOffRoad.
+MEASURED: zero speed-gain violations over GLACIER COL's 388-sample
+sustained climb; GLACIER F7 59% / 1.3 s (was 4 km/h and never); PINE
+53% is the standing band-edge marginal (54% on the r383 base — thrust
+equilibrium, not the slope law). Lap cost: PINE 173 s, GLACIER 489 s —
+the 19% interim grades now hurt, which is §5's own reason the rebuild
+comes AFTER this physics.
+
+FIX-2 completion: freeze is a 40 km/h cap for <= 3 s (was half-pace 6 s,
+which a fast car barely felt — R10's "ineffective at 194 km/h") and it
+is always visible: slowed rivals show the bubble ice-white,
+invulnerability keeps cyan. Grid verified clean (8 cars, min pair
+7.12 u, zero bubbles in countdown). WR-4.2: chromatic aberration deleted
+game-wide (the grade shader's radial fringe — Citadel Bay's evidence).
+Feel floor: test-drift 6/6, patch02 green.
+
 ## r387 — THE CORNICHE COMPOSITION: MOUNTAINS AND SEA AT THE SIDE
 
 Owner's live OLIVE COAST frame: "Just a wall and road. Make it pretty
