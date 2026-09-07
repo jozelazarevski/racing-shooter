@@ -4396,11 +4396,17 @@ export class Car {
     // cyan. Same mesh, tinted per cause — no new elements, world-space only.
     const frozen9 = this !== this.game.player && this.alive
       && this.game.enemySlowUntil && this.game.raceTime < this.game.enemySlowUntil;
-    this._setShield(this.alive && this.invuln > 0
+    // MASTER FIX-2, r392: grid-spawn invulnerability protects SILENTLY —
+    // eight bubbles through green filmed as "field frozen at t=0" four
+    // times (R10, R11, Citadel Bay, R12). The tag drops when that first
+    // invuln window expires; every later grant shows its bubble.
+    if (this._gridInvuln && this.invuln <= 0) this._gridInvuln = false;
+    const showInv9 = this.invuln > 0 && !this._gridInvuln;
+    this._setShield(this.alive && showInv9
       && this.game.state === 'race' ? this.invuln : (frozen9 ? 1 : 0));
     if (this._shield && this._shield.visible) {
       this._shield.material.color.setHex(
-        this.invuln > 0 && this.game.state === 'race' ? 0x62e8ff : 0xeaf6ff);
+        showInv9 && this.game.state === 'race' ? 0x62e8ff : 0xeaf6ff);
     }
   }
 
@@ -4607,6 +4613,7 @@ export class Car {
     this.alive = true;
     this.health = this.maxHealth;
     this.invuln = 3.0;
+    this._gridInvuln = false; // r392: a respawn's bubble always shows
     this._tintFrac = 1;
     this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull

@@ -10707,6 +10707,14 @@ class Game {
     // target until GO + 4 (see aiCanTarget).
     this.player.invuln = Math.max(this.player.invuln ?? 0, this.countdown + 1.5);
     for (const e of this.enemies ?? []) e.invuln = Math.max(e.invuln ?? 0, this.countdown + 1.5);
+    // MASTER FIX-2, r392 (R12 — "grid freeze at t=0", FOURTH sighting): the
+    // grid-spawn invulnerability above kept rendering its bubble THROUGH
+    // green, so the field launched under eight cyan spheres and every
+    // recording read it as a freeze status. The protection is silent: tag
+    // grid invuln, and the bubble renderer skips it. Any invuln granted
+    // LATER (respawn, shield pickup, fall return) clears the tag and shows.
+    this.player._gridInvuln = true;
+    for (const e of this.enemies ?? []) e._gridInvuln = true;
     // CORRIDOR: arm every car at gate 0 (the line) — shadow counters only
     if (this.route) for (const c of [this.player, ...this.enemies]) this.route.reset(c);
     this._lastCount = 4;
