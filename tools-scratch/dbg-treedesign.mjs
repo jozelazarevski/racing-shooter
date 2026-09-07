@@ -118,14 +118,18 @@ await p.evaluate(async () => {
     const i = best;
     const c = t.center[i], n = t.nrm[i];
     const along = t.tan[i];
-    const off = (k - 2.5) * 4.6;
-    grp.position.set(c.x + along.x * off, c.y, c.z + along.z * off);
+    const off = (k - 2.5) * 4.8;
+    // ON THE VERGE, not the carriageway: lateral = width + 3
+    const lat = t.widthAt(i) + 3;
+    const vx = c.x + along.x * off - t.nrm[i].x * lat;
+    const vz = c.z + along.z * off - t.nrm[i].z * lat;
+    grp.position.set(vx, t.terrainHeight(vx, vz), vz);
     g.scene.add(grp);
   });
   // camera: stand back on the road looking down the row
   const c0 = t.center[best], n0 = t.nrm[best];
-  g.camera.position.set(c0.x + n0.x * 17, c0.y + 4.6, c0.z + n0.z * 17);
-  g.camera.lookAt(c0.x, c0.y + 3.4, c0.z);
+  g.camera.position.set(c0.x + n0.x * 12, c0.y + 5.2, c0.z + n0.z * 12);
+  g.camera.lookAt(c0.x - n0.x * 9, c0.y + 3.2, c0.z - n0.z * 9);
   g.frame = () => {};                 // freeze: keep our camera
   g.composer ? g.composer.render() : g.renderer.render(g.scene, g.camera);
 });
