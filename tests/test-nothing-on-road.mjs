@@ -88,9 +88,11 @@ const KNOWN_BODY = {
   // placed beside one leg stands in the other. Fix the overlap, not the props.
   'SEA CLIFF RUN': { max: 8, why: '80 u of road stacked on road (HANDOVER item 3)' },
   'MOUNTAIN TO SEA': { max: 60, why: 'roadWidth 5 (45 u half-width): measured 47, down from 1159 before the width-cascade fix' },
-  // r392: measured 9 — the same cable, per-instance since the r391 rebuild
-  // regenerated the hero bridge over the composed route
-  'GLACIER COL': { max: 9, why: 'a hero-bridge cable descending to road level over the deck it carries' },
+  // r393: the GLACIER pin is GONE — the nine "cable" bodies were guard-
+  // fence bays anchored inside the carriageway by a stale theme lateral
+  // (the owner drove into one and ruled: nothing stands in the middle of
+  // the road). Fences now anchor off the LOCAL width and skip any spot
+  // whose bay would reach a leg of the lap. Measured clean at 0.
   // r392: measured 5 dodecahedron rocks at up to 4.24 u — pre-existing (this
   // suite was not in the historical deploy set); tracked with the LAW 6
   // stones below for a builder-side fix that moves mesh AND collider together

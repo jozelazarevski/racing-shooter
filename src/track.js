@@ -13067,15 +13067,39 @@ export class Track {
       if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
       if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
       if (this.curvature[i] > 0.045) continue;                 // gap through hairpins
+      // r393 (owner RULE: "nothing stands at the middle of the road"): the
+      // theme's fixed lateral predates the width laws — on the rebuilt
+      // GLACIER COL, 33 of 54 bays anchored INSIDE the 9 u carriageway and
+      // one lay across the hairpin the owner drove into. The anchor now
+      // respects the LOCAL width like the edge-rails do...
+      const lat9 = Math.max(LAT, this.widthAt(i) + 1.8);
       // downhill side: the edge that falls away
       let side = 0, drop = 0;
       for (const sd of [1, -1]) {
-        const p = this.pointAt(i, LAT * sd);
+        const p = this.pointAt(i, lat9 * sd);
         const d = p.y - this._terrainMeshHeight(p.x, p.z);
         if (d > drop) { drop = d; side = sd; }
       }
       if (!side || drop < 1.4) continue;
-      const p = this.pointAt(i, LAT * side);
+      const p = this.pointAt(i, lat9 * side);
+      // ...and never stands inside ANY leg of the lap: a bay whose beam end
+      // reaches a carriageway — its own station's or a fold's — is skipped
+      // (the cross-leg family: skirts, cliff caps, now fences)
+      {
+        const hd9 = this.headingAt(i);
+        let bad9 = false;
+        // sample the bay's reach on BOTH axes — the bay is 5.4 long and the
+        // check must hold whichever way the merged box points
+        for (const [ax, az] of [[Math.sin(hd9), Math.cos(hd9)],
+          [Math.cos(hd9), -Math.sin(hd9)]]) {
+          for (const e9 of [-2.7, 0, 2.7]) {
+            const s9 = this._nearestSample(p.x + ax * e9, p.z + az * e9);
+            if (s9.d < this.widthAt(s9.i) + 0.3) { bad9 = true; break; }
+          }
+          if (bad9) break;
+        }
+        if (bad9) continue;
+      }
       q.setFromAxisAngle(up, this.headingAt(i));
       m4.compose(new THREE.Vector3(p.x, p.y - 0.35, p.z), q, new THREE.Vector3(1, 1, 1));
       mesh.setMatrixAt(k, m4);
