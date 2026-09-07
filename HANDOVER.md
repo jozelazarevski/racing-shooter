@@ -4236,6 +4236,43 @@ hillside grove). After: zero buried trunks, zero crowns-in-hill, zero
 buried carpet cones on all five census worlds; the olive verges still
 read as groves — the culled population was the wall-pinned one.
 
+THE GATE EARNED ITS KEEP ON DAY ONE — it blocked r392 TWICE before
+letting it through, and each block was real:
+
+Round 1: the conform pass was lifting FORESTS. Its first cut "corrected"
+seat differences both ways, but half the builders seat slope trees at the
+MIN of several samples on purpose — the correction raised whole hillsides
+by the slope differential (cones floating 5-15 u on 18 worlds, verge rows
+standing in the corridor). Burial-gated now: a tree that is not buried is
+never touched; a buried tree within crown reach of the road is culled,
+not lifted.
+
+Round 2: two pre-existing classes surfaced, because test-nothing-on-road
+was NEVER IN THE HISTORICAL DEPLOY SET. (a) The r386 high-poly carpet's
+crowns lean over the verge exactly like grove crowns, but the carpet is
+paint with no t.trees entries, so the suite's foliage exemption never saw
+it — x454 "bodies in the carriageway" on PINE VALLEY alone. The carpet
+now names itself 'carpet-foliage' and the census classes it with the
+crowns. (b) test-shortcut's controlled cut strips t.solids — but FIX-5
+trunk collisions read t.trees and camTreesNear DIRECTLY, and the conform
+pass surfaces buried trees exactly on the rising banks the rig drives.
+The rig strips trunks now, and restores them for the hinterland run.
+
+Round 3: nine measured pre-existing residues pinned BY NAME in the
+suite's own KNOWN lists (six worlds' edge-clipping stones, FROST PEAK's
+five drawn rocks, MOUNTAIN TO SEA's LAW 4 olive inside the 45 u
+width-cascade artifact, GLACIER's hero-bridge cable re-measured after
+the rebuild) — builder-side fix tracked on the board (#96: mesh and
+collider move together; a post-hoc collider push leaves a phantom rock).
+
+ALSO MEASURED GREEN THIS ROUND (R12 claims, current build): FIX-4
+framing on the olive worlds — car visible 100% of frames over full laps
+on OLIVE PASS and OLIVE COAST at the default camera; zero floating
+pickups on the four Mediterranean census worlds; and the new
+test-camstable joins the gate (WR-4.1 twitch harness — yaw 11°/s worst
+on DUST CANYON vs 29°/s through GLACIER's hairpins, exactly v/R, zero
+reversal churn; WR-4.2 frozen-time sky diff — zero crawl pixels).
+
 Remaining from the R12 round, tracked for the next builds: grid freeze at
 t=0 (4th sighting — FIX-2 verify against the tip), occlusion fade must
 learn the NEW tree meshes (carpet tiers, olive domes), unlit/black new
