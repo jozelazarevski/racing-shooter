@@ -5066,6 +5066,7 @@ export function disposeSubtree(root) {
  *  limit that makes the wall unclimbable must apply HERE and nowhere else. */
 export const RIM_RADIUS = 1620;
 const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
+const _emptyCamTrees = [];             // camTreesNear's no-carpet answer, never mutated
 const _pzV = new THREE.Vector3();      // ...and for the squares (see _buildPiazzas)
 // A PREDICATE MUST NOT WRITE THE CALLER'S SCRATCH. `_inPiazza` is reached
 // through `_clearsRoad`, which every builder calls — usually while holding a
@@ -6644,6 +6645,15 @@ export class Track {
     // a *= would compound every restart.
     const fogNear = Math.max(T.fogNear * 0.72, Math.min(T.fogNear, 190));
     scene.fog = new THREE.Fog(T.fogColor, fogNear, T.fogFar);
+    // PATCH_02 v3 C-E: fog luminance <= 0.85. Near-white haze is what blew
+    // R10's horizons to a sheet — under ACES at 1.46 a 0.9+ fog colour lands
+    // on the shoulder and everything distant reads as overexposure. Scaled,
+    // not tinted: the hue each theme chose survives, only the ceiling binds.
+    {
+      const fc = scene.fog.color;
+      const lum = 0.2126 * fc.r + 0.7152 * fc.g + 0.0722 * fc.b;
+      if (lum > 0.85) fc.multiplyScalar(0.85 / lum);
+    }
 
     // EVERYTHING the track builds goes in here, nothing straight into the
     // scene. That is what makes a level swappable without reloading the page:
@@ -16564,6 +16574,32 @@ export class Track {
    *  wood you drive through continues to the skyline instead of stopping
    *  at an invisible fence. Far scenery: no colliders (the near field's
    *  trees and solids already own everything reachable at speed). */
+  /** PATCH_02 v3 C-C: verge-carpet trees near a point, for the camera's
+   *  foliage guard. The verge ring is thousands of instances, so a flat walk
+   *  per frame is off the table — a 24 u cell hash built on first use keeps
+   *  the per-frame answer to a handful of candidates. */
+  camTreesNear(x, z) {
+    if (!this.camTrees || !this.camTrees.length) return _emptyCamTrees;
+    if (!this._camTreeGrid) {
+      this._camTreeGrid = new Map();
+      for (const t of this.camTrees) {
+        const key = ((t.x / 24) | 0) + ':' + ((t.z / 24) | 0);
+        let cell = this._camTreeGrid.get(key);
+        if (!cell) this._camTreeGrid.set(key, cell = []);
+        cell.push(t);
+      }
+    }
+    const cx = (x / 24) | 0, cz = (z / 24) | 0;
+    const out = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const cell = this._camTreeGrid.get((cx + dx) + ':' + (cz + dz));
+        if (cell) out.push(...cell);
+      }
+    }
+    return out;
+  }
+
   _buildForestCarpet() {
     // r375 (owner: "Add 20x more trees"): the carpet is now the bulk of the
     // forest — two LOD rings totalling ~40,000 instanced trees per world, on
@@ -16607,7 +16643,7 @@ export class Track {
     // verge bare wherever the lap wandered far from (0,0). spot() with a
     // lateral band places uniformly along the whole lap; the origin-radial
     // form survives only for the horizon ring.
-    const ring = (geos, count, spot, margin, scMin, scRange, paintFn = paint) => {
+    const ring = (geos, count, spot, margin, scMin, scRange, paintFn = paint, reg = false) => {
       const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
       let n = 0;
       for (let tries = 0; tries < count * 3 && n < count; tries++) {
@@ -16643,6 +16679,12 @@ export class Track {
         m.compose(pos, q, scl);
         paintFn(col);
         for (const mesh of meshes) { mesh.setMatrixAt(n, m); mesh.setColorAt(n, col); }
+        // PATCH_02 v3 C-C: the verge wall is exactly where the chase boom
+        // swings on a corner, and these instances are pure paint — no entry
+        // in this.trees, so the camera's foliage guard could not see them.
+        // Registered position + canopy radius + top height, camera-side only.
+        if (reg) (this.camTrees ??= []).push({
+          x, z, r: 1.9 * sc, top: y - 0.35 + 5.2 * scl.y });
         n++;
       }
       for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
@@ -16670,7 +16712,7 @@ export class Track {
     // large, starting just off the road edge, the whole way round the lap.
     // r377 (owner's forest mockup): scaled up to TOWER — the reference's
     // lane runs under the canopy, not past shoulder-height cones
-    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9);
+    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
     // r377 UNDERSTOREY, from the owner's mockup: the ground between the
     // trunks is not bare — a fern layer fills the first metres off the
     // lane, and moss pads green the verge. Non-solid, same as every

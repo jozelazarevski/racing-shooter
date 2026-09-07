@@ -3039,6 +3039,12 @@ class Game {
         const fn = th.fogNear ?? 320;
         this.scene.fog = new THREE.Fog(th.fogColor,
           Math.max(fn * 0.72, Math.min(fn, 190)), th.fogFar ?? 1500);
+        // PATCH_02 v3 C-E: the same fog-luminance ceiling the track ctor
+        // applies (<= 0.85) — this path re-fogs on theme swap and would
+        // otherwise hand the blown haze straight back
+        const fc9 = this.scene.fog.color;
+        const lum9 = 0.2126 * fc9.r + 0.7152 * fc9.g + 0.0722 * fc9.b;
+        if (lum9 > 0.85) fc9.multiplyScalar(0.85 / lum9);
       }
       if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
       if (th.hemiGround !== undefined) {
@@ -11536,6 +11542,7 @@ class Game {
       // would be a far worse bug than the one that removal fixes.
       for (const c of p.mesh?.userData?._capParts ?? []) c.visible = true;
       for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = true;
+      for (const c of p.mesh?.userData?._glassParts ?? []) c.visible = true;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
@@ -11657,11 +11664,43 @@ class Game {
       v.z = nz;
       v.y += Math.min(4, Math.abs(over) * 0.5);
     };
+    // PATCH_02 v3 C-D: THE FALL IS WATCHED FROM ABOVE. A boom that stays on
+    // the cliff top while the car drops loses it behind the lip within a
+    // second — the eye must go where the lip cannot occlude, which is over
+    // the car, the same answer §3.9 gives a too-close camera. Blended in
+    // with fall speed so a kicker hop (vy barely negative) feels nothing.
+    const vyNow = p.vy ?? p.vel?.y ?? 0;
+    if (vyNow < -9) {
+      const f01 = Math.min(1, (-vyNow - 9) / 14);
+      targetPos.x += (p.pos.x - targetPos.x) * 0.55 * f01;
+      targetPos.z += (p.pos.z - targetPos.z) * 0.55 * f01;
+      targetPos.y = Math.max(targetPos.y, p.pos.y + M.h + 12 * f01);
+      targetLook.lerp(p.pos, 0.65 * f01);
+    }
     clampCam(targetPos);
-    const k = 1 - Math.exp(-5.5 * (this._camDt ?? dt));
+    // ...and the eye keeps up: at the cruise rate the boom trails a fast
+    // fall by the better part of its own length, which is how the car ends
+    // below the frame while the lens is still easing.
+    const k = 1 - Math.exp(-(5.5 + (vyNow < -9 ? 4 : 0)) * (this._camDt ?? dt));
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
     clampCam(this.camPos);
+    // A REAL PLUNGE OUTRUNS ANY LERP. Measured on GLACIER COL's 286 u face:
+    // vertical speed passes -200 u/s, and with only the eased blend above the
+    // car was in frame for 65% of the fall with a worst miss of 18 NDC — the
+    // lens stayed at the lip while the car became the valley. Past -20 u/s
+    // the camera stops being a boom and RIDES the fall: pinned over the car,
+    // holding ~26 u above it all the way down, aim on the bodywork. Authority
+    // scales with fall speed so a big kicker still feels like a boom shot.
+    if (vyNow < -20) {
+      const f9 = Math.min(1, (-vyNow - 20) / 30);
+      const kf = 0.12 + 0.28 * f9;
+      this.camPos.x += (p.pos.x - this.camPos.x) * kf;
+      this.camPos.z += (p.pos.z - this.camPos.z) * kf;
+      const wantY = p.pos.y + 26;
+      if (this.camPos.y > wantY) this.camPos.y += (wantY - this.camPos.y) * kf;
+      this.camLook.lerp(p.pos, 0.5);
+    }
 
     // THE GROUND MUST NEVER GET BETWEEN YOU AND YOUR CAR.
     //
@@ -11858,7 +11897,9 @@ class Game {
       const L2 = dx * dx + dz * dz;
       if (L2 > 1) {
         for (const tr of tk.trees) {
-          if (tr.dead || tr.kind !== 'pine' || tr.s < 1.0) continue;
+          // v3 C-C: every full-size species, not just pines — a fir, a gum
+          // or a larch on the sightline fills the frame exactly the same way
+          if (tr.dead || tr.s < 1.0) continue;
           const t01 = ((tr.x - cp.x) * dx + (tr.z - cp.z) * dz) / L2;
           if (t01 < 0 || t01 > 0.9) continue;
           const qx = cp.x + dx * t01, qz = cp.z + dz * t01;
@@ -11873,6 +11914,30 @@ class Game {
             cp.z -= pz * side * push;
           }
         }
+      }
+    }
+    // PATCH_02 v3 C-C: THE VERGE WALL EATS THE FRAME AND THE SIDESTEP CANNOT
+    // SEE IT. The trunk slide above reads this.trees — gameplay trees with
+    // colliders — but the r375 forest carpet is pure paint, thousands of
+    // instanced cones starting one unit off the road edge, exactly where the
+    // boom swings on every corner (R10: 70-100% of the screen green for up
+    // to 12 s). The carpet's verge ring now registers its placements
+    // (camTreesNear, 24 u cell hash), and an eye inside a canopy cone rises
+    // OVER it — the lift answer, not a fade: the same move every other
+    // occluder in this file gets, it needs no per-instance material surgery,
+    // and it is judged by FIX-4's own acceptance (car visible >= 95% of
+    // frames), which is measured, not assumed.
+    if (tk?.camTreesNear) {
+      const cp = this.camPos;
+      let capTop = -Infinity;
+      for (const tr of tk.camTreesNear(cp.x, cp.z)) {
+        const dTr = Math.hypot(tr.x - cp.x, tr.z - cp.z);
+        if (dTr < tr.r + 1.2 && tr.top > cp.y && tr.top > capTop) capTop = tr.top;
+      }
+      if (capTop > -Infinity) {
+        // ease the rise: a hard set pops the view every time the boom
+        // clips a cone lip. 45%/frame reaches the canopy top inside 150 ms.
+        cp.y += (capTop + 0.8 - cp.y) * 0.45;
       }
     }
     // v2.3 §3.9 (r329): A CAMERA INSIDE SIX UNITS OF THE CAR HAS STOPPED
@@ -12121,6 +12186,16 @@ class Game {
         (c) => c !== p.mesh.userData.cockpit && c.position.y > lid);
     }
     for (const c of p.mesh?.userData?._capParts ?? []) c.visible = false;
+    // ...AND SO DOES THE WINDSCREEN (PATCH_02 v3 C-A). The glasshouse sits
+    // below the cap-part lid so the roof filter never catches it, and from
+    // the seat its raked front face renders as a featureless sky-mirror band
+    // across the lower frame on every descent — the R10 "untextured gray"
+    // cockpit. Eyes are behind glass precisely so the glass is not seen.
+    if (p.mesh && !p.mesh.userData._glassParts) {
+      p.mesh.userData._glassParts = p.mesh.children.filter(
+        (c) => c.name === 'glasshouse');
+    }
+    for (const c of p.mesh?.userData?._glassParts ?? []) c.visible = false;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.
@@ -12345,7 +12420,13 @@ class Game {
    *  which of the three it was, instead of inferring it from the picture. */
   _watchCarVisible(dt) {
     const p = this.player;
-    if (this.state !== 'race' || !p || !p.alive) { this._blindT = 0; return; }
+    // PATCH_02 v3 C-D: the DEAD player kept the watchdog OFF, so through a
+    // cliff fall or a wreck the camera answered to nothing and whatever car
+    // happened to be near the lens read as the subject (R11 0:32 frames a
+    // rival while the player falls). The camera's target is ALWAYS the
+    // player, alive or not — only the body-state writes below stay gated on
+    // being alive, because a husk is not to be revived by a framing rule.
+    if (this.state !== 'race' || !p) { this._blindT = 0; return; }
     // ...EXCEPT FROM THE DRIVER'S SEAT, where not seeing your own car is the
     // feature. The eye sits at the driver's head, so the car's origin projects
     // to somewhere behind the near plane every single frame and this watchdog
@@ -12362,15 +12443,21 @@ class Game {
       return;
     }
     const v = p.mesh.position.clone().project(this.camera);
-    const onScreen = v.x > -1.05 && v.x < 1.05 && v.y > -1.05 && v.y < 1.05 && v.z < 1;
+    // v3 C-B tightened the bar: R10 ran 4-6 s stretches with the car fully
+    // off frame, and the old rule (out past the EDGE for a full second)
+    // let every one of them begin. 0.85 catches the car while it is still
+    // on screen but sliding out, and 0.3 s is three-ish frames of "gone"
+    // at the eye's own lerp rate — late enough that a drift or a kicker
+    // never trips it (measured: a scripted lap logs zero re-seats).
+    const onScreen = v.x > -0.85 && v.x < 0.85 && v.y > -0.85 && v.y < 0.85 && v.z < 1;
     const gy = this.track.terrainHeight(p.pos.x, p.pos.z);
-    const buried = p.y < gy - 1.2;
-    const why = !p.mesh.visible ? 'hidden' : buried ? 'buried' : !onScreen ? 'offscreen' : null;
+    const buried = p.alive && p.y < gy - 1.2;
+    const why = p.alive && !p.mesh.visible ? 'hidden' : buried ? 'buried' : !onScreen ? 'offscreen' : null;
     this._blindT = why ? (this._blindT ?? 0) + dt : 0;
-    if (this._blindT <= 1.0) return;
+    if (this._blindT <= 0.3) return;
     this._blindT = 0;
     if (buried) { p.y = gy; p.pos.y = gy; p.vy = Math.max(0, p.vy); }
-    p.mesh.visible = true;
+    if (p.alive) p.mesh.visible = true;
     // re-seat the camera behind the car rather than letting it lerp back from
     // wherever it had wandered to
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];

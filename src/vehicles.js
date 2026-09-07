@@ -406,6 +406,13 @@ export function buildVoxelRacer(spec) {
   const glassHouse = new THREE.Mesh(
     _wedgeGeo(cabW, cabH, cabL, { frontBack: fRake, backFwd: bRake }), glassMat);
   glassHouse.position.set(0, cabY, cabZ);
+  // Named so the driver's seat can stand the glass down: the eye sits at the
+  // glasshouse ceiling, and on any descent the OUTSIDE of the raked
+  // windscreen enters the frame below the aim as a featureless sky-mirror
+  // band (PATCH_02 v3 C-A, measured at 13% of a portrait frame). A driver
+  // looks THROUGH glass; the seat hides it like the roof cap and restores it
+  // with the outside view.
+  glassHouse.name = 'glasshouse';
   glassHouse.castShadow = true;
   g.add(glassHouse);
   const capL = cabL - fRake - bRake;
