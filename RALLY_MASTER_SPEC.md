@@ -64,13 +64,17 @@
 
 | Tier | Distance | Spec |
 |---|---|---|
-| T0 hero | < 60 m of road | 800–2000 tris, distinct species silhouette, trunk + branches + crown clusters, wind sway |
-| T1 mid | 60–200 m | 200–500 tris, species-recognizable |
+| T0 hero | < 60 m of road | 1500–3000 tris, distinct species silhouette, modeled trunk + branch structure + layered crown clusters, wind sway |
+| T1 mid | 60–200 m | 400–800 tris, species-recognizable, modeled trunk |
 | T2 far | > 200 m | ≤ 80 tris or batched impostors, silhouette-correct |
 
 4. The single-cone tree is retired near roads; cones survive only as T2 impostors.
 5. ≥ 3 species per stage from the reference region, mixed naturally, size variance ±25%.
-6. Placement: terrain-raycast grounded; no trees on slopes > 50°; none inside the road clearance envelope; canopy non-collidable, trunk capsules only (§3 FIX-5).
+6. Placement — trees stand ON terrain, never IN it:
+   a. Trunk base grounded by terrain raycast; the full root footprint sits on a surface ≤ 50° slope.
+   b. No part of any tree (trunk or crown) may intersect terrain, rock, cliff, wall, or structure meshes. Minimum clearance from any cliff or wall face: half the crown radius. A tree half-buried in a mountainside is a generation failure, not scenery (reference violations: Olive Coast trees pinned into walls; cliff-face pixel garbage traced to tree geometry clipped inside the rock).
+   c. None inside the road clearance envelope; canopy non-collidable, trunk capsules only (§3 FIX-5).
+   d. Per-seed sweep at generation time: every placed tree runs a bounds-overlap test against terrain and static meshes; intersecting trees are repositioned once, then culled. This check is part of the §7 generation gate.
 7. Vegetation ≤ 15% of frame time at 60 fps mobile Safari; instancing mandatory; LOD dissolves without popping.
 
 ### WR-8 Altitude scenery bands
@@ -109,6 +113,8 @@ Glacier Col MUST reach band 3. Transitions blend ≥ 150 m.
 
 **FIX-7 Falls, wrecks, recovery.** Cliff fall: −1 hull retained, respawn on road, unfrozen, 3 s invulnerability, camera on player throughout. Stuck detection (< 8 km/h for 6 s with throttle > 0.5, or roll/pitch > 75° for 3 s) auto-invokes the existing SOS respawn, 15 s cooldown. Continuous breakable guardrail on any drop > 15 m. Accept: a three-wreck DESTROYED outcome is unreachable by terrain alone.
 
+**FIX-8b Combat position economy (new, R12).** A destroyed rival respawns BEHIND the player (last road point ≥ 150 m back), retains its position loss, and re-enters at tail pace for 10 s. Destroying a rival directly ahead MUST yield the position. Accept: in a scripted run, each of 3 kills on the cars ahead advances the player one position within 5 s.
+
 **FIX-8 Scoring validity and AI pace.** CLEAN PASS: opponent within 6 m lateral / 15 m longitudinal, both on-road, no contact ±1.5 s. BIG AIR: all wheels off ≥ 0.7 s, clean landing, ≤ 20 m from the road spline. ROCK SHOVED CLEAR requires rock-collider contact. AI pace, tuned LAST (after FIX-1 and FIX-6): leaders 96% / midfield 90% / tail 85% of player top speed; rubber-bands +8% when > 150 m behind (decay to 0 at 40 m), −5% when > 250 m ahead (decay at 100 m). Accept: P1 takes ≥ 60 s on a clean lap; leaving the road > 20 s costs ≥ 1 position; ≥ 1 opponent on screen ≥ 30% of an on-road lap.
 
 ---
@@ -135,7 +141,7 @@ Corner direction alternates at least every 3 corners; no more than 2 identical-r
 1. Engine first: FIX-2 (freeze/grid, systemic across three stages), FIX-4 camera + post-process, FIX-1 AI line.
 2. FIX-6 slope + surfaces (before rebuilding any geometry, so climbs are tuned against real physics).
 3. FIX-3 grounding sweep + FIX-5 colliders.
-4. Stage rebuilds to §2 + §4, in order: Glacier Col, Olive Coast, Harvest Run, Citadel Bay — each including WR-7 vegetation and WR-8 bands.
+4. Generator rebuild to §2 + §4 + §7 (vegetation WR-7 and bands WR-8 included), then regenerate all shipped biomes; validate reference seeds r379, r384, r389 pass the §6 suite.
 5. FIX-7 falls/recovery on rebuilt geometry.
 6. FIX-8 scoring + AI pace last.
 7. Full regression: both video routes replayed against every acceptance criterion and §6 checks.
@@ -144,11 +150,23 @@ Corner direction alternates at least every 3 corners; no more than 2 identical-r
 
 ## §6 Enforcement
 
-validation.spec.ts (build-time, hard failures): road-corridor clearance; adjacent-slope ≤ 45°; crest-noise check; climb-archetype conformance; lap length / corner density / max straight; grade-effect test (constant-throttle speed falls on ≥ 8% grades); sightline layer check every 50 m; cloud-altitude ≥ 60 m below road; sea-band check on coastal stages; placeholder-material and texture-corruption sweep; shadow-caster audit; texture-frequency cap; AI-waypoints-on-road; prop grounding ≤ 0.15 m; vegetation density per km; T0/T1 tree presence near road; prop-scale bounds; camera twitch harness (angular-velocity reversal > 3 Hz fails) + sky pixel-crawl diff.
+validation.spec.ts (build-time, hard failures): road-corridor clearance; adjacent-slope ≤ 45°; crest-noise check; climb-archetype conformance; lap length / corner density / max straight; grade-effect test (constant-throttle speed falls on ≥ 8% grades); sightline layer check every 50 m; cloud-altitude ≥ 60 m below road; sea-band check on coastal stages; placeholder-material and texture-corruption sweep; shadow-caster audit; texture-frequency cap; AI-waypoints-on-road; prop grounding ≤ 0.15 m; vegetation density per km; T0/T1 tree presence near road; tree-vs-terrain/mesh intersection sweep (zero tolerance); prop-scale bounds; camera twitch harness (angular-velocity reversal > 3 Hz fails) + sky pixel-crawl diff.
 
 Rules without automated checks are verified by scripted flythrough capture reviewed against this document before a stage ships. Performance budget holds throughout: 60 fps mobile Safari; vegetation ≤ 15% frame time; occlusion fade cap 12; ridge layers as baked low-poly silhouettes; cloud sea ≤ 3 planes.
 
 This file changes only by owner directive.
+
+---
+
+## §7 Procedural generation gate
+
+Stage identifiers (r379, r384, r389 …) confirm stages are seeded procedural output. Therefore:
+
+1. Every rule in §2 and every target in §4 binds the TRACK GENERATOR, not hand-edits to individual stages. A defect observed on one seed is treated as a generator defect until proven seed-specific.
+2. The full §6 validation suite runs at generation time on every seed. A failing seed is rejected and regenerated automatically; a seed MUST NOT reach the player unvalidated. Target: ≤ 3 regeneration attempts per stage load at < 2 s total on the mobile target; if exceeded, fall back to a cached pre-validated seed for that biome.
+3. Mega-structure constraint: the generator may not place any single mesh with a bounding box > 40 m in any dimension within 60 m of the road, except ridge/mountain background layers, which MUST stay outside the 60 m corridor and below the WR-1 slope rule at the corridor edge. Bridges and gantries, if generated, are grounded on both ends, span ≥ 6 m above the road surface, and pass the clearance-envelope sweep. (Reference violation: Olive Pass r389 0:29 — building-scale slabs and a floating beam over the road.)
+4. Readability under shadow: road albedo and shading MUST keep the road surface distinguishable from water and from cast shadow at all times of day the stage supports; a luminance/chroma separation check between road, water, and shadowed road runs per seed. (Reference violation: Olive Pass r389 — road ahead indistinguishable from sea/shadow at speed.)
+5. A library of golden seeds (validated, human-reviewed flythroughs) ships as the fallback pool per biome.
 
 ---
 
@@ -161,3 +179,9 @@ This file changes only by owner directive.
 **Olive Coast r384 (screenshots):** start grid in a two-wall trench; sawtooth crest spikes; micro-trees pinned to walls; casterless shadow blobs on road; crest into white void; floating RALLY CO. sign and white cylinder; green pixel corruption on cliff; no olive trees.
 
 **Citadel Bay r379 (screenshot):** full field frozen at t=0 (third stage); frozen opponent overlapping player at spawn; wavy sky artifact lines + chromatic fringing; high-frequency cobble moiré; near-treeless terrain; sea as flat bands; no citadel sighted.
+
+**Olive Pass r389 (screenshot, 0:29):** building-scale slab complex and floating beam hanging over the road inside the clearance envelope; road ahead indistinguishable from sea/shadow at 127 km/h; horizontal post-process artifact lines across the full frame (third stage confirmed); grass tuft floating on left slope. Seed pattern r379/r384/r389 establishes procedural generation — see §7.
+
+**R12 (Olive Pass-class seed, 3:15, YOU WIN 3,183):** Verified improvements — real hairpins/switchbacks/sweepers, ~3:07 lap, blob-crown trees + conifer plantation rows, on-road pack racing 0:10–0:40, working combat loop (mines, missile lock, 3 destroys, contracts, slipstream, combos), tree-hit damage feedback, win/unlock flow. Remaining/regressed: grid freeze at t=0 (4th stage); destroyed rivals rejoin ahead — 3 kills, position unchanged (1:59); occlusion fade skips new tree meshes (0:24, 0:33, 2:43); full-frame brown void, camera inside hillside at the tree-hit moment (2:45); black unlit monolith over road 0:29–0:33 and unlit underpass 1:31; NEW cypress assets render solid black (2:47); accelerating uphill 109→144 (0:55); field evaporates after 2:19, solo cruise to win; AI cuts hairpins off-road (1:11–1:13); opponent launched to building height (2:03); BIG AIR while tumbling in trees (2:49); floating capsule/pickups/crate/HYPER-FLUX sign, empty sign gantries.
+
+**Enforcement finding (binding):** R12's freeze-at-start, unlit new assets, and floating props are all §6-specified catches. Conclusion: the §6 suite is not yet wired as a build gate. §5 step 0 (new): wire validation.spec.ts as a blocking gate BEFORE further fixes; every subsequent build fails on any §6 check. New-asset rule: any asset added after this spec (e.g. cypress) passes the placeholder/unlit sweep and registers with the camera occlusion-fade system before shipping.

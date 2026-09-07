@@ -4513,8 +4513,14 @@ export class Car {
     if (this !== g.player && g.state === 'race' && !g.freeRoam && !g.missionMode
         && g.route?.gates?.length) {
       this.respawnTimer = window.__DRIVING?.route?.killRespawnHoldS ?? 4.0;
+      // MASTER FIX-8b (R12 1:59 — three kills, position unchanged): the
+      // last-passed-gate respawn could still be AHEAD of the player, so a
+      // kill on the car in front handed the place straight back. A
+      // destroyed rival now re-enters BEHIND the player; the point is
+      // resolved at respawn time against the player's position then.
+      this._respawnBehindPlayer = true;
       this._respawnAtGate = ((this._nextGate ?? 0) - 1 + g.route.gates.length)
-        % g.route.gates.length;
+        % g.route.gates.length; // fallback if the player is gone at respawn
       g.telemetry?.log('rivalDestroyed', { rival: this.name ?? 'rival' });
     }
     this.game.particles.explosion(this.pos, true);
@@ -4607,6 +4613,30 @@ export class Car {
     // §6.10 (r311): a killed rival comes back at its LAST GATE, still
     // owing the next one — same shape as every other return in the game.
     const g = this.game;
+    // MASTER FIX-8b: in a routed race the wreck re-enters BEHIND the
+    // player — last road point >= 150 m back, clamped at the lap line so
+    // going negative can never read as a lap gained (the r311 trap). The
+    // owed gate is recomputed for the new index, and the car holds tail
+    // pace for 10 s so it re-enters as a backmarker, not a missile.
+    if (this._respawnBehindPlayer && g.player?.alive !== undefined
+        && g.state === 'race' && g.route?.gates?.length && this !== g.player) {
+      this._respawnBehindPlayer = false;
+      const N = g.track.center.length;
+      const back = Math.ceil(150 / (g.track.segLen ?? 4));
+      const idx = Math.max(0, (g.player.trackIndex ?? 0) - back);
+      this.trackIndex = idx;
+      const gates = g.route.gates;
+      let owe = gates[0]?.id ?? 0;
+      for (const gt2 of gates) { if (gt2.si > idx) { owe = gt2.id; break; } }
+      this._nextGate = owe;
+      this._gateAlong = undefined;
+      this._respawnAtGate = null;
+      this._tailPaceT = 10;
+      g.telemetry?.log('return', { car: this.name ?? 'rival', reason: 'kill', gateId: owe });
+      this.placeAt(this.trackIndex, 0, true);
+      return;
+    }
+    this._respawnBehindPlayer = false;
     const gt = this._respawnAtGate != null ? g.route?.gates?.[this._respawnAtGate] : null;
     if (gt) {
       const N = g.track.center.length;
@@ -5568,6 +5598,10 @@ export class EnemyCar extends Car {
     else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
     if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, 11.1); // MASTER FIX-2: the 40 km/h freeze cap
+    if (this._tailPaceT > 0) { // MASTER FIX-8b: a kill-respawned car re-enters at tail pace
+      this._tailPaceT -= dt;
+      vAllowed = Math.min(vAllowed, (g.player?.topSpeed ?? this.maxSpeed) * 0.85);
+    }
     // §5.3 mistake, 'late' kind: brake 10% late — carry a tenth too much
     // speed in, then pay it back at the exit. The recovery factors are the
     // stopwatch price of a mistake (r313 tuning: at ×0.90 a backmarker's

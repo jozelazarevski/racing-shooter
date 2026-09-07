@@ -18,6 +18,7 @@ STANDING DECISIONS (owner, do not reopen):
 2. **Delete means delete.** A removed element has no render call, no asset reference, no CSS. Restyling is not removal (the r296 marquee).
 3. **A fix that failed twice has a second code path.** Fix 8 survived two builds; damage bypassed PROP colliders. Search every emitter before touching the first one again.
 4. **Prove with the race log.** Every build gate in §12 is a query in §13. A build is done when its queries pass on one scripted run and one hand-driven run per affected stage.
+4a. **The blocking gate (MASTER §5 step 0, r392).** `node tests/validation.mjs` MUST exit 0 before any deploy. It runs the §6-mapped deploy set and parses verdict lines (suites exit 0 even on FAILED). A red blocks the deploy unless it is a recorded waiver inside the runner, each with a ledger reference.
 5. **Constants audit after every build:** `grep -rn "[0-9]\." src/physics src/ai src/race src/stage` and move anything behavioural to `driving.json`.
 6. **Base model semantics of RALLY_DRIVING.md are untouched** except where §3 says so (slope grip, landing assist, fall handling).
 

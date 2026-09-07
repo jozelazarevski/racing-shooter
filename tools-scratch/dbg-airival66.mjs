@@ -11,7 +11,7 @@ const r = await p.evaluate(() => {
   const g = window.__game;
   g.clock.getDelta = () => 1 / 30; if (g.composer) g.composer.render = () => {};
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
-  const rivals = g.cars.filter(c => c !== g.player);
+  const rivals = g.enemies;
   const stall = new Map(rivals.map(c => [c, { cur: 0, max: 0 }]));
   for (let k = 0; k < 150 * 30; k++) {
     g.frame();

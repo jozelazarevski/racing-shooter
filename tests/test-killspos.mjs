@@ -45,15 +45,19 @@ const R = await p.evaluate(async () => {
   const deadAt = g.raceTime;
   let held = 0;
   for (let f = 0; f < 400 && !ahead.alive; f++) { g._frameBody(); held = g.raceTime - deadAt; }
-  const gt = g.route.gates[ahead._respawnAtGate ?? lastGate] ?? g.route.gates[lastGate];
-  const respawnGap = Math.min(
-    (ahead.trackIndex - gt.si + N) % N, (gt.si - ahead.trackIndex + N) % N);
+  // MASTER FIX-8b: the wreck re-enters BEHIND THE PLAYER (>= 150 m back,
+  // clamped at the lap line), not at its own last gate. Measure against
+  // the player at the respawn moment.
+  const behindM = (pl.trackIndex - ahead.trackIndex) * (t.segLen ?? 4);
+  const atLapLineClamp = ahead.trackIndex === 0;
+  const oweGate = g.route.gates.find((q) => q.si > ahead.trackIndex) ?? g.route.gates[0];
   for (let f = 0; f < 60; f++) g._frameBody();
   return {
     p1: {
       destroyedEv: evs.some((e) => e.k === 'rivalDestroyed'),
       returnEv: evs.filter((e) => e.k === 'return' && e.reason === 'kill').length,
-      held: +held.toFixed(2), respawnGap, owes: ahead._nextGate, lastGate,
+      held: +held.toFixed(2), behindM: +behindM.toFixed(0), atLapLineClamp,
+      owes: ahead._nextGate, oweGate: oweGate.id, tailPace: (ahead._tailPaceT ?? 0) > 0,
       rankBefore, rankAfter: g.playerRank,
       victimWasAhead, victimNowBehind: ahead.progress < pl.progress,
       victimProgBefore: +victimProgBefore.toFixed(3),
@@ -67,9 +71,12 @@ ok(R.p1.destroyedEv && R.p1.returnEv >= 1,
 ok(R.p1.held >= 3.8 && R.p1.held <= 5.5,
   'P1 the destroyed rival holds ~4.0 s before coming back',
   `${R.p1.held}s`);
-ok(R.p1.respawnGap < 12 && R.p1.owes === R.p1.lastGate,
-  'P1 it respawns at its LAST gate, still owing it',
-  `${R.p1.respawnGap} samples from gate ${R.p1.lastGate}, owes ${R.p1.owes}`);
+// MASTER FIX-8b (supersedes the r311 last-gate law): the wreck re-enters
+// BEHIND THE PLAYER, >= 150 m back or clamped at the lap line, owing the
+// gate ahead of its new position, at tail pace.
+ok((R.p1.behindM >= 140 || R.p1.atLapLineClamp) && R.p1.owes === R.p1.oweGate && R.p1.tailPace,
+  'P1 it respawns >= 150 m behind the player at tail pace (FIX-8b)',
+  `${R.p1.behindM} m behind${R.p1.atLapLineClamp ? ' (lap-line clamp)' : ''}, owes gate ${R.p1.owes}, tailPace ${R.p1.tailPace}`);
 // Q22's mechanism, rig-honestly: the kill CONFISCATES the victim's
 // progress back to its last gate (position is progress-anchored, so the
 // killer gains exactly the ground the victim loses). Absolute rank here
@@ -106,7 +113,15 @@ const S = await p.evaluate(async () => {
   }
   pl.step = orig;
   const p2 = { firedAt: +firedAt.toFixed(2), slid: +lat.toFixed(1) };
-  // P3: an honest 2 m/s crawl ALONG the course, throttle held, never touched
+  // P3: an honest 2 m/s crawl ALONG the course, throttle held, never
+  // touched by the 2.5 s zero-progress wedge. The old rig snapped pos to
+  // the CENTER SAMPLE each frame, so the fractional-progress meter (r358)
+  // read frac 0 and alongW froze for a whole segLen between crossings —
+  // 2.0-2.8 s of apparent standstill, and the wedge fired on a rig
+  // artifact. The crawl now moves CONTINUOUSLY between samples, as a real
+  // crawling car does. (MASTER FIX-7, §5.5, will make ANY < 8 km/h crawl
+  // stuck at 6 s — this check gets rewritten to that law when FIX-7
+  // lands on the rebuilt geometry.)
   pl.placeAt(anchor, 0, true); pl.vel.set(0, 0, 0);
   rescues = 0;
   const orig2 = pl.step.bind(pl);
@@ -114,9 +129,11 @@ const S = await p.evaluate(async () => {
   pl.step = (dt, inp) => {
     orig2(dt, inp);
     s += 2 * dt / (t.segLen ?? 4);     // crawl forward 2 m/s along the lap
-    const i = (anchor + Math.floor(s)) % N;
-    const c = t.center[i];
-    pl.pos.set(c.x, c.y, c.z); pl.y = c.y; pl.trackIndex = i; pl.vel.set(0, 0, 0);
+    const i = (anchor + Math.floor(s)) % N, i2 = (i + 1) % N;
+    const fr = s - Math.floor(s);
+    const c = t.center[i], c2 = t.center[i2];
+    pl.pos.set(c.x + (c2.x - c.x) * fr, c.y + (c2.y - c.y) * fr, c.z + (c2.z - c.z) * fr);
+    pl.y = pl.pos.y; pl.trackIndex = i; pl.vel.set(0, 0, 0);
   };
   for (let f = 0; f < 360; f++) g._frameBody();       // 6 s of crawling
   pl.step = orig2;
@@ -127,7 +144,7 @@ ok(S.p2.firedAt > 0 && S.p2.firedAt <= 3.5,
   'P2 zero course-progress with throttle held is STUCK at ~2.5 s — sideways metres do not defeat it',
   `rescued at ${S.p2.firedAt}s having slid ${S.p2.slid} m sideways (the old anchor never fired here)`);
 ok(S.p3.rescues === 0,
-  'P3 an honest 2 m/s crawl that IS progressing is never touched',
+  'P3 an honest 2 m/s crawl that IS progressing is never touched by the wedge',
   `${S.p3.rescues} rescues in 6 s`);
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 

@@ -4171,6 +4171,52 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r392 — THE GATE IS WIRED, AND KILLS LAND BEHIND YOU (MASTER step 0 + FIX-8b)
+
+The owner re-issued RALLY_MASTER_SPEC.md with three additions (saved
+verbatim at the repo root): FIX-8b, §7 (the procedural-generation gate),
+and R12 evidence with a BINDING enforcement finding — "the §6 suite is not
+yet wired as a build gate… wire validation.spec.ts as a blocking gate
+BEFORE further fixes."
+
+STEP 0 — `tests/validation.mjs` IS THE BLOCKING GATE. One command, the
+whole deploy set (boot, stagerules, phase4, nothing-floats,
+nothing-on-road, drift, shortcut, patch02, killspos; FULL=1 adds airace),
+one exit code. Two hard-won rules inside it: suites here print verdicts
+but historically EXIT 0 EVEN ON FAILED, so the gate parses FAIL lines and
+failure counts, never exit codes; and a known standing marginal blocks
+every deploy unless it is a RECORDED WAIVER — the only entry today is
+PINE VALLEY's F7 52-54% thrust-equilibrium bound (r388 ledger). A deploy
+that has not run this to green is a spec violation, not a judgement call.
+
+FIX-8b — A DESTROYED RIVAL RE-ENTERS BEHIND THE PLAYER. R12 at 1:59:
+three kills on the cars ahead, position unchanged — the r311 last-gate
+respawn could put the wreck back AHEAD of the player, handing the place
+straight back. The respawn point is now resolved at respawn time against
+the player: last road point >= 150 m back, clamped at the lap line so the
+subtraction can never read as a lap gained (the r311 trap, still armed),
+owed gate recomputed for the new index, and 10 s of tail pace (85% of the
+player's top speed) so the wreck re-enters as a backmarker, not a
+missile. Scripted acceptance: three kills, victim behind and staying
+behind each time, gap 150 m (96 m once, lap-line clamp), tail pace armed;
+killspos P1 rewritten to the new law and green 7/7.
+
+KILLSPOS P3 WAS LYING TO EVERYONE. Its "honest crawl" snapped the car
+EXACTLY onto center samples each frame, so the r358 fractional-progress
+meter read frac 0 and alongW froze for a whole segLen between crossings —
+2-3 s of apparent standstill, and the wedge fired on a RIG artifact
+(reproduced identically on the pristine r383 base; not a game defect).
+The rig now interpolates between samples like a moving car; P3 green.
+When FIX-7 lands (§5.5, after the rebuilds), ANY < 8 km/h crawl becomes
+stuck at 6 s and P3 gets rewritten to that law — noted in the test.
+
+Remaining from the R12 round, tracked for the next builds: grid freeze at
+t=0 (4th sighting — FIX-2 verify against the tip), occlusion fade must
+learn the NEW tree meshes (carpet tiers, olive domes), unlit/black new
+assets (cypress class), uphill 109→144 on an Olive Pass-class seed
+(FIX-6 verify on that world), field evaporating after 2:19, AI cutting
+hairpins off-road, floating pickups/signs.
+
 ## r391 — GLACIER COL REBUILT: THE COMPOSED PASS (MASTER §2+§4)
 
 The first stage rebuild of MASTER §5.4. GLACIER COL's route was PANORAMA's
