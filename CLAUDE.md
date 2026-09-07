@@ -100,6 +100,8 @@ Open, in priority order. Each row is a repair of observed behaviour.
 
 **Scope amendment (RALLY_PATCH_02 v3 C-4, 2026-09-06).** The repair-only restriction is LIFTED for world and track scope: track geometry, length, curvature, mountains, snow, scenery bands and valley composition may be redesigned per PART III of that document. HUD freeze (recording E) and the no-overlays rule stand unchanged.
 
+**Master spec (RALLY_MASTER_SPEC.md, 2026-09-07).** Supersedes RALLY_PATCH_02.md entirely; sits above this file in authority. One recorded conflict: the r364/r378 elevation mandates (passes 1200 m, terraces 500 m) are geometrically incompatible with WR-2.1 (grades 4–12%) plus §4 (lap target 5.5 km) — a lap climbing AND descending H at grade g needs length ≥ 2H/g, so 12% at 5.5 km caps the range near 330 m. The master spec is newer and higher authority: ELEV_MANDATE compresses to the grade-lawful range per world (min(mandate, lapLen·0.12/2·(1−a))), recorded here rather than silently traded. WR-8's altitude bands are relative to each stage's own max, so snow summits survive.
+
 **3.7 Landing assist.** For 300 ms after touchdown: lateral velocity blended toward heading at 80% per 100 ms, yaw rate clamped 60[deg]/s, steer honoured, handbrake cancels and preserves the slide.
 
 ---
