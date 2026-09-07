@@ -18,19 +18,39 @@ await p.evaluate(async () => {
   const GREEN = 0x236555, TRUNK = 0x84824c,
     AUT_A = 0xe77834, AUT_B = 0xff8c4d, AUT_C = 0xffb349; // C: the sheet's gold tree
 
-  // jagged, drooping skirt tier: open cone, rim dragged down and waved
+  // per-vertex facet noise: the sheet's crowns are NOISY solids, not spheres
+  const roughen = (geo, amp) => {
+    const pos = geo.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const n = Math.sin(v.x * 7.3 + v.y * 3.1) * Math.cos(v.z * 5.7 - v.y * 2.2);
+      const L = v.length() || 1;
+      v.multiplyScalar(1 + amp * n / L * Math.max(0.4, L));
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  // jagged, drooping skirt tier: open cone (2 height rings for a mid fold),
+  // rim dragged down and waved, whole surface noised
   const skirt = (R, h, y, seg, droop, jag, rot) => {
-    const geo = new THREE.ConeGeometry(R, h, seg, 1, true);
+    const geo = new THREE.ConeGeometry(R, h, seg, 2, true);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const py = pos.getY(i);
+      const a = Math.atan2(pos.getZ(i), pos.getX(i));
+      const w = Math.sin(a * 3.1 + rot * 7) * 0.5 + Math.sin(a * 5.7 + rot * 3) * 0.5;
       if (py < -h / 2 + 0.01) {                    // a rim vertex
-        const a = Math.atan2(pos.getZ(i), pos.getX(i));
-        const w = Math.sin(a * 3.1 + rot * 7) * 0.5 + Math.sin(a * 5.7 + rot * 3) * 0.5;
         const rr = 1 + w * jag;
         pos.setX(i, pos.getX(i) * rr);
         pos.setZ(i, pos.getZ(i) * rr);
         pos.setY(i, py - droop * (0.55 + 0.45 * Math.abs(w)));
+      } else if (py > -h / 2 + 0.01 && py < h / 2 - 0.01) {
+        // mid ring: a soft fold so the frond has BODY, not a straight face
+        const rr = 1 + w * jag * 0.45;
+        pos.setX(i, pos.getX(i) * rr);
+        pos.setZ(i, pos.getZ(i) * rr);
+        pos.setY(i, py - droop * 0.22 * Math.abs(w));
       }
     }
     geo.rotateY(rot);
@@ -45,14 +65,25 @@ await p.evaluate(async () => {
     grp.add(new THREE.Mesh(tr, mat(TRUNK)));
     const tiers = [[2.15, 1.7, 1.15], [1.85, 1.6, 2.15], [1.5, 1.5, 3.1],
       [1.2, 1.4, 4.0], [0.9, 1.3, 4.85], [0.62, 1.25, 5.6]];
+    const gLight = mat(GREEN), gDark = mat(GREEN);
+    gDark.color.multiplyScalar(0.72);
+    gLight.color.multiplyScalar(1.18);
     let k = 0;
     for (const [R, h, y] of tiers) {
-      grp.add(new THREE.Mesh(skirt(R, h, y, 10, 0.5, 0.24, k * 1.7 + 0.4), mat(GREEN)));
+      grp.add(new THREE.Mesh(skirt(R, h, y, 12, 0.5, 0.26, k * 1.7 + 0.4),
+        k % 2 ? gDark : gLight));
+      // a branch stub poking between tiers, the sheet's broken silhouette
+      if (k > 0 && k < 5) {
+        const st = new THREE.CylinderGeometry(0.045, 0.08, 0.9, 5);
+        st.translate(0, 0.45, 0); st.rotateZ(1.35 + (k % 2 ? 0.35 : -0.3));
+        st.rotateY(k * 2.1); st.translate(0, y + 0.35, 0);
+        grp.add(new THREE.Mesh(st, mat(0x6f5638)));
+      }
       k++;
     }
-    const tip = new THREE.ConeGeometry(0.3, 1.15, 7);
+    const tip = roughen(new THREE.ConeGeometry(0.3, 1.15, 7), 0.05);
     tip.translate(0, 6.9, 0);
-    grp.add(new THREE.Mesh(tip, mat(GREEN)));
+    grp.add(new THREE.Mesh(tip, gLight));
     return grp;
   };
   const coniferB = () => {
@@ -62,18 +93,22 @@ await p.evaluate(async () => {
     grp.add(new THREE.Mesh(tr, mat(TRUNK)));
     const tiers = [[1.85, 1.9, 1.15], [1.5, 1.75, 2.3], [1.15, 1.6, 3.4],
       [0.82, 1.5, 4.4], [0.52, 1.4, 5.3]];
+    const gLight = mat(GREEN), gDark = mat(GREEN);
+    gDark.color.multiplyScalar(0.78);
+    gLight.color.multiplyScalar(1.12);
     let k = 0;
     for (const [R, h, y] of tiers) {
-      grp.add(new THREE.Mesh(skirt(R, h, y, 9, 0.28, 0.14, k * 2.3), mat(GREEN)));
+      grp.add(new THREE.Mesh(skirt(R, h, y, 11, 0.3, 0.16, k * 2.3),
+        k % 2 ? gDark : gLight));
       k++;
     }
-    const tip = new THREE.ConeGeometry(0.24, 1.0, 7);
+    const tip = roughen(new THREE.ConeGeometry(0.24, 1.0, 7), 0.04);
     tip.translate(0, 6.6, 0);
-    grp.add(new THREE.Mesh(tip, mat(GREEN)));
+    grp.add(new THREE.Mesh(tip, gLight));
     return grp;
   };
   // faceted crown lobe
-  const lobe = (r, d = 1) => new THREE.IcosahedronGeometry(r, d);
+  const lobe = (r, d = 1, amp = 0.11) => roughen(new THREE.IcosahedronGeometry(r, d), amp * r);
   const deciduous = (crownHex, seed) => {
     const grp = new THREE.Group();
     const tm = mat(0x6f5638);   // the sheet's drawn trunk: warm dark brown
@@ -95,12 +130,22 @@ await p.evaluate(async () => {
     const j2 = seg(0.32, 0.20, 1.8, -0.30 * seed, 'z', j1);         // the bend
     seg(0.16, 0.09, 1.6, 0.85 * seed, 'z', j1);                     // limb from the bend
     seg(0.14, 0.08, 1.4, -0.7, 'x', j2);                            // limb into the crown
-    // the crown: five faceted lobes clustered wider than tall
+    // root flare: three small cones around the bole foot
+    for (let rf = 0; rf < 3; rf++) {
+      const fl = new THREE.ConeGeometry(0.22, 0.7, 5);
+      fl.translate(0, 0.3, 0); fl.rotateZ(0.5);
+      fl.rotateY(rf * 2.1 + 0.4);
+      grp.add(new THREE.Mesh(fl, tm));
+    }
+    // the crown: faceted noisy lobes in THREE tones, clustered wider than tall
     const cm = mat(crownHex);
-    const cmD = mat(crownHex); cmD.color.multiplyScalar(0.74);   // shaded lobes
+    const cmD = mat(crownHex); cmD.color.multiplyScalar(0.72);   // shaded lobes
+    const cmH = mat(crownHex); cmH.color.multiplyScalar(1.22);   // lit crowns
     const spots = [[0, 0.9, 0, 1.6, cm], [1.45, 0.3, 0.4, 1.2, cmD],
-      [-1.35, 0.45, -0.3, 1.15, cmD], [0.35, 2.05, -0.2, 1.1, cm],
-      [-0.5, -0.25, 1.15, 0.95, cmD], [0.9, 1.4, 0.75, 0.95, cm]];
+      [-1.35, 0.45, -0.3, 1.15, cmD], [0.35, 2.05, -0.2, 1.1, cmH],
+      [-0.5, -0.25, 1.15, 0.95, cmD], [0.9, 1.4, 0.75, 0.95, cm],
+      [-0.9, 1.75, 0.45, 0.8, cmH], [0.15, 0.1, -1.15, 0.85, cmD],
+      [1.0, -0.35, -0.6, 0.7, cmD]];
     for (const [x, y, z, r, m] of spots) {
       const geo = lobe(r);
       geo.translate(j2.x + x * (seed > 0 ? 1 : -1), j2.y + y, j2.z + z);
