@@ -16934,6 +16934,11 @@ export class Track {
     // form survives only for the horizon ring.
     const ring = (geos, count, spot, margin, scMin, scRange, paintFn = paint, reg = false) => {
       const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
+      // r392: the carpet is FOLIAGE — placement-checked paint, canopy
+      // non-collidable (FIX-5). Named so the corridor census classes its
+      // crown overhang with the tree crowns instead of counting each
+      // r386 high-poly cone as a stray body in the carriageway.
+      for (const m9 of meshes) m9.name = 'carpet-foliage';
       let n = 0;
       for (let tries = 0; tries < count * 3 && n < count; tries++) {
         const p2 = spot();

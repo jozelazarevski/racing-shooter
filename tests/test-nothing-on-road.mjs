@@ -293,7 +293,11 @@ await page.evaluate(() => {
       const sig = chainOf(o) + ' | ' + geo.type.replace('Geometry', '') + '('
         + Object.entries(q).filter(([k, v]) => typeof v === 'number' && !/segment/i.test(k))
           .map(([k, v]) => `${k}=${+v.toFixed(2)}`).join(',') + ')';
-      const isProp = anc(o, propRoots), isRoad = namedRoad(o), isLeaf = anc(o, foliage);
+      // r392: the tree carpet names itself 'carpet-foliage' — placement-
+      // checked decorative paint whose r386 high-poly crowns lean over the
+      // verge edge exactly like grove crowns do. Foliage, not bodies.
+      const isProp = anc(o, propRoots), isRoad = namedRoad(o),
+        isLeaf = anc(o, foliage) || o.name === 'carpet-foliage';
       o.updateWorldMatrix(true, false);
       if (o.isInstancedMesh) {
         for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, M); M.premultiply(o.matrixWorld); consider(M, bb, sig, isProp, isRoad, isLeaf); }

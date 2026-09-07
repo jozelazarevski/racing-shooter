@@ -130,8 +130,16 @@ const r = await p.evaluate(() => {
     }
     if (flat) break;
   }
-  const kept = { obstacles: t.obstacles, solids: t.solids, barriers: t.barriers };
+  // r392: FIX-5 collides tree trunks via t.trees and t.camTreesNear
+  // DIRECTLY, not via t.solids — and the WR-7.6d conform pass surfaces
+  // formerly-buried trees exactly on rising banks, which is where this
+  // rig drives. The controlled runs measure the SURFACE law, so trunks
+  // are stripped with the rest; the hinterland run keeps them (the wild
+  // is allowed to cost you its trees).
+  const kept = { obstacles: t.obstacles, solids: t.solids, barriers: t.barriers,
+    trees: t.trees, ctn: t.camTreesNear };
   t.obstacles = []; t.solids = []; t.barriers = [];
+  t.trees = []; t.camTreesNear = () => [];
   const cut = run(best.i, 30, 2.5);
   // The off-road-is-slower comparison is a CONTROLLED PAIR: same sample, a
   // bank that is level with the road, on the carriageway vs 28 u off it. The
@@ -147,6 +155,7 @@ const r = await p.evaluate(() => {
   const onFlat = run(flat.i, 0, 2.5);
   const offFlat = run(flat.i, 28, 2.5);
   t.obstacles = kept.obstacles; t.solids = kept.solids; t.barriers = kept.barriers;
+  t.trees = kept.trees; t.camTreesNear = kept.ctn;
 
   // The hinterland: far enough out that the stray gate is at full strength.
   // FROM EVERY LEG OF THE LAP, not just from sample 200: the gate now
