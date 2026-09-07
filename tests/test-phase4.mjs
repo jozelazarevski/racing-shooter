@@ -110,7 +110,15 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         if (k > 0 && k % 90 === 0) place(Math.hypot(c.vel.x, c.vel.z));
         c.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false, hold: false });
         const v = Math.hypot(c.vel.x, c.vel.z);
-        vTop = Math.max(vTop, v);
+        // r388 (MASTER FIX-6): the slope law now prices every roller, and
+        // even the flattest runway undulates 3-10% — F7 is a SURFACE law
+        // ("flat drivable surface", v2.3 3.5), so the top-speed read only
+        // counts frames where the ground under the run is actually flat.
+        const dxh = Math.sin(c.heading), dzh = Math.cos(c.heading);
+        const hh0 = lat === 0 ? 0 : t.terrainHeight(c.pos.x, c.pos.z);
+        const gg4 = lat === 0 ? 0 : Math.abs(
+          (t.terrainHeight(c.pos.x + dxh * 4, c.pos.z + dzh * 4) - hh0) / 4);
+        if (gg4 < 0.03) vTop = Math.max(vTop, v);
         if (t30 === null && v * 3.6 >= 30) t30 = +(k / 60).toFixed(2);
       }
       return { top: +(vTop * 3.6).toFixed(0), t30 };

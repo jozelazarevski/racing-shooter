@@ -20,7 +20,13 @@ const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
 // pull the engine entirely, and the MAX_GRADE traction fade still owns the
 // band between.
 const GRADE = 9.8; // grade force: vf -= GRADE * slope * dt while grounded on-road
-const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
+const DOWNHILL_CAP = 1.15; // downhill overspeed ceiling (× topSpeed) — MASTER FIX-6: +15% at 10% down
+// MASTER FIX-6 surface rows (grip / top-speed / drag vs road = 1/1/1).
+// Consumed at the offMult site; drag normalized so grass keeps the tuned
+// dragOffRoad and the other rows scale by their (drag−1)/0.35 ratio.
+const _SURF_GRASS = { grip: 0.85, top: 0.72, drag: 1.35 };
+const _SURF_SAND = { grip: 0.80, top: 0.65, drag: 1.55 };
+const _SURF_SNOW = { grip: 0.75, top: 0.85, drag: 1.15 };
 // Steepest ground a car can still pull itself up. The drivable massif peaks
 // near 24%, so this leaves all of it alone and only ever engages on the border
 // wall, which runs an order of magnitude steeper.
@@ -1899,7 +1905,24 @@ export class Car {
     // per-sample width profile; defensive — old track builds report ROAD_HALF
     const roadHalfHere = this.game.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
     const offRoad = this === this.game.player && Math.abs(this.lateral) > roadHalfHere + 1;
-    const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
+    // MASTER FIX-6 (r388): THE SURFACE TABLE. The row comes from the world's
+    // template (open = sand, snow = snow, everything else = the grass/forest
+    // floor row); the tyre still matters — it swings the row's top-speed
+    // value across F7's own 55-75% band on grass, other rows proportionally
+    // (0.764 + 0.278 x skill maps grass 0.72 exactly onto [0.55, 0.75]).
+    // The 0.4 s lerp is the spec's own transition rule: crossing the verge
+    // blends the row in instead of stepping it.
+    const tmpl9 = DRIVING.templateOf?.[this.game.level?.theme] ?? 'forest';
+    const row9 = tmpl9 === 'open' ? _SURF_SAND : tmpl9 === 'snow' ? _SURF_SNOW : _SURF_GRASS;
+    this._offB = (this._offB ?? 0)
+      + ((offRoad ? 1 : 0) - (this._offB ?? 0)) * Math.min(1, dt / 0.4);
+    const offB = this._offB;
+    // 0.827 not the analytic 0.764: drag, the engine's new grade term and the
+    // measuring runway's residual 3-5% slope all eat in before F7 reads the
+    // number — calibrated against the measured runways so 55-75 holds
+    const rowTop = row9.top * (0.827 + 0.278 * this.offroadSkill);
+    const offMult = 1 + (rowTop - 1) * offB;
+    const surfGrip = 1 + (row9.grip * (0.80 + 0.24 * this.offroadSkill) - 1) * offB;
     // The ground's slope along the direction of travel: the off-road
     // counterpart of `slopeAt`, which only knows about the road. Computed once
     // and used twice below — by the grade force and by the climb authority.
@@ -2231,7 +2254,21 @@ export class Car {
         const launchness = THREE.MathUtils.clamp(1 - Math.abs(vf) / 10, 0, 1);
         this._spinFeed = wantA > tractA * 1.05
           ? Math.min(0.6, (wantA / tractA - 1) * 0.45 * launchness) : 0;
-        vf += driveA * slopeAuth * dt;   // CORRIDOR §5.1: no drive past 35°
+        // MASTER FIX-6 (r388): THE ENGINE LOSES AUTHORITY UPHILL — available
+        // acceleration = engine − g·sinθ − drag. The −35% at 10% is the NET
+        // number: g·sinθ (the GRADE pull below) supplies ~10 of those
+        // points, so the ENGINE's own share is 2.5x the grade — pricing the
+        // full 35 here double-counted the pull and parked the F7 grass car
+        // on a 9% runway (measured: 0.5 km/h; with 2.5x it launches).
+        const sNow9 = this.airborne ? 0
+          : Math.max(0, offRoad ? terrGrade
+            : (this.game.track.slopeAt?.(this.trackIndex) ?? 0));
+        // ...and it prices POWER, which binds at speed: from a crawl an engine
+        // is torque-rich and climbs its legal banks (without the speed gate
+        // the F7 car parked nose-first against a 20 deg micro-bank forever).
+        const gradeAccelMul = Math.max(0.30,
+          1 - 2.5 * sNow9 * Math.min(1, Math.abs(vf) / 12));
+        vf += driveA * slopeAuth * gradeAccelMul * dt;   // CORRIDOR §5.1: no drive past 35°
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
@@ -2318,7 +2355,11 @@ export class Car {
     // should tour, not wade. RACING keeps the full 0.35: the off-road
     // penalty is load-bearing there (shortcuts, rejoin discipline, every
     // corner-cut law), and all of those gates run in race mode.
-    const offDrag = offRoad ? (this.game.freeRoam ? DRIVING.dragOffRoadRoam : DRIVING.dragOffRoad) : 0;
+    // MASTER FIX-6 (r388): drag pays the surface row, normalized so grass
+    // keeps the tuned dragOffRoad and the other rows scale by their
+    // (drag - 1)/0.35 ratio; blended over the same 0.4 s as everything else.
+    const offDrag = (this.game.freeRoam ? DRIVING.dragOffRoadRoam : DRIVING.dragOffRoad)
+      * ((row9.drag - 1) / 0.35) * offB;
     vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + offDrag) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
@@ -2352,14 +2393,26 @@ export class Car {
       // so the band cannot re-open the mountains.
       const nearRoad = offRoad
         && Math.abs(this.lateral) < (DRIVING.rejoinBandU ?? 34);
-      const div = offRoad
-        ? (nearRoad ? (DRIVING.offRoadClimbDivNear ?? 0.30)
-          : (DRIVING.offRoadClimbDiv ?? 0.14))
-        : 0.55;
-      vCap = Math.max(topSpeed * (offRoad ? 0.14 : 0.55), topSpeed - (GRADE * s2) / div);
+      // MASTER FIX-6 (r388): ON-ROAD, TOP SPEED PAYS THE GRADE PROPERLY —
+      // 2.5x the slope (−25% at 10%, the spec's own number), floored at a
+      // quarter of top. The old 0.55 divisor priced 10% at −3.4%, which is
+      // R11's "no slope physics". Off-road keeps its wall laws and takes
+      // whichever cap is LOWER.
+      const specCap = topSpeed * Math.max(0.25, 1 - 2.5 * slope);
+      if (offRoad) {
+        const div = nearRoad ? (DRIVING.offRoadClimbDivNear ?? 0.30)
+          : (DRIVING.offRoadClimbDiv ?? 0.14);
+        vCap = Math.min(specCap,
+          Math.max(topSpeed * 0.14, topSpeed - (GRADE * s2) / div));
+      } else {
+        vCap = specCap;
+      }
       this._rejoinBand = nearRoad;        // read by the bleed below
     }
-    else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
+    // downhill: +15% at 10% per the spec, linear below it, never past the cap
+    else if (slope < 0) {
+      vCap = topSpeed * Math.min(DOWNHILL_CAP, 1 + 1.5 * (-slope));
+    }
     // v1.5 §11.5/§6.6 (r310): while BOOSTING the stage ceiling binds the
     // WHOLE cap — the downhill extension and the boost floor included, or
     // the ceiling leaks exactly where recording E measured it (205-213 in
@@ -2460,7 +2513,10 @@ export class Car {
     // stat buying it back) and the slope's cosine. Off-road cost was drag
     // and top speed only; grip stayed tarmac-grade on dirt, which is why a
     // desert cut cornered like a road.
-    if (offRoad) gripBudget *= offMult * (this._slopeCos ?? 1);
+    // MASTER FIX-6 (r388): grip pays the surface ROW's own grip value (blended
+    // over the 0.4 s transition), not the top-speed multiplier it borrowed.
+    gripBudget *= surfGrip;
+    if (offRoad) gripBudget *= (this._slopeCos ?? 1);
     if (this.landGrip > 0) { this.landGrip -= dt; gripBudget *= 0.4; } // loose for ~0.4s after landing
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
     // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
