@@ -3524,7 +3524,10 @@ const THEMES = {
     elements: 'medhill',
     crossroads: 2,
     // the dry inland range standing behind the terraces — low, hazy, bare
-    massif: { az: 1.15, spread: 2.0, count: 8, r0: 420, r1: 700,
+    // r387: 8 cones over 2.0 rad left two thirds of the compass empty and
+    // the owner's frame showed exactly that — widened to a real inland range
+    // (the coast reflection in _buildMassif keeps every cone out of the bay)
+    massif: { az: 1.15, spread: 3.4, count: 14, r0: 420, r1: 760,
       h0: 90, h1: 175, w0: 210, w1: 360 },
     // THE SEA. A Mediterranean coast world shipped without one, and the
     // seaward half of every elevated view was therefore pure fog — measured
@@ -6378,7 +6381,9 @@ const DESERT_THEMES = new Set(['dunes', 'desert', 'oasis', 'outback', 'savanna',
 // or a deliberately treeless moor would be wrong, not rich.
 const CARPET_THEMES = new Set(['forest', 'deepwood', 'autumnwood', 'harvestvale',
   'flume', 'alpine', 'pass', 'tremola', 'furka', 'dolomiti', 'avalanche',
-  'snow', 'glacial', 'jungle', 'redwood', 'mountainsea']);
+  'snow', 'glacial', 'jungle', 'redwood', 'mountainsea',
+  // r387 (owner's OLIVE COAST frame): the terrace slopes grow olive groves
+  'medterrace', 'olivecountry']);
 const NEON_THEMES = new Set(['neon', 'undercity']);
 // r378 (owner): "Mountain passes need to have at least 1200m climbing
 // difference. Olive and vine yards at least 500m vertical difference."
@@ -9627,9 +9632,26 @@ export class Track {
   _coastDepress(x, z, h, dRoad) {
     const C = this.T.coast;
     const sd = this._coastSide(x, z);
-    if (sd <= 0) return h;
-    const w = smoothstep01(Math.min(1, sd / (C.beach ?? 60)))
-      * THREE.MathUtils.smoothstep(dRoad, 24, 44);
+    const roadW = THREE.MathUtils.smoothstep(dRoad, 24, 44);
+    if (sd <= 0) {
+      // r387 (owner's OLIVE COAST frame — "make it pretty with sea on the
+      // side"): the sea existed and was invisible — the mandate-scaled
+      // highland noise piled a 90 u ridge on the LANDWARD approach (measured
+      // seaward of station 70: road 46, ridge 136 at 60 u out, water at
+      // 120), so the bay hid behind a wall almost everywhere. Within the
+      // approach band the terrain now gets a falling ceiling toward the
+      // waterline — land stairs DOWN to a shore, which is what a shore is.
+      // The road corridor is exempt like every carve, so a seafront leg
+      // keeps its bench.
+      const ap = 260;
+      if (sd > -ap && h > (C.level ?? -2)) {
+        const t9 = Math.max(0, 1 + sd / ap);      // 0 inland -> 1 at the line
+        const cap = (C.level ?? -2) + (1 - smoothstep01(t9)) * ap * 0.55;
+        if (h > cap) h = h * (1 - roadW) + cap * roadW;
+      }
+      return h;
+    }
+    const w = smoothstep01(Math.min(1, sd / (C.beach ?? 60))) * roadW;
     return h * (1 - w) + (C.floor ?? -7) * w;
   }
 
@@ -14042,8 +14064,13 @@ export class Track {
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
       // `h` is mutable because the shrink-to-fit below scales the whole form,
       // not just its base — see there
-      let h = M.h0 + Math.random() * (M.h1 - M.h0);
-      let w = M.w0 + Math.random() * (M.w1 - M.w0);
+      // r387: the massif grows with the mandate — a spec authored for a flat
+      // lap stands below eye level once the route climbs 500+ u, and the
+      // owner's OLIVE COAST frame looks straight over it into fog. Height
+      // and width scale together so the form keeps its proportion.
+      const mv9 = 1 + this._routeElevRange() / 420;
+      let h = (M.h0 + Math.random() * (M.h1 - M.h0)) * mv9;
+      let w = (M.w0 + Math.random() * (M.w1 - M.w0)) * mv9;
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
       // coast world the azimuth ring can land a peak in the bay, a cream
@@ -16615,6 +16642,20 @@ export class Track {
    *  wood you drive through continues to the skyline instead of stopping
    *  at an invisible fence. Far scenery: no colliders (the near field's
    *  trees and solids already own everything reachable at speed). */
+  /** r387: how far the route itself climbs — the number every backdrop must
+   *  outgrow. Memoized; reads the finished elevation profile. */
+  _routeElevRange() {
+    if (this._elevRangeMemo === undefined) {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < this.center.length; i++) {
+        const y = this.center[i].y;
+        if (y < lo) lo = y; if (y > hi) hi = y;
+      }
+      this._elevRangeMemo = Math.max(0, hi - lo);
+    }
+    return this._elevRangeMemo;
+  }
+
   /** PATCH_02 v3 C-C: verge-carpet trees near a point, for the camera's
    *  foliage guard. The verge ring is thousands of instances, so a flat walk
    *  per frame is off the table — a 24 u cell hash built on first use keeps
@@ -16667,6 +16708,10 @@ export class Track {
       } else if (SCREE_THEMES.has(theme) || theme === 'avalanche' || theme === 'dolomiti') {
         if (roll < 0.7) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
         else col.setHSL(0.075 + Math.random() * 0.035, 0.65, 0.30 + Math.random() * 0.09);
+      } else if (theme === 'medterrace' || theme === 'olivecountry') {
+        // r387: olives — silvery sage, sun-bleached, never fir-dark
+        col.setHSL(0.21 + Math.random() * 0.05, 0.24 + Math.random() * 0.14,
+          0.30 + Math.random() * 0.13);
       } else {
         if (roll < 0.7) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
         else col.setHSL(0.24 + Math.random() * 0.05, 0.42, 0.22 + Math.random() * 0.09);
@@ -16781,11 +16826,24 @@ export class Track {
       const hi = roughenC(new THREE.ConeGeometry(1.1, 2.5, 7, 1, true), 0.12); hi.translate(0, 4.1, 0);
       return [lo, hi];
     };
+    // r387 (owner's OLIVE COAST frame — "just a wall and road"): the terrace
+    // themes carpet in OLIVES, not firs — a broad roughened dome on a short
+    // trunk, planted as a grove rather than a wall. The trunk is the
+    // column-bottom part the seat law grounds; the canopy rides it.
+    const terrace = theme === 'medterrace' || theme === 'olivecountry';
+    const oliveDome = () => {
+      const crown = roughenC(new THREE.SphereGeometry(1.7, 9, 6), 0.20);
+      crown.scale(1, 0.72, 1); crown.translate(0, 2.7, 0);
+      const trunk = roughenC(new THREE.CylinderGeometry(0.20, 0.34, 2.4, 6), 0.12);
+      trunk.translate(0, 1.2, 0);
+      return [crown, trunk];
+    };
     // VERGE WALL: the trees the chase camera actually lives beside — dense,
     // large, starting just off the road edge, the whole way round the lap.
     // r377 (owner's forest mockup): scaled up to TOWER — the reference's
     // lane runs under the canopy, not past shoulder-height cones
-    ring(twoCone(), spec.verge ?? 9000, trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
+    ring(terrace ? oliveDome() : twoCone(),
+      spec.verge ?? (terrace ? 4200 : 9000), trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
     // r377 UNDERSTOREY, from the owner's mockup: the ground between the
     // trunks is not bare — a fern layer fills the first metres off the
     // lane, and moss pads green the verge. Non-solid, same as every
@@ -16801,7 +16859,8 @@ export class Track {
       c2.setHSL(0.30 + Math.random() * 0.06, 0.5, 0.17 + Math.random() * 0.1);
     ring([mossG], spec.moss ?? 1400, trackSpot(0.3, 16), 1.2, 0.7, 1.1, paintMoss);
     // mid-field: fills the ground between the wall and the horizon
-    ring(twoConeMid(), spec.near ?? 14000, trackSpot(38, 160), 20, 1.1, 1.6);
+    ring(terrace ? oliveDome() : twoConeMid(),
+      spec.near ?? (terrace ? 7000 : 14000), trackSpot(38, 160), 20, 1.1, 1.6);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
     // margin 25 keeps an 18 u horizon-scale cone off the verge where the
     // radial scatter happens to cross the lap. r376: the radial extent
@@ -18511,7 +18570,16 @@ export class Track {
         const e = Math.max(1.0, s.r * 0.6);
         const hx = this.terrainHeight(s.x + e, s.z) - this.terrainHeight(s.x - e, s.z);
         const hz = this.terrainHeight(s.x, s.z + e) - this.terrainHeight(s.x, s.z - e);
-        nrm.set(-hx / (2 * e), 1, -hz / (2 * e)).normalize();
+        // r387 (owner's OLIVE COAST frame — dark amoebas on the road): the
+        // conform tilt was unclamped, and on the mandate-steep berms beside
+        // a bench a 30-45° decal plane lifts its edge metres into the air,
+        // leaning clean across the carriageway. A shadow may hug ground up
+        // to ~20°; steeper stays flat — a flat decal on a steep bank is
+        // invisible wrong, a leaning one is a blob on the road.
+        let gx = hx / (2 * e), gz = hz / (2 * e);
+        const gm = Math.hypot(gx, gz);
+        if (gm > 0.36) { gx *= 0.36 / gm; gz *= 0.36 / gm; }
+        nrm.set(-gx, 1, -gz).normalize();
         q.setFromUnitVectors(up, nrm);
       } else {
         q.identity();
@@ -22363,8 +22431,14 @@ export class Track {
     // frame at point-blank, their gradient bands reading as sky garbage.
     // The rings now stand off the world's own patch edge.
     const hs = Math.max(1, (this._patchHalf ?? 1000) / 1000);
-    place(near, 9, 930 * hs, 140 * hs, 48, 36, 240, 210, 0.82);
-    place(far, 8, 1120 * hs, 160 * hs, 135, 60, 360, 300, 0.76);
+    // r387 (owner's OLIVE COAST frame — "just a wall and road", white beyond):
+    // the ring heights were sized for flat laps. A mandated route climbs 500
+    // or 1200 u and simply looks OVER a 135-195 u skyline into the fog — the
+    // backdrop must grow with the climb it stands behind. Widths scale with
+    // heights so the 0.33 aspect law (the comment above) keeps holding.
+    const mv = 1 + this._routeElevRange() / 420;
+    place(near, 9, 930 * hs, 140 * hs, 48 * mv, 36 * mv, 240 * mv, 210 * mv, 0.82);
+    place(far, 8, 1120 * hs, 160 * hs, 135 * mv, 60 * mv, 360 * mv, 300 * mv, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;

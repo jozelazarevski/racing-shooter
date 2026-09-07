@@ -4171,6 +4171,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r387 — THE CORNICHE COMPOSITION: MOUNTAINS AND SEA AT THE SIDE
+
+Owner's live OLIVE COAST frame: "Just a wall and road. Make it pretty
+with mountains and sea on the side." Four findings, one theme: the world
+HAD a sea and a massif, and the 500 m mandate outgrew all of it.
+
+1. THE SKYLINE SCALES WITH THE CLIMB. The horizon hills/peaks rings
+   (48-195 u) and the massif specs were sized for flat laps — a mandated
+   route tops out at 500-1200 u and looks straight OVER them into fog.
+   Both now scale by 1 + routeElevRange/420 (_routeElevRange, memoized;
+   the real profile, so naturally tall worlds scale too), widths with
+   heights so the 0.33 aspect law keeps holding.
+2. THE SHORE HAS AN APPROACH. The mandate-scaled highland noise piled a
+   90 u ridge on the landward side of the coastline (measured seaward of
+   station 70: road 46, ridge 136 at 60 u out, water at 120) — the sea
+   existed and was invisible. _coastDepress now caps terrain under a
+   falling ceiling within 260 u of the waterline, road corridor exempt,
+   so the land stairs down to a shore.
+3. OLIVE GROVES. medterrace/olivecountry join CARPET_THEMES with their
+   own silhouette: a roughened dome on a short trunk (grove counts, not
+   wall counts) painted silvery sage. The trunk is the column-bottom part
+   the seat law grounds.
+4. THE AMOEBAS ON THE ROAD were contact-shadow decals: the slope-conform
+   tilt was UNCLAMPED, and on a mandate-steep berm a 30-45° decal plane
+   lifts its edge metres into the air across the carriageway. Tilt capped
+   at ~20° (grade 0.36) — flat-on-steep is invisibly wrong, leaning is a
+   blob. medterrace massif widened 8/2.0 rad -> 14/3.4 (the coast
+   reflection keeps every cone out of the bay).
+
 ## r386 — HIGH-POLY CARPET: THE FOREST THE CAMERA LIVES BESIDE GROWS FACETS
 
 Owner, twice, latest with a mockup: "Make the trees high poly." The r374
