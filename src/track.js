@@ -7252,18 +7252,41 @@ export class Track {
    *  its new seat, or whose seat is steeper than the 50° root rule, is
    *  culled (scaled away, collider off), never left half-buried. */
   _conformTrees() {
-    if (!this.trees?.length && !this.camTrees?.length) return;
+    if (!this.trees?.length) return;
     const m4 = new THREE.Matrix4(), v9 = new THREE.Vector3(),
       q9 = new THREE.Quaternion(), s9 = new THREE.Vector3();
     const touched = new Set();
     let seated = 0, culled = 0;
+    const cull9 = (tr) => {
+      for (const part of tr.parts) {
+        part.getMatrixAt(tr.id, m4);
+        m4.decompose(v9, q9, s9);
+        s9.setScalar(0.0001);
+        m4.compose(v9, q9, s9);
+        part.setMatrixAt(tr.id, m4);
+        touched.add(part);
+      }
+      tr.r = 0; tr.solid = false; tr.culled = true;
+      culled++;
+    };
+    // BURIAL-GATED, and ONLY burial. The first cut of this pass also
+    // "corrected" small seat differences in both directions — but half the
+    // builders seat at the MIN of several terrain samples on purpose (a
+    // slope tree sits slightly sunk, never floating), so the correction
+    // LIFTED whole hillside forests by the slope differential: the
+    // blocking gate caught cones floating 5-15 u on 18 worlds and whole
+    // verge rows standing in the road corridor. A tree that is not buried
+    // is not touched, ever.
     for (const tr of this.trees ?? []) {
       if (!tr.parts?.length || tr.id == null) continue;
       const g0 = this.terrainHeight(tr.x, tr.z);
-      // builders store base as ground minus a small builder constant
-      // (0-0.35); 0.2 is the family median and burial is metres, not cm
       const delta = g0 - 0.2 - tr.y;
+      if (delta < 1.2) continue;               // standing (or floating) — not ours
       const hApprox = 7 * (tr.s ?? 1), rCrown = Math.max(1.5, (tr.r ?? 2) * 1.6);
+      // a buried tree lifted metres must not surface as an overhang in the
+      // carriageway: its plant-time road clearance was checked against the
+      // OLD ground, and the corridor gate measures the drawn crown
+      if (this._distToTrack && this._distToTrack(tr.x, tr.z) < rCrown + 7) { cull9(tr); continue; }
       // crown clearance at the NEW seat (WR-7.6b)
       let clipped = false;
       for (const [dx, dz] of [[rCrown, 0], [-rCrown, 0], [0, rCrown], [0, -rCrown]]) {
@@ -7275,21 +7298,7 @@ export class Track {
       // every hillside grove that stood perfectly on its terrace flat
       const gx9 = (this.terrainHeight(tr.x + 1.5, tr.z) - this.terrainHeight(tr.x - 1.5, tr.z)) / 3;
       const gz9 = (this.terrainHeight(tr.x, tr.z + 1.5) - this.terrainHeight(tr.x, tr.z - 1.5)) / 3;
-      const steep = gx9 * gx9 + gz9 * gz9 > 1.44;
-      if (clipped || steep) {
-        for (const part of tr.parts) {
-          part.getMatrixAt(tr.id, m4);
-          m4.decompose(v9, q9, s9);
-          s9.setScalar(0.0001);
-          m4.compose(v9, q9, s9);
-          part.setMatrixAt(tr.id, m4);
-          touched.add(part);
-        }
-        tr.r = 0; tr.solid = false; tr.culled = true;
-        culled++;
-        continue;
-      }
-      if (Math.abs(delta) < 0.6) continue;
+      if (clipped || gx9 * gx9 + gz9 * gz9 > 1.44) { cull9(tr); continue; }
       for (const part of tr.parts) {
         part.getMatrixAt(tr.id, m4);
         m4.decompose(v9, q9, s9);
@@ -7299,23 +7308,6 @@ export class Track {
         touched.add(part);
       }
       tr.y += delta;
-      seated++;
-    }
-    // the carpet's registered verge ring (camera-side paint with refs)
-    for (const tr of this.camTrees ?? []) {
-      if (!tr.meshes || tr.idx == null) continue;
-      const g0 = this.terrainHeight(tr.x, tr.z);
-      const delta = g0 - 0.35 - tr.y;
-      if (Math.abs(delta) < 0.8) continue;
-      for (const mesh of tr.meshes) {
-        mesh.getMatrixAt(tr.idx, m4);
-        m4.decompose(v9, q9, s9);
-        v9.y += delta;
-        m4.compose(v9, q9, s9);
-        mesh.setMatrixAt(tr.idx, m4);
-        touched.add(mesh);
-      }
-      tr.y += delta; tr.top += delta;
       seated++;
     }
     for (const part of touched) part.instanceMatrix.needsUpdate = true;
