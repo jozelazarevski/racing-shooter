@@ -4273,6 +4273,39 @@ test-camstable joins the gate (WR-4.1 twitch harness — yaw 11°/s worst
 on DUST CANYON vs 29°/s through GLACIER's hairpins, exactly v/R, zero
 reversal churn; WR-4.2 frozen-time sky diff — zero crawl pixels).
 
+THE GREEN SHARDS WERE THE SKIRT ("Too many gourges around the game").
+The road-skirt apron of one switchback leg draped across the leg beside
+it and surfaced through that carriageway as flat green wedges — R11's
+"green shards over road", filmed again by the owner on live GLACIER COL.
+Measured: 80 skirt vertices up to 22 u ABOVE the deck around the hairpin
+stack. The apron now obeys the cliff caps' law — NOT ACROSS ANOTHER LEG
+OF THE LAP: any skirt vertex landing inside a different leg's
+carriageway is tucked below that deck, where "different leg" is decided
+by distance AND height (nearby alone exempted the opposite side of a
+climbing hairpin, 8-12 samples away but lower; the tolerance took two
+measured rounds: 80 -> 40 -> 14 -> 0 pokes, five worlds clean). The dark
+wedge at station 520 pre-exists the fix (A/B verified against a stash)
+and reads as the apex bank's cast shadow.
+
+THE CONTROL THAT BLINDED ITSELF. Naming the carpet 'carpet-foliage' for
+the corridor census silently removed the floats suite's positive-control
+victim — it lifts the densest UNNAMED scatter, the pick fell through to
+the grass-tuft planes (a class the seat scan cannot see), and the
+control went red on its own blindness in gate round 4. The control now
+accepts the carpet by name. Rule worth keeping: WHEN YOU NAME A MESH,
+GREP THE SUITES FOR WHO KEYS ON NAMELESSNESS.
+
+QUEUED BEHIND THE r392 DEPLOY (owner directives, prototyped in-page with
+approval screenshots, tools-scratch/dbg-treedesign.mjs): the FOREST
+ASSET SHEET — frilled drooping skirt-tier conifers (A loose / B tidy),
+multi-lobe faceted deciduous with CHAINED bent trunks (the first cut
+rotated segments about the origin and the owner called the broken
+trunks immediately), autumn A/B/C + summer in the sheet's palette
+(#236555 / #E77834 / #FF8C4D / gold, trunks warm brown). Lands in the
+_buildForest SPECIES table as r393; placement paths unchanged (the
+owner also flagged the preview row standing mid-road — that was the
+display lineup only, never a plant).
+
 Remaining from the R12 round, tracked for the next builds: grid freeze at
 t=0 (4th sighting — FIX-2 verify against the tip), occlusion fade must
 learn the NEW tree meshes (carpet tiers, olive domes), unlit/black new
