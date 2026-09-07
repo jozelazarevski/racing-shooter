@@ -40,7 +40,7 @@ await p.evaluate(async () => {
   };
   const coniferA = () => {
     const grp = new THREE.Group();
-    const tr = new THREE.CylinderGeometry(0.16, 0.34, 2.2, 7);
+    const tr = new THREE.CylinderGeometry(0.22, 0.46, 2.2, 7);
     tr.translate(0, 1.1, 0);
     grp.add(new THREE.Mesh(tr, mat(TRUNK)));
     const tiers = [[2.15, 1.7, 1.15], [1.85, 1.6, 2.15], [1.5, 1.5, 3.1],
@@ -57,7 +57,7 @@ await p.evaluate(async () => {
   };
   const coniferB = () => {
     const grp = new THREE.Group();
-    const tr = new THREE.CylinderGeometry(0.15, 0.3, 2.0, 7);
+    const tr = new THREE.CylinderGeometry(0.2, 0.4, 2.0, 7);
     tr.translate(0, 1.0, 0);
     grp.add(new THREE.Mesh(tr, mat(TRUNK)));
     const tiers = [[1.85, 1.9, 1.15], [1.5, 1.75, 2.3], [1.15, 1.6, 3.4],
@@ -76,26 +76,34 @@ await p.evaluate(async () => {
   const lobe = (r, d = 1) => new THREE.IcosahedronGeometry(r, d);
   const deciduous = (crownHex, seed) => {
     const grp = new THREE.Group();
-    const tm = mat(TRUNK);
-    // the bent trunk: two tilted segments and two limbs reaching into the crown
-    const t1 = new THREE.CylinderGeometry(0.24, 0.4, 2.0, 7);
-    t1.translate(0, 1.0, 0); t1.rotateZ(0.10 * seed);
-    const t2 = new THREE.CylinderGeometry(0.17, 0.24, 1.7, 6);
-    t2.translate(0, 0.85, 0); t2.rotateZ(-0.34); t2.translate(0.28 * seed, 1.85, 0);
-    const l1 = new THREE.CylinderGeometry(0.09, 0.15, 1.5, 5);
-    l1.translate(0, 0.75, 0); l1.rotateZ(0.85); l1.translate(-0.15, 2.6, 0.1);
-    const l2 = new THREE.CylinderGeometry(0.08, 0.13, 1.3, 5);
-    l2.translate(0, 0.65, 0); l2.rotateX(-0.7); l2.translate(0.3 * seed, 2.9, -0.1);
-    for (const geo of [t1, t2, l1, l2]) grp.add(new THREE.Mesh(geo, tm));
+    const tm = mat(0x6f5638);   // the sheet's drawn trunk: warm dark brown
+    // the bent trunk: segments CHAINED end to end (rotate about the base,
+    // then translate to the previous segment's top), limbs from the joints
+    const seg = (r0, r1, h, tilt, axis, at) => {
+      const geo = new THREE.CylinderGeometry(r1, r0, h, 7);
+      geo.translate(0, h / 2, 0);
+      if (axis === 'z') geo.rotateZ(tilt); else geo.rotateX(tilt);
+      geo.translate(at.x, at.y, at.z);
+      const top = axis === 'z'
+        ? new THREE.Vector3(at.x - Math.sin(tilt) * h, at.y + Math.cos(tilt) * h, at.z)
+        : new THREE.Vector3(at.x, at.y + Math.cos(tilt) * h, at.z + Math.sin(tilt) * h);
+      grp.add(new THREE.Mesh(geo, tm));
+      return top;
+    };
+    const base = new THREE.Vector3(0, 0, 0);
+    const j1 = seg(0.52, 0.34, 2.1, 0.12 * seed, 'z', base);        // stout lower bole
+    const j2 = seg(0.32, 0.20, 1.8, -0.30 * seed, 'z', j1);         // the bend
+    seg(0.16, 0.09, 1.6, 0.85 * seed, 'z', j1);                     // limb from the bend
+    seg(0.14, 0.08, 1.4, -0.7, 'x', j2);                            // limb into the crown
     // the crown: five faceted lobes clustered wider than tall
     const cm = mat(crownHex);
     const cmD = mat(crownHex); cmD.color.multiplyScalar(0.74);   // shaded lobes
-    const spots = [[0, 4.7, 0, 1.6, cm], [1.45, 4.1, 0.4, 1.2, cmD],
-      [-1.35, 4.25, -0.3, 1.15, cmD], [0.35, 5.85, -0.2, 1.1, cm],
-      [-0.5, 3.55, 1.15, 0.95, cmD], [0.9, 5.2, 0.75, 0.95, cm]];
+    const spots = [[0, 0.9, 0, 1.6, cm], [1.45, 0.3, 0.4, 1.2, cmD],
+      [-1.35, 0.45, -0.3, 1.15, cmD], [0.35, 2.05, -0.2, 1.1, cm],
+      [-0.5, -0.25, 1.15, 0.95, cmD], [0.9, 1.4, 0.75, 0.95, cm]];
     for (const [x, y, z, r, m] of spots) {
       const geo = lobe(r);
-      geo.translate(x * (seed > 0 ? 1 : -1), y, z);
+      geo.translate(j2.x + x * (seed > 0 ? 1 : -1), j2.y + y, j2.z + z);
       grp.add(new THREE.Mesh(geo, m));
     }
     return grp;
