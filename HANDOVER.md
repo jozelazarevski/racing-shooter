@@ -4171,6 +4171,26 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r389 — MASTER FIX-5: TRUNKS ARE THE COLLIDER, CROWNS ARE SCENERY
+
+Solid trees now collide on a 0.35 x scale trunk capsule instead of their
+crown radius — brushing foliage no longer bounces the car, which is the
+whole "cone colliders act as ramps" family. A trunk hit at >= 60 km/h
+deflects at −40% speed through the same angle-of-attack law instead of
+stopping dead; below that the parking nudge still parks. And the carpet
+grows trunks: the verge forest was pure paint with no records in
+t.trees, so cars drove clean through standing wood — the player now
+collides with carpet trunks through the same 24 u cell hash the camera's
+foliage guard reads (crowns stay drive-under, physics push + grind, no
+damage event). Probe: aimed at a LARCH GOLD verge trunk from 30 u at
+80 km/h, the car deflects off the wall and keeps 99 km/h.
+
+ALSO: test-shortcut's goto gets the 300 s timeout every newer suite has —
+FALKEN RIDGE (mandate-stretched furka) builds in ~35 s under a busy
+SwiftShader, which is a slow build, not a hang. Gates: boot, stagerules
+17/17, drift 6/6, shortcut, patch02; phase4's single red is the standing
+PINE F7 53% marginal (r388 ledger).
+
 ## r388 — MASTER SPEC LANDS: THE SLOPE LAW BINDS, FREEZE HAS ONE SEMANTIC
 
 RALLY_MASTER_SPEC.md (repo root) is now the normative document,

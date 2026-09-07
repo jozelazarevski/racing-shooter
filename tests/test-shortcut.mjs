@@ -32,7 +32,10 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 // FURKA RIDGE: a shelf road on a mountain, so "off the course and well above
 // the road" is easy to arrange and is exactly what the altitude gate punished.
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
-await p.goto(`${BASE}/?level=21&go=1&unlockall=1`, { waitUntil: 'load' });
+// r389: 300 s like every newer suite — a mandate-stretched furka world
+// takes >30 s to build under a busy SwiftShader, and that is a slow
+// build, not a hang (probed: FALKEN RIDGE loads in ~35 s)
+await p.goto(`${BASE}/?level=21&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
 const ready = await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
   undefined, { timeout: 180000 }).then(() => 1).catch(() => 0);
 if (!ready) { console.log('SKIP  world never built'); await browser.close(); process.exit(1); }
