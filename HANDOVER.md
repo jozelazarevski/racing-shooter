@@ -4171,6 +4171,54 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r384 — PATCH_02 v3 FIX-4: THE CAMERA ANSWERS FOR THE PLAYER, EVERYWHERE
+
+C-A (60% of R10's portrait frame untextured gray): raycasting the dead
+band's own pixels found the car's WINDSCREEN at 0.2 u — the eye sits at
+the glasshouse ceiling, and on any descent the OUTSIDE of the raked glass
+enters the frame below the aim as a featureless sky-mirror sheet
+(roughness 0.12, envMapIntensity 1.6: it reflects sky and nothing else).
+The seat now stands the glass down exactly like the roof cap and the
+cockpit — a driver's eyes are behind glass precisely so the glass is not
+seen — and restores it with the outside view. The glasshouse is a named
+part; no geometry changed. Result frame: the road runs clean to the dash,
+rendered cockpit ~0-5% of the portrait frame against the spec's <= 20%
+bar, so DRIVER stays in the cycle (the §6.3/§6.8 re-add bar it passed
+still holds — test-phase4's seat checks are untouched and green).
+
+C-B/C-D (car off frame 4-6 s; camera framing a rival through the cliff
+fall): two causes. The framing watchdog early-outed on a DEAD player, so
+through falls and wrecks the camera answered to nothing; and its bar was
+"past the screen edge for a full second". It now arms for the player
+alive or not (only the body-state writes stay alive-gated), fires at 0.85
+NDC held 0.3 s — and a REAL plunge gets its own camera: past -20 u/s the
+eye stops being a boom, pins over the car and rides down holding ~26 u
+above it. Measured on GLACIER COL's 286 u face (vertical speed -205 u/s):
+was 65% of fall frames seen with a worst miss of 18 NDC; now 100% seen,
+worst 0.09. COL DE VERNAY's 219 u face the same. Driven-lap framing:
+GLACIER COL / HARVEST RUN / LARCH GOLD, CHASE and TRAIL — 100% of frames
+inside the CENTRAL 60%, zero watchdog re-seats (the acceptance asks 95%
+merely visible).
+
+C-C (screen 70-100% tree geometry up to 12 s): the trunk sidestep read
+this.trees — gameplay trees — but the r375 forest carpet is pure paint
+with no registry, and its verge ring stands exactly where the boom swings
+on corners. The carpet's verge ring now registers placements
+(camTreesNear, 24 u cell hash, built on first use), an eye inside a
+canopy cone rises over it, and the sidestep covers every full-size
+species, not just pines.
+
+C-E (blown horizons): fog luminance ceiling 0.85 at both live fog sites
+(track ctor + theme swap), scaled not tinted, so each theme keeps its hue
+under the ACES 1.46 exposure. Measured post-clamp: 0.2% of pixels above
+0.9 luminance mid-drive (ceiling: 90%).
+
+KNOWN BASE REDS (not this build's): test-phase4 F7 surface bounds fail
+identically on the pristine r383 base — PINE VALLEY grass at 54% (bound
+55-75), GLACIER COL grass top 4 km/h — the mandate-slope x surface
+interaction FIX-6 (task #84) owns. Camera gates all green: boot, camera,
+hudreview, stagerules 17/17.
+
 ## r383 — PATCH_02 v3 FIX-3: THE START GATE ALWAYS STANDS, AND THE "ORPHANS" WERE THE VOID
 
 B-6 (floating start banner, R11 0:00): `_buildStartGate`'s scaffold towers
