@@ -24403,8 +24403,13 @@ export class Track {
       // saturated dome — all under the 55 % saturation ceiling (R02).
       switch (spec.tone) {
         case 'cypress':
+          // r392 (R12 2:47 — "NEW cypress assets render solid black"): the
+          // instance color MULTIPLIES the theme-green material, so the
+          // dark-column L of ~0.22 collapsed to ~0.05 luminance on screen.
+          // The grove is tuned under that multiply; the cypress floor rises
+          // so the PRODUCT reads as the darkest green, never black.
           color.setHSL(F.h + 0.03 + Math.random() * F.hVar, Math.min(0.55, F.s + 0.1),
-            Math.max(0.13, F.l - 0.14 + Math.random() * F.lVar * 0.6)); break;
+            Math.max(0.32, F.l - 0.08 + Math.random() * F.lVar * 0.6)); break;
         case 'oak':
           color.setHSL(F.h + 0.012 + Math.random() * F.hVar, Math.min(0.55, F.s + 0.08),
             Math.max(0.16, F.l - 0.06 + Math.random() * F.lVar)); break;
