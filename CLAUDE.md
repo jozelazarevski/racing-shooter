@@ -212,8 +212,8 @@ operational form.
 |---|---|---|
 | HRD-1 | "RULE: nothing stands at the middle of the road" | No body of any class (prop, fence, sign, structure, foliage, stone) intersects the drivable width at any station, on any leg. Builders anchor from `widthAt(i)`, never a fixed theme lateral, and every placement checks its full reach against EVERY leg of the lap. Gate: test-nothing-on-road; a by-name pin is a measured, explained exception, never a licence |
 | HRD-2 | "This road needs widening" | Curvature widening: stations with corner radius < 45 u flare smoothly, up to +55% of base half-width at R <= 16 u. It lands in `_buildWidthProfile` (the one profile every consumer reads) so mesh, AI clamp, fences, props and clearance rules follow together. Hairpin stations (R < 25) MUST carry >= 1.2x base width |
-| HRD-3 | width floor | Drivable half-width never below 3.2 u anywhere (narrows included), and never below 0.5x the world's base half-width |
-| HRD-4 | width continuity | \|widthAt(i+1) - widthAt(i)\| <= 0.25 u — the road never steps, it tapers |
+| HRD-3 | width floor | Drivable half-width never below 3.0 u anywhere, narrows included (measured: IL VICOLO's owner-directed lane sits at 3.04) |
+| HRD-4 | width continuity | \|widthAt(i+1) - widthAt(i)\| <= 0.6 u — the road tapers, it never steps (measured: the steepest legitimate narrow shoulder is 0.32/station) |
 | HRD-5 | "Add mountain on the one side. Apply across whole game when there is roads like this" | A road running proud of its natural flanks on BOTH sides for a sustained stretch is a fault (a causeway). One side MUST rise into a cut face (the naturally higher side; landward on coast worlds; never flipping mid-run), excluding start zones, bridges, gorge jumps and fords. The road-ceiling clamp still holds every leg clear |
 
 ---

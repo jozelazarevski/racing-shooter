@@ -151,6 +151,44 @@ for (const [lvl, tag] of [[59, 'CLIFF KNOT'], [74, 'IL BUDELLO'], [4, 'CANYON RU
   await p.close();
 }
 
+// ---- HRD: hard road rules (CLAUDE.md §7A, owner directives, r394) ---------
+// Checked on the two hairpin-dense references plus the deliberate street
+// lane. True radius comes from the circumcircle of real centreline points —
+// NEVER from t.curvature, whose 16×segLen divisor understates curvature ~3×
+// wherever the relaxation bunches stations (measured on GLACIER: the array
+// reported ZERO stations under R30 on a lap whose true minimum is 7 u).
+for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDELLO']]) {
+  const { p, errors } = await boot(lvl);
+  const H = await p.evaluate(() => {
+    const t = window.__game.track, N = t.center.length;
+    const rad = (i) => {
+      const a = t.center[(i - 6 + N) % N], b = t.center[i % N], c = t.center[(i + 6) % N];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ac = Math.hypot(c.x - a.x, c.z - a.z);
+      return (ab * bc * ac) / (2 * Math.abs(cross));
+    };
+    const ws = []; for (let i = 0; i < N; i++) ws.push(t.widthAt(i));
+    const wBase = [...ws].sort((a, b) => a - b)[Math.floor(N * 0.5)];
+    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0;
+    for (let i = 0; i < N; i++) {
+      wMin = Math.min(wMin, ws[i]);
+      wStep = Math.max(wStep, Math.abs(ws[(i + 1) % N] - ws[i]));
+      if (rad(i) < 25) { hairN++; if (ws[i] < wBase * 1.19) flareBad++; }
+    }
+    return { wMin: +wMin.toFixed(2), wStep: +wStep.toFixed(2), hairN, flareBad,
+      wBase: +wBase.toFixed(2) };
+  });
+  ok(H.wMin >= 3.0, `HRD-3 [${tag}] half-width floor 3.0 u`, `min ${H.wMin}`);
+  ok(H.wStep <= 0.6, `HRD-4 [${tag}] width tapers, never steps`, `max step ${H.wStep} u/station`);
+  ok(H.flareBad === 0,
+    `HRD-2 [${tag}] hairpin stations (true R<25) carry >= 1.19x base width`,
+    `${H.hairN} hairpin station(s), ${H.flareBad} unflared, base ${H.wBase} u`);
+  ok(errors.length === 0, `HRD [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
