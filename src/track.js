@@ -17055,9 +17055,32 @@ export class Track {
     // BAKED into the shared geometry (position-hash, so tier seams agree)
     // and costs nothing per instance. ~41 tris/tree here vs 12 before.
     // Roughen BEFORE translate — the hash reads positions.
+    // r393 (owner asset sheet): the verge tree wears the sheet's DROOPING
+    // FROND rims — same cones, same triangle count, the bottom ring dragged
+    // down and waved. Integer wave multipliers keep the ±π seam vertices
+    // agreeing (the r374 lesson).
+    const skirtC = (geo, h, droop, jag, rot) => {
+      const P = geo.attributes.position;
+      for (let i2 = 0; i2 < P.count; i2++) {
+        const py = P.getY(i2);
+        if (py > -h / 2 + 0.01) continue;
+        const a = Math.atan2(P.getZ(i2), P.getX(i2));
+        const w = Math.sin(a * 3 + rot * 7) * 0.5 + Math.sin(a * 5 + rot * 3) * 0.5;
+        const rr = 1 + w * jag;
+        P.setX(i2, P.getX(i2) * rr);
+        P.setZ(i2, P.getZ(i2) * rr);
+        P.setY(i2, py - droop * (0.55 + 0.45 * Math.abs(w)));
+      }
+      P.needsUpdate = true;
+      return geo;
+    };
     const twoCone = () => {
-      const lo = roughenC(new THREE.ConeGeometry(1.9, 3.4, 9, 2, true), 0.13); lo.translate(0, 1.7, 0);
-      const hi = roughenC(new THREE.ConeGeometry(1.2, 2.6, 8, 2, true), 0.13); hi.translate(0, 3.9, 0);
+      const lo = skirtC(roughenC(new THREE.ConeGeometry(1.9, 3.4, 9, 2, true), 0.13),
+        3.4, 0.5, 0.24, 0.4);
+      lo.translate(0, 1.9, 0);
+      const hi = skirtC(roughenC(new THREE.ConeGeometry(1.2, 2.6, 8, 2, true), 0.13),
+        2.6, 0.4, 0.2, 2.1);
+      hi.translate(0, 4.05, 0);
       const tip = roughenC(new THREE.ConeGeometry(0.62, 1.7, 6, 1, true), 0.10); tip.translate(0, 5.5, 0);
       return [lo, hi, tip];
     };
@@ -23217,17 +23240,50 @@ export class Track {
     const crownHP = (r, w = 10, hgt = 7, amp = 0.13) =>
       roughen(new THREE.SphereGeometry(r, w, hgt), amp);
     roughen(trunkGeo, 0.06);   // bark facets (y-only translate, so still safe)
-    // --- conifers ---
-    const lowA = coneHP(2.6, 4.2);
-    lowA.translate(0, 4.0, 0);
-    const topA = coneHP(1.8, 3.4);
-    topA.translate(0, 6.6, 0);
-    const lowB = coneHP(2.3, 3.4, 9);
-    lowB.translate(0.2, 3.6, -0.12);
-    const midB = coneHP(1.75, 2.9, 9);
-    midB.translate(-0.16, 5.6, 0.12);
-    const topB = coneHP(1.15, 2.6, 9);
-    topB.translate(0.05, 7.4, -0.05);
+    // r393 (owner asset sheet, "implement the trees exactly like the
+    // design" + "add complex designs"): a conifer TIER is a drooping
+    // frilled SKIRT, not a smooth cone — open cone, two height rings so
+    // the frond has a fold, rim dragged down and waved. Wave multipliers
+    // are INTEGERS so the duplicated seam vertices at ±π get the same
+    // wave (the r374 seam-tear lesson, one abstraction up).
+    const skirtHP = (R, h, y, seg, droop, jag, rot) => {
+      const geo = new THREE.ConeGeometry(R, h, seg, 2, true);
+      const P = geo.attributes.position;
+      for (let i = 0; i < P.count; i++) {
+        const py = P.getY(i);
+        const a = Math.atan2(P.getZ(i), P.getX(i));
+        const w = Math.sin(a * 3 + rot * 7) * 0.5 + Math.sin(a * 5 + rot * 3) * 0.5;
+        if (py < -h / 2 + 0.01) {                  // rim: the sagging frond edge
+          const rr = 1 + w * jag;
+          P.setX(i, P.getX(i) * rr);
+          P.setZ(i, P.getZ(i) * rr);
+          P.setY(i, py - droop * (0.55 + 0.45 * Math.abs(w)));
+        } else if (py > -h / 2 + 0.01 && py < h / 2 - 0.01) {
+          const rr = 1 + w * jag * 0.45;           // mid ring: body, not a face
+          P.setX(i, P.getX(i) * rr);
+          P.setZ(i, P.getZ(i) * rr);
+          P.setY(i, py - droop * 0.22 * Math.abs(w));
+        }
+      }
+      geo.rotateY(rot);
+      geo.translate(0, y + h / 2, 0);
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const skirtStack = (tiers, seg, droop, jag) =>
+      tiers.map(([R, h, y], k) =>
+        [skirtHP(R, h, y, seg, droop, jag, k * 1.7 + 0.4), k % 2 ? lowMat : topMat]);
+    // --- conifers: the sheet's Type A (loose, heavy droop) and Type B (tidy) ---
+    const conifA = skirtStack([[2.45, 1.95, 1.3], [2.1, 1.85, 2.45], [1.7, 1.7, 3.55],
+      [1.35, 1.6, 4.6], [1.0, 1.5, 5.55], [0.7, 1.4, 6.4]], 12, 0.5, 0.26);
+    const tipA = roughen(new THREE.ConeGeometry(0.34, 1.3, 7), 0.05);
+    tipA.translate(0, 7.95, 0);
+    conifA.push([tipA, topMat]);
+    const conifB = skirtStack([[2.1, 2.2, 1.3], [1.7, 2.0, 2.65], [1.3, 1.85, 3.9],
+      [0.95, 1.7, 5.05], [0.6, 1.6, 6.1]], 11, 0.3, 0.16);
+    const tipB = roughen(new THREE.ConeGeometry(0.27, 1.15, 7), 0.04);
+    tipB.translate(0, 7.55, 0);
+    conifB.push([tipB, topMat]);
     const larchTiers = [];
     for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
       const tg = coneHP(r, 1.5, 9);      // sparse gappy tiers
@@ -23263,17 +23319,55 @@ export class Track {
     // r372 (owner: "Pay attention to the details"): the reference's conifer
     // is a FIR — four spiky tiers stepping in, not two smooth cones. Same
     // trunk, its own tier stack.
-    const firT1 = coneHP(2.05, 2.3, 9); firT1.translate(0, 2.6, 0);
-    const firT2 = coneHP(1.6, 2.1, 9); firT2.translate(0, 4.1, 0);
-    const firT3 = coneHP(1.15, 1.9, 9); firT3.translate(0, 5.5, 0);
-    const firT4 = coneHP(0.65, 1.7, 8); firT4.translate(0, 6.9, 0);
-    const oakTrunk = roughen(new THREE.CylinderGeometry(0.42, 0.6, 2.7, 8), 0.05);
-    oakTrunk.translate(0, 1.35, 0);
-    const oakDome = crownHP(2.35, 11, 8);
-    oakDome.scale(1, 0.78, 1);
-    oakDome.translate(0, 4.0, 0);
-    const oakTop = crownHP(1.4, 9, 6);
-    oakTop.translate(0.35, 5.5, 0.2);
+    // fir keeps its four-tier step but in the sheet's skirt language,
+    // jaggier than Type A so the spiky r372 silhouette survives
+    const firTiers = skirtStack([[2.05, 1.9, 1.55], [1.6, 1.75, 2.9],
+      [1.2, 1.65, 4.15], [0.75, 1.55, 5.35]], 11, 0.42, 0.3);
+    const tipF = roughen(new THREE.ConeGeometry(0.3, 1.2, 7), 0.05);
+    tipF.translate(0, 6.85, 0);
+    firTiers.push([tipF, topMat]);
+    // r393 deciduous: the sheet's tree is a BENT BOLE that branches, under
+    // a cluster of faceted lobes. Segments CHAIN (each starts at the
+    // previous one's computed top — the r393-prep 'trunks are broken'
+    // lesson), limbs leave the joints, three root flares seat the foot.
+    const chainSeg = (list, r0, r1, h, tilt, axis, at) => {
+      const geo = new THREE.CylinderGeometry(r1, r0, h, 7);
+      geo.translate(0, h / 2, 0);
+      if (axis === 'z') geo.rotateZ(tilt); else geo.rotateX(tilt);
+      geo.translate(at.x, at.y, at.z);
+      roughen(geo, 0.04);
+      list.push([geo, trunkMat]);
+      return axis === 'z'
+        ? { x: at.x - Math.sin(tilt) * h, y: at.y + Math.cos(tilt) * h, z: at.z }
+        : { x: at.x, y: at.y + Math.cos(tilt) * h, z: at.z + Math.sin(tilt) * h };
+    };
+    const bentTree = (sig, crownR) => {
+      const wood = [];
+      const j1 = chainSeg(wood, 0.6, 0.4, 2.6, 0.12 * sig, 'z', { x: 0, y: 0, z: 0 });
+      const j2 = chainSeg(wood, 0.38, 0.24, 2.2, -0.3 * sig, 'z', j1);
+      chainSeg(wood, 0.19, 0.1, 2.0, 0.85 * sig, 'z', j1);   // limb from the bend
+      chainSeg(wood, 0.17, 0.09, 1.7, -0.7, 'x', j2);        // limb into the crown
+      for (let rf = 0; rf < 3; rf++) {
+        const fl = new THREE.ConeGeometry(0.26, 0.85, 5);
+        fl.translate(0, 0.38, 0); fl.rotateZ(0.5); fl.rotateY(rf * 2.1 + 0.4);
+        wood.push([fl, trunkMat]);
+      }
+      // nine noisy lobes in a cluster wider than tall, seated on the bend's
+      // head; the tint loop shades ti-order upward, giving the sheet's
+      // lit-top / shaded-flank read
+      const lobes = [];
+      const L = (dx, dy, dz, r) => {
+        const geo = crownHP(r * crownR, 9, 6, 0.12);
+        geo.translate(j2.x + dx * sig, j2.y + dy, j2.z + dz);
+        lobes.push([geo, lobes.length % 2 ? lowMat : topMat]);
+      };
+      L(0.15, 0.1, -1.4, 0.85); L(-0.6, -0.3, 1.4, 0.95); L(1.2, -0.45, -0.75, 0.7);
+      L(1.8, 0.35, 0.5, 1.2); L(-1.7, 0.55, -0.4, 1.15); L(1.1, 1.75, 0.9, 0.95);
+      L(0, 1.1, 0, 1.6); L(-1.1, 2.2, 0.55, 0.8); L(0.45, 2.55, -0.25, 1.1);
+      return { wood, lobes, nLobes: lobes.length };
+    };
+    const oakBuild = bentTree(1, 1.28);
+    const mapleBuild = bentTree(-1, 1.2);
     // --- rainforest ---
     // AMAZON RAPIDS was falling through to the default two-pine stand, so the
     // Amazon was planted with conifers. Three storeys instead, which is what
@@ -23308,13 +23402,12 @@ export class Track {
         kind: 'cecropia', rFac: 0.8, solidAt: 1.45, tint: 'canopy', tiers: 1 },
       treeFern: { parts: mkParts([fernTrunk, trunkMat], [[fernFrond, topMat]], null),
         kind: 'fern', rFac: 0.5, solidAt: null, tint: 'understorey', tiers: 1 },
-      fir: { parts: mkParts([trunkGeo, trunkMat],
-        [[firT1, lowMat], [firT2, lowMat], [firT3, lowMat], [firT4, topMat]], 8.0),
-        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 4 },
-      pineA: { parts: mkParts([trunkGeo, trunkMat], [[lowA, lowMat], [topA, topMat]], 7.35),
-        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 2 },
-      pineB: { parts: mkParts([trunkGeo, trunkMat], [[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
-        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 3 },
+      fir: { parts: mkParts([trunkGeo, trunkMat], firTiers, 7.6),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 5 },
+      pineA: { parts: mkParts([trunkGeo, trunkMat], conifA, 8.6),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 7 },
+      pineB: { parts: mkParts([trunkGeo, trunkMat], conifB, 8.2),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 6 },
       larch: { parts: mkParts([trunkGeo, trunkMat], larchTiers, 8.3),
         kind: 'larch', rFac: 0.85, solidAt: null, tint: 'larch', tiers: 4 },
       birch: { parts: mkParts([birchTrunk, birchBark], [[birchCrown, lowMat], [birchTop, topMat]], null),
@@ -23322,14 +23415,17 @@ export class Track {
       birchBare: { parts: mkParts([birchTrunk, birchBark],
         [bareBranch(-0.85, 0.7, 3.4, 0), bareBranch(0.8, -0.6, 2.9, 0.1), bareBranch(-0.3, 0.15, 4.3, -0.4)], null),
         kind: 'birch', rFac: 0.55, solidAt: null, tint: 'bare', tiers: 3 },
-      oak: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
-        kind: 'oak', rFac: 1.15, solidAt: 1.35, tint: 'oak', tiers: 2 },
-      // r365b (owner asset board): the RED tree. Same dome silhouette as the
-      // oak — a maple's is — but its tint case ignores the theme's amber band
-      // and commits to deep red, which is the one colour the board leads with
-      // and the one the amber band could never roll.
-      maple: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
-        kind: 'oak', rFac: 1.1, solidAt: 1.35, tint: 'maple', tiers: 2 },
+      // r393: the sheet's deciduous — bent branching bole under a nine-lobe
+      // cluster. Wood extras ride AFTER the lobes so the ti=1..tiers tint
+      // loop paints exactly the foliage and the wood keeps its material.
+      oak: { parts: mkParts(oakBuild.wood[0],
+        [...oakBuild.lobes, ...oakBuild.wood.slice(1)], null),
+        kind: 'oak', rFac: 1.15, solidAt: 1.35, tint: 'oak', tiers: oakBuild.nLobes },
+      // r365b: the RED tree — the maple keeps its committed-red tint case,
+      // now on the sheet's bent-bole geometry (mirrored bend from the oak)
+      maple: { parts: mkParts(mapleBuild.wood[0],
+        [...mapleBuild.lobes, ...mapleBuild.wood.slice(1)], null),
+        kind: 'oak', rFac: 1.1, solidAt: 1.35, tint: 'maple', tiers: mapleBuild.nLobes },
       // r366c: yellow-green poplar cluster, the deconstruction board's third tree
       poplar: { parts: mkParts([popTallTrunk, birchBark],
         [[popLow, lowMat], [popMid, lowMat], [popTop, topMat]], null),
@@ -23480,7 +23576,11 @@ export class Track {
         const room = dRoad2 - (this.widthAt(this.nearestIndex(_clearV)) + 1.7);
         const s = Math.min(sMax, (room - 0.05) / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
         const ty = this._seatY(p.x, p.z) - 0.25;
-        m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
+        // r393: a random yaw per instance — the sheet's bent boles share one
+        // geometry per species, and un-rotated they'd all lean the same way
+        // (cones never cared; a bend does)
+        m4.makeRotationY(Math.random() * Math.PI * 2);
+        m4.scale(new THREE.Vector3(s, s * (0.85 + Math.random() * 0.45), s));
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
         this.trees.push({
@@ -23502,14 +23602,15 @@ export class Track {
             // r370b: one notch darker — the first target rendered lime
             // against the reference's deep spruce (the top tier's material
             // is the LIGHTER amber, so the crown tips ride brighter anyway)
-            color.setHSL(0.32 + Math.random() * 0.035, 0.46 + Math.random() * 0.12,
-              0.13 + Math.random() * 0.07);
+            // r393: retargeted to the asset sheet's conifer green #236555
+            // (H .435 S .49 L .26), and the material division now runs on
+            // EVERY theme — the sheet's green is the law, not the band
+            color.setHSL(0.43 + Math.random() * 0.025, 0.45 + Math.random() * 0.1,
+              0.22 + Math.random() * 0.07);
             const M = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
-            if (M.r > M.g) {
-              color.setRGB(Math.min(1, color.r / Math.max(0.2, M.r)),
-                Math.min(1, color.g / Math.max(0.2, M.g)),
-                Math.min(1, color.b / Math.max(0.2, M.b)));
-            }
+            color.setRGB(Math.min(1, color.r / Math.max(0.2, M.r)),
+              Math.min(1, color.g / Math.max(0.2, M.g)),
+              Math.min(1, color.b / Math.max(0.2, M.b)));
             break;
           }
           case 'larch':   // paler, yellow-shifted soft needles
@@ -23522,14 +23623,22 @@ export class Track {
             color.setHSL(0.135 + Math.random() * 0.05, 0.58 + Math.random() * 0.1,
               0.44 + Math.random() * 0.1);
             break;
-          case 'maple': { // committed RED, hue wrapping through 0
-            const hh = (0.975 + Math.random() * 0.065) % 1;
-            color.setHSL(hh, 0.72 + Math.random() * 0.12, 0.34 + Math.random() * 0.1);
+          case 'maple': { // r393: the sheet's Autumn A — red-orange #E77834
+            // band (was committed pure red; the owner's sheet leads with A)
+            color.setHSL(0.055 + Math.random() * 0.03, 0.74 + Math.random() * 0.1,
+              0.42 + Math.random() * 0.08);
             break;
           }
-          case 'oak':     // deep saturated dome
-            color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
-              Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar)); break;
+          case 'oak':     // deep saturated cluster; on AUTUMN themes the
+            // sheet's Type B orange #FF8C4D band, else the theme's band
+            if (T.season === 'AUTUMN') {
+              color.setHSL(0.075 + Math.random() * 0.03, 0.8 + Math.random() * 0.1,
+                0.5 + Math.random() * 0.08);
+            } else {
+              color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
+                Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar));
+            }
+            break;
           case 'canopy':  // rainforest broadleaf — deep, wet, slightly blue-green
             color.setHSL(F.h + 0.012 + Math.random() * F.hVar, Math.min(1, F.s + 0.16),
               Math.max(0.15, F.l - 0.01 + Math.random() * F.lVar)); break;

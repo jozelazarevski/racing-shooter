@@ -2,8 +2,8 @@
  * of seconds, shoot CAM=3 (and driver view where asked). */
 import { chromium } from 'playwright-core';
 const SHOTS = [
-  { lvl: 66, idx: 245, cam: 3, out: '/tmp/shot-skirtfix-a.png' },
-  { lvl: 66, idx: 520, cam: 3, out: '/tmp/shot-skirtfix-b.png' },
+  { lvl: 68, idx: 200, cam: 3, out: '/tmp/shot-r393-larch.png' },
+  { lvl: 69, idx: 300, cam: 3, out: '/tmp/shot-r393-maple.png' },
 ];
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
