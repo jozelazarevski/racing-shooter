@@ -4210,6 +4210,32 @@ The rig now interpolates between samples like a moving car; P3 green.
 When FIX-7 lands (§5.5, after the rebuilds), ANY < 8 km/h crawl becomes
 stuck at 6 s and P3 gets rewritten to that law — noted in the test.
 
+CITADEL BAY WAS UNDER A PHANTOM HILL. "Citadel bay is broken": the whole
+race ran inside a 32 u mound of DRAWN ground — murky olive blur, car
+invisible, quay gone. The far terrain ring sinks itself where the near
+patch covers it, but that sink ring was HARDCODED at 820 u from the old
+fixed ±1000 patch; when the near patch became route-aware (PATCH_HALF =
+ext + 320) the sink never followed, so on any world whose lap reaches
+past ~900 u the far mesh stood at raw hill noise OVER the carved ground.
+CITADEL BAY's route reaches x≈1240. The sink now tracks the near patch's
+own rim (patchHalf − 180). One radius, whole class: every long-lap world
+had this waiting at its far corners.
+
+TREES STAND ON THE FINAL GROUND (WR-7.6d). "I still see trees buried":
+every vegetation builder seats its trees on the terrain AS IT WAS when it
+ran, and later passes (the r387 massif widening above all) moved the
+ground over them — measured 246 of 1159 grove trees buried on OLIVE PASS,
+one OLIVE COAST cypress under 83 u of mountain. `_conformTrees()` now
+runs at the END of construction: re-seats every tree (grove trees by
+instance matrix, the carpet's registered verge ring via new mesh refs)
+onto the final ground, and CULLS — scale zeroed, collider off — any tree
+whose crown would sit inside a hillside at its new seat or whose root
+footprint exceeds ~50° (sampled at 1.5 u, the footprint itself: a 3 u
+sample read terrace risers as ground slope and culled half of every
+hillside grove). After: zero buried trunks, zero crowns-in-hill, zero
+buried carpet cones on all five census worlds; the olive verges still
+read as groves — the culled population was the wall-pinned one.
+
 Remaining from the R12 round, tracked for the next builds: grid freeze at
 t=0 (4th sighting — FIX-2 verify against the tip), occlusion fade must
 learn the NEW tree meshes (carpet tiers, olive domes), unlit/black new

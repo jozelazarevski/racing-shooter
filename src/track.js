@@ -7239,6 +7239,87 @@ export class Track {
     this._buildNarrowDressing(); // ---- width-variation: pinch edge markers
     this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
+    this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
+  }
+
+  /** WR-7.6 (r392, owner: "I still see trees buried"): every builder seats
+   *  its trees on the terrain AS IT WAS when that builder ran, and later
+   *  passes (massif widening, coast carves, elevation work) move the ground
+   *  without telling anyone — measured 246 of 1159 grove trees buried on
+   *  OLIVE PASS, one OLIVE COAST cypress under 83 u of mountain. The spec's
+   *  answer is a per-seed sweep AFTER generation: re-seat every tree onto
+   *  the final ground; a tree whose crown would sit inside a hillside at
+   *  its new seat, or whose seat is steeper than the 50° root rule, is
+   *  culled (scaled away, collider off), never left half-buried. */
+  _conformTrees() {
+    if (!this.trees?.length && !this.camTrees?.length) return;
+    const m4 = new THREE.Matrix4(), v9 = new THREE.Vector3(),
+      q9 = new THREE.Quaternion(), s9 = new THREE.Vector3();
+    const touched = new Set();
+    let seated = 0, culled = 0;
+    for (const tr of this.trees ?? []) {
+      if (!tr.parts?.length || tr.id == null) continue;
+      const g0 = this.terrainHeight(tr.x, tr.z);
+      // builders store base as ground minus a small builder constant
+      // (0-0.35); 0.2 is the family median and burial is metres, not cm
+      const delta = g0 - 0.2 - tr.y;
+      const hApprox = 7 * (tr.s ?? 1), rCrown = Math.max(1.5, (tr.r ?? 2) * 1.6);
+      // crown clearance at the NEW seat (WR-7.6b)
+      let clipped = false;
+      for (const [dx, dz] of [[rCrown, 0], [-rCrown, 0], [0, rCrown], [0, -rCrown]]) {
+        if (this.terrainHeight(tr.x + dx, tr.z + dz) > g0 + hApprox * 0.6) { clipped = true; break; }
+      }
+      // root slope (WR-7.6a: the ROOT FOOTPRINT sits on <= ~50°), finite
+      // difference at 1.5 u — the footprint itself, not the neighbourhood:
+      // a 3 u sample read terrace RISERS as ground slope and culled half of
+      // every hillside grove that stood perfectly on its terrace flat
+      const gx9 = (this.terrainHeight(tr.x + 1.5, tr.z) - this.terrainHeight(tr.x - 1.5, tr.z)) / 3;
+      const gz9 = (this.terrainHeight(tr.x, tr.z + 1.5) - this.terrainHeight(tr.x, tr.z - 1.5)) / 3;
+      const steep = gx9 * gx9 + gz9 * gz9 > 1.44;
+      if (clipped || steep) {
+        for (const part of tr.parts) {
+          part.getMatrixAt(tr.id, m4);
+          m4.decompose(v9, q9, s9);
+          s9.setScalar(0.0001);
+          m4.compose(v9, q9, s9);
+          part.setMatrixAt(tr.id, m4);
+          touched.add(part);
+        }
+        tr.r = 0; tr.solid = false; tr.culled = true;
+        culled++;
+        continue;
+      }
+      if (Math.abs(delta) < 0.6) continue;
+      for (const part of tr.parts) {
+        part.getMatrixAt(tr.id, m4);
+        m4.decompose(v9, q9, s9);
+        v9.y += delta;
+        m4.compose(v9, q9, s9);
+        part.setMatrixAt(tr.id, m4);
+        touched.add(part);
+      }
+      tr.y += delta;
+      seated++;
+    }
+    // the carpet's registered verge ring (camera-side paint with refs)
+    for (const tr of this.camTrees ?? []) {
+      if (!tr.meshes || tr.idx == null) continue;
+      const g0 = this.terrainHeight(tr.x, tr.z);
+      const delta = g0 - 0.35 - tr.y;
+      if (Math.abs(delta) < 0.8) continue;
+      for (const mesh of tr.meshes) {
+        mesh.getMatrixAt(tr.idx, m4);
+        m4.decompose(v9, q9, s9);
+        v9.y += delta;
+        m4.compose(v9, q9, s9);
+        mesh.setMatrixAt(tr.idx, m4);
+        touched.add(mesh);
+      }
+      tr.y += delta; tr.top += delta;
+      seated++;
+    }
+    for (const part of touched) part.instanceMatrix.needsUpdate = true;
+    this._treesConformed = { seated, culled };
   }
 
   /** Dev sanity check: warn if the centerline passes too close to itself
@@ -16908,7 +16989,10 @@ export class Track {
         // in this.trees, so the camera's foliage guard could not see them.
         // Registered position + canopy radius + top height, camera-side only.
         if (reg) (this.camTrees ??= []).push({
-          x, z, r: 1.9 * sc, top: y - 0.35 + 6.3 * scl.y });
+          x, z, r: 1.9 * sc, top: y - 0.35 + 6.3 * scl.y,
+          // r392: seat + refs so the WR-7.6d conform pass can re-seat these
+          // instances after late terrain mutations (buried-tree sweep)
+          y: y - 0.35, meshes, idx: n });
         n++;
       }
       for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
@@ -21851,11 +21935,21 @@ export class Track {
       // carriageway on Pine Valley, Frost Peak and Redwood. That is the road
       // disappearing under the hillside, and the car driving along under it.
       //
-      // The near patch already switches to pure _hillNoise beyond 900 u (same
-      // square metric), so the two agree out there and the seam is invisible.
-      // Inside that, drop this mesh far enough that it can never show through.
+      // The near patch already switches to pure _hillNoise near its own rim
+      // (PATCH_HALF - 100, same square metric), so the two agree out there
+      // and the seam is invisible. Inside that, drop this mesh far enough
+      // that it can never show through.
+      //
+      // r392 ("Citadel bay is broken"): this ring was HARDCODED at 820 u
+      // from the old fixed ±1000 patch. The near patch became route-aware
+      // (PATCH_HALF = ext + 320) and this sink never followed, so on any
+      // world whose lap reaches past ~900 u the far mesh stood at raw hill
+      // noise OVER the carved near ground — on CITADEL BAY a 32 u phantom
+      // hill covered the quay, the grid and the car, and the whole race ran
+      // inside it. The sink now tracks the near patch's own rim.
+      const sinkTo9 = (this._patchHalf ?? 1000) - 180;
       const m = Math.max(Math.abs(x), Math.abs(z));
-      h -= 60 * (1 - smoothstep01((m - 820) / 80));
+      h -= 60 * (1 - smoothstep01((m - sinkTo9) / 80));
       pos.setY(i, h - 0.52);                    // 0.4 under the near patch
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
