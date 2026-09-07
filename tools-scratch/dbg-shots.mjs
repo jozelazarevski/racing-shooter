@@ -1,7 +1,7 @@
 /* Screenshot tour: place the player mid-lap on given worlds, drive a couple
  * of seconds, shoot CAM=3 (and driver view where asked). */
 import { chromium } from 'playwright-core';
-const SHOTS = [ { lvl: 29, idx: 8, cam: 3, out: '/tmp/shot-olive-start.png' } ];
+const SHOTS = [ { lvl: 29, idx: 40, cam: 3, out: '/tmp/shot-board.png' } ];
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const s of SHOTS) {

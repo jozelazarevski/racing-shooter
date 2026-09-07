@@ -25469,6 +25469,33 @@ export class Track {
           this._clearsRoad(p.x + t2.x * d, p.z + t2.z * d, 0.3, 0.3));
         if (!clearEnds) continue;
       }
+      // MASTER FIX-3 residue (r390, owner's OLIVE COAST frame — "floating
+      // RALLY CO. sign"): the posts were a fixed 3.4 u pair and the group
+      // seated at its CENTRE sample, so on a mandate slope the downhill
+      // post foot dangled in air. Each post now stretches from the board
+      // to ITS OWN ground; the group drops to the lower foot so nothing
+      // hangs. Runs after the yaw is final because the feet move with it.
+      {
+        const cy9 = Math.cos(g.rotation.y), sy9 = Math.sin(g.rotation.y);
+        let minG = g.position.y;
+        const feet = [];
+        for (const s of [-1, 1]) {
+          const fx = g.position.x + cy9 * 4 * s;
+          const fz = g.position.z - sy9 * 4 * s;
+          const gy9 = this._seatY ? this._seatY(fx, fz) : this.terrainHeight(fx, fz);
+          feet.push(gy9);
+          if (gy9 < minG) minG = gy9;
+        }
+        g.position.y = minG;
+        for (let s9 = 0; s9 < 2; s9++) {
+          const pl = g.children[1 + s9];
+          const topLocal = 3.4;                       // behind the board face
+          const footLocal = feet[s9] - minG;
+          const len = Math.max(1.2, topLocal - footLocal);
+          pl.scale.y = len / 3.4;
+          pl.position.y = footLocal + len / 2;
+        }
+      }
       this.group.add(g);
       this.banners.push({
         x: p.x, z: p.z, y: g.position.y, r: 1.3, dead: false,
