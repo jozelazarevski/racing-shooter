@@ -4171,6 +4171,72 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r391 — GLACIER COL REBUILT: THE COMPOSED PASS (MASTER §2+§4)
+
+The first stage rebuild of MASTER §5.4. GLACIER COL's route was PANORAMA's
+shape — measured 0.6 corners/km against the §4 law of >= 7/km — so the route
+is no longer traced from a control polygon at all: `composeRoute(segs)` is a
+turtle that walks a corner GRAMMAR (straight lengths and {radius, arc,
+direction} triples), emits arcs at <= 20°/point AND <= 7 u/point so a 3.2 u
+hairpin survives Catmull smoothing, closes heading with an auto sweeper and
+closes position by shearing the WHOLE loop (a tail-only blend invented a
+fake 2 km straight). `CIRCUITS.glaciercol` is authored in that grammar:
+valley sprint, a three-hairpin climb stack, ramp, ridge, a second stack, the
+col, and a flowing descent home.
+
+Measured against the §4 table: lap 5102 m (ask 4.5-5.5 km), 7.3 corners/km
+(>= 7), 5 hairpins with the tightest at 19-25 m (>= 2 at R12-20, stacked),
+17 medium (>= 6), 12 sweepers (>= 4), max straight 96 m (<= 300), same-
+direction run <= 2 (<= 3), elevation range 275 m. Bot lap 194 s. Climb-law
+acceptance: zero speed-gain violations. F7 grass bound: 70%, in-band.
+
+Three engine-side laws made the geometry honest:
+
+1. MANDATE COMPRESSION replaces the r385 stretch. Per the CLAUDE.md master-
+   spec conflict note, a lap climbing AND descending H at grade g needs
+   length >= 2H/g, so the elevation mandate is now compressed to the grade-
+   lawful range: stretch only to §4's 4.5 km floor, then
+   `mandLawful = min(mandate, lapLen * 0.12/2 * (1-a))`.
+
+2. KINK RELAX AT 20°. MAX_TURN 13° was silently flooring EVERY corner at
+   ~R28 — a legal 18 m hairpin at 5.7 m stations is 18° per station. Tighter
+   hairpins existed in no world because the relax pass unfolded them.
+
+3. WR-2.1 IS A FILTER, NOT A HOPE. On mandate worlds the elevation profile
+   is slope-limited directly: 13% per station on legs, 6% through anything
+   tighter than R40, excess split pairwise, 6000-pass budget. THE LIMIT IS
+   PRICED PER STATION RUN: through a hairpin the resampled points bunch to
+   0.6 u, and a limit priced at the 5.7 u nominal spacing legalised 0.34 m
+   of rise over a 0.6 m step — a 57% wall the filter blessed (measured max
+   0.716 before, 0.207 after). Census after: grade p50 10.3%, zero stations
+   over 30%; the residual 29% spike is the stone-bridge hump, a feature.
+
+THE HARNESS HAD THREE LIES OF ITS OWN. phase4's F7 runway search (a) ran
+one fixed shoulder (lat 14) — on the rebuilt pass that line threads a verge
+grove, and since FIX-5 made carpet trunks colliders the read was tree
+threshing at 31%, not the surface law; (b) when taught to avoid trees at
+radius 4 it fled to a treeless 36% mountainside and read 20%; (c) when
+taught to search both verges it found the grid apron, where the widened
+road means lat 9 is CARRIAGEWAY, and read grass at 100% of road speed. The
+search now walks both verges at several offsets, prices trunks at their
+real collision radius (1.8 u), and only starts where the off-road
+classifier (|lat| > widthAt + 1) actually holds. PINE VALLEY's 53% stands
+as the documented thrust-equilibrium marginal (r388 ledger).
+
+NEXT IN §5.4: WR-8 altitude bands on GLACIER COL (it MUST reach full-snow
+band 3 — furka theme has no band logic yet), then the OLIVE COAST rebuild
+(owner: "surrounded by hills and pretty olive gardens" — contour grove rows
++ low walls), HARVEST RUN, CITADEL BAY (citadel visible, WR-6.5).
+
+## r390 — BANNER FEET AND THE 50° TREE LAW (ships inside r391)
+
+Not separately deployed; the tag went straight r389 -> r391. Two repairs:
+sponsor-banner posts now seat PER FOOT (each post stretched to its own
+ground contact — the fixed-length pair floated one end of every banner on
+cross-slopes), and the WR-7.6 carpet guard rejects tree spots where the
+4 u finite-difference gradient exceeds tan 50° — no more pines growing
+sideways out of cliff faces.
+
 ## r389 — MASTER FIX-5: TRUNKS ARE THE COLLIDER, CROWNS ARE SCENERY
 
 Solid trees now collide on a 0.35 x scale trunk capsule instead of their
