@@ -16742,6 +16742,14 @@ export class Track {
         const s = this._nearestSample(x, z);
         if (s.d < this.widthAt(s.i) + margin) continue;
         if (this._underwater && this._underwater(x, z)) continue;
+        // MASTER WR-7.6 (r390): no trees on slopes past 50° — the owner's
+        // OLIVE COAST frame shows micro-trees pinned sideways to cut faces.
+        // 4 u finite difference, the tree's own footprint scale.
+        {
+          const gx9 = (this.terrainHeight(x + 4, z) - this.terrainHeight(x - 4, z)) / 8;
+          const gz9 = (this.terrainHeight(x, z + 4) - this.terrainHeight(x, z - 4)) / 8;
+          if (gx9 * gx9 + gz9 * gz9 > 1.44) continue;   // tan(50°)² ≈ 1.42
+        }
         const sc = scMin + Math.random() * scRange;
         const fr = 1.9 * sc;
         // r378b: seat on the ground that is DRAWN, not the analytic field —
