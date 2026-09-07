@@ -69,9 +69,13 @@ export class Route {
     // street,street,street and begins the same) — §7.1's pacing rule says
     // <= 3 consecutive street, so a seam that would run past 3 turns its
     // first repeated gate into a trail gate.
-    if (ROUTE_SCALE >= 2) {
+    // r385: a mandate-stretched world's lap is ROUTE_SCALE * _gradeStretch
+    // times the authored length (the climb budget bought it more road), so
+    // the layout repeats by the TRUE factor or gate spacing breaks §7.7.
+    const rep = Math.max(1, Math.round(ROUTE_SCALE * (track._gradeStretch ?? 1)));
+    if (rep >= 2) {
       const doubled = [];
-      for (let r2 = 0; r2 < ROUTE_SCALE; r2++) {
+      for (let r2 = 0; r2 < rep; r2++) {
         for (let i = 0; i < kinds.length; i++) doubled.push(kinds[i]);
       }
       kinds = doubled;

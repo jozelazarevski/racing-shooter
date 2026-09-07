@@ -65,12 +65,42 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
   const r = await p.evaluate(() => {
     const g = window.__game, t = g.track, c = g.player;
     g.state = 'race'; g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+    // F7's bounds bind on FLAT surface (v2.3 §3.5): index 220 was flat on
+    // every world until the r385 mandate stretch made the passes real —
+    // GLACIER COL's grade there is now ~0.21 on the road and the straight
+    // grass line crosses 0.8-grade hillside ridges, so a fixed station
+    // measures the mountain, not the surface law. Search the lap for the
+    // flattest runway per surface instead.
+    const N = t.center.length;
+    const runwayGrade = (i, lat) => {
+      const h = t.headingAt(i), pt = t.pointAt(i, lat);
+      const dx = Math.sin(h), dz = Math.cos(h);
+      let worst = 0, prev = lat === 0 ? t.groundHeightAt(i, 0) : t.terrainHeight(pt.x, pt.z);
+      for (let s = 1; s <= 5; s++) {
+        const y2 = lat === 0
+          ? t.groundHeightAt((i + Math.round(s * 20 / Math.max(1, Math.hypot(
+              t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z)))) % N, 0)
+          : t.terrainHeight(pt.x + dx * s * 20, pt.z + dz * s * 20);
+        worst = Math.max(worst, Math.abs(y2 - prev) / 20);
+        prev = y2;
+      }
+      return worst;
+    };
+    const flattest = (lat) => {
+      let best = 220, bg = Infinity;
+      for (let i = 0; i < N; i += 10) {
+        const w = runwayGrade(i, lat);
+        if (w < bg) { bg = w; best = i; }
+      }
+      return best;
+    };
     const run = (lat) => {
+      const idx = flattest(lat);
       const place = (sp) => {
         c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
-        const pt = t.pointAt(220, lat);
-        c.pos.set(pt.x, (lat === 0 ? t.groundHeightAt(220, 0) : t.terrainHeight(pt.x, pt.z)) + 0.3, pt.z);
-        c.y = c.pos.y; c.trackIndex = 220; c.lateral = lat; c.heading = t.headingAt(220);
+        const pt = t.pointAt(idx, lat);
+        c.pos.set(pt.x, (lat === 0 ? t.groundHeightAt(idx, 0) : t.terrainHeight(pt.x, pt.z)) + 0.3, pt.z);
+        c.y = c.pos.y; c.trackIndex = idx; c.lateral = lat; c.heading = t.headingAt(idx);
         c.slip = 0; c._wetT = 0; c._fordNow = 0; c._wetMax = 0;
         c.vel.set(Math.sin(c.heading), 0, Math.cos(c.heading)).multiplyScalar(sp);
       };

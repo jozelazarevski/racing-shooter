@@ -6677,8 +6677,49 @@ export class Track {
     if (level && level.routeReverse) rawPts = [...rawPts].reverse();
     // r340: the 2x lap — one multiplication, at the single point every
     // world's shape passes through
-    const pts = ROUTE_SCALE === 1 ? rawPts
-      : rawPts.map(([x, z]) => [x * ROUTE_SCALE, z * ROUTE_SCALE]);
+    // r385 (PATCH_02 v3 FIX-6/PART III): THE MANDATE BUYS LENGTH, NOT WALLS.
+    // A lap that must climb AND descend its ELEV_MANDATE cannot average
+    // under 2*mand/length of grade, whatever shape the profile takes —
+    // measured on GLACIER COL at r384: median road grade 50%, 81% of the
+    // lap over 30%, the F7 grass car parked at 4 km/h by the honest climb
+    // law, and R11's whole climb complaint. The a=0.16 ramp cap in the
+    // mandate block was geometrically unsatisfiable at 5.5 km. So a
+    // mandated world stretches its CONTROL POLYGON until the climb fits a
+    // 0.20 grade budget (11°: a steep alpine pass, half the wall it was).
+    // The 500 m terrace worlds already fit (VINEYARD measures p50 14%) and
+    // stretch by 1. Everything downstream is footprint-parametric since
+    // r380; the gate layout reads _gradeStretch to keep §7 spacing.
+    this._gradeStretch = 1;
+    {
+      const mand9 = T.minElevRange ?? ELEV_MANDATE[level && level.theme];
+      if (mand9) {
+        let per = 0;
+        for (let i = 0; i < rawPts.length; i++) {
+          const a9 = rawPts[i], b9 = rawPts[(i + 1) % rawPts.length];
+          per += Math.hypot(b9[0] - a9[0], b9[1] - a9[1]);
+        }
+        per *= ROUTE_SCALE;
+        // 2*mand/len is only the AVERAGE ramp grade: the mandate block's
+        // C1 triangle spends a=0.16 of each ramp easing in and out, so its
+        // constant mid-section runs 1/(1-a) steeper than the average
+        // (measured: budget 0.20 delivered p50 0.23 without this factor)
+        const needLen = 2 * mand9 / 0.20 / (1 - 0.16);
+        this._gradeStretch = Math.min(2.6, Math.max(1, needLen / Math.max(1, per)));
+      }
+    }
+    // the coast line was scaled by ROUTE_SCALE where T was assembled; a
+    // stretched world's sea moves with its lap (T is already a local clone
+    // there, so this compounds nothing across rebuilds)
+    if (this._gradeStretch > 1 && T.coast) {
+      const g9 = this._gradeStretch;
+      T = { ...T, coast: { ...T.coast,
+        a: [T.coast.a[0] * g9, T.coast.a[1] * g9],
+        b: [T.coast.b[0] * g9, T.coast.b[1] * g9] } };
+      this.T = T;              // this.T was published above the route block
+    }
+    const RS9 = ROUTE_SCALE * this._gradeStretch;
+    const pts = RS9 === 1 ? rawPts
+      : rawPts.map(([x, z]) => [x * RS9, z * RS9]);
     this.curve = new THREE.CatmullRomCurve3(
       pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'
