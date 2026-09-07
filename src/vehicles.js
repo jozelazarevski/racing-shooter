@@ -2397,7 +2397,10 @@ export class Car {
     // in-flight boosts too, so rivals really do crawl at half pace
     if (this !== this.game.player && this.game.enemySlowUntil
         && this.game.raceTime < this.game.enemySlowUntil) {
-      vf = Math.min(vf, this.maxSpeed * 0.5);
+      // MASTER FIX-2 (r388): freeze has ONE semantic — a 40 km/h cap. The
+      // half-pace version scaled with the victim's machine (a fast car
+      // "froze" at 100+), which is R10's "freeze ineffective at 194 km/h".
+      vf = Math.min(vf, 11.1);
       this.boostTimer = 0;
     }
     // speed strips (log flume / maglev): the lane carries the car — fast,
@@ -4278,8 +4281,17 @@ export class Car {
     // as "delivered frozen" — there is no freeze status in this game at
     // all, only this VFX. The grid lock and spawn shield keep protecting;
     // the bubble waits for the green light.
+    // MASTER FIX-2 (r388): freeze has ONE semantic and it is always VISIBLE.
+    // A slowed rival shows the bubble in ice-white; invulnerability keeps its
+    // cyan. Same mesh, tinted per cause — no new elements, world-space only.
+    const frozen9 = this !== this.game.player && this.alive
+      && this.game.enemySlowUntil && this.game.raceTime < this.game.enemySlowUntil;
     this._setShield(this.alive && this.invuln > 0
-      && this.game.state === 'race' ? this.invuln : 0);
+      && this.game.state === 'race' ? this.invuln : (frozen9 ? 1 : 0));
+    if (this._shield && this._shield.visible) {
+      this._shield.material.color.setHex(
+        this.invuln > 0 && this.game.state === 'race' ? 0x62e8ff : 0xeaf6ff);
+    }
   }
 
   /** Show/hide the invulnerability bubble. `t` is the remaining invuln time,
@@ -5445,7 +5457,7 @@ export class EnemyCar extends Car {
     if (aiSurf === 'snow') vAllowed *= 0.86;
     else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
-    if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
+    if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, 11.1); // MASTER FIX-2: the 40 km/h freeze cap
     // §5.3 mistake, 'late' kind: brake 10% late — carry a tenth too much
     // speed in, then pay it back at the exit. The recovery factors are the
     // stopwatch price of a mistake (r313 tuning: at ×0.90 a backmarker's

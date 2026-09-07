@@ -7156,8 +7156,11 @@ class Game {
           this.hud.feed('SHIELD — 4s INVULNERABLE', 'good');
           this.buzz([20, 30, 20]);
         } else if (p.type === 'slowfield') {
-          // world special: every rival crawls at half pace for 6 seconds
-          this.enemySlowUntil = this.raceTime + 6;
+          // world special. MASTER FIX-2 (r388): freeze is a 40 km/h cap for
+          // <= 3 s with an always-visible ice bubble — one semantic, priced
+          // the same on every machine (was half pace for 6 s, which a fast
+          // car barely felt and R10 filmed as "ineffective at 194 km/h").
+          this.enemySlowUntil = this.raceTime + 3;
           const jungle = this.level?.theme === 'jungle';
           this.hud.centerMsg(jungle ? 'JUNGLE FURY!' : 'FREEZE STRIKE!');
           this.hud.feed(jungle ? 'MUD SLOW ×2.0 — RIVALS BOGGED' : 'ICE SLOW ×2.0 — RIVALS FROZEN', 'good');
