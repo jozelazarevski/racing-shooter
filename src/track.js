@@ -26809,7 +26809,13 @@ export class Track {
         if (Math.random() > 0.5) continue;
         const off = f.w * (1.05 + Math.random() * 0.5);
         const x = f.x + f.nx * off * sl, z = f.z + f.nz * off * sl;
-        const y = this.terrainHeight(x, z);
+        // r394: seated on the DRAWN ground, not terrainHeight — at a bank the
+        // bed carve bends the field faster than any analytic seat can agree
+        // with the 10 u lattice, and on ALPENRING one reed measured 15.18 u
+        // over the drawn floor (the r394 re-resample moved the river's ford
+        // threading, which is what re-rolled the spot). _drawnGroundY IS the
+        // mesh's own arithmetic, so the seat cannot disagree with it.
+        const y = this._drawnGroundY?.(x, z) ?? this.terrainHeight(x, z);
         const h = 0.9 + Math.random() * 1.5;
         put(reeds, x, y - 0.1, z, Math.random() * 3.14, 0.5 + Math.random() * 0.3, h, 0.5);
       }
@@ -26817,7 +26823,8 @@ export class Track {
         const off = f.w * (Math.random() - 0.5) * 1.2;
         const x = f.x + f.nx * off, z = f.z + f.nz * off;
         const sc = 0.5 + Math.random() * 0.7;
-        put(rocks, x, this.terrainHeight(x, z) + sc * 0.3, z, Math.random() * 3.14, sc, sc * 0.8, sc);
+        const yb = this._drawnGroundY?.(x, z) ?? this.terrainHeight(x, z);
+        put(rocks, x, yb + sc * 0.3, z, Math.random() * 3.14, sc, sc * 0.8, sc);
       }
     }
     if (reeds.count) { reeds.instanceMatrix.needsUpdate = true; this.group.add(reeds); }
