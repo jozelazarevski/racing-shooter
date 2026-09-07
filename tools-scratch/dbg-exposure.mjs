@@ -8,7 +8,7 @@ for (const w of WORLDS) {
   await p.goto('http://localhost:8901/?level=' + w + '&go=1&unlockall=1', { waitUntil: 'load' });
   await p.waitForFunction(() => window.__game?.track?.center && window.__game.player);
   await p.evaluate(() => { window.__game.camMode = 3; });
-  await p.waitForTimeout(2500);
+  await p.waitForTimeout(2500); for (let w=0;w<3;w++){ await p.evaluate(()=>{const g=window.__game; g.input.analog.throttle=1;}); await p.waitForTimeout(1500);} 
   const buf = await p.screenshot();
   // decode PNG via canvas in the page (no deps in node): reload buffer there
   const b64 = buf.toString('base64');
