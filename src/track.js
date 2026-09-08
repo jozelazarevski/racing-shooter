@@ -7174,6 +7174,8 @@ export class Track {
 
     // ---- width-variation: per-sample drivable half-width (pinch sections) ----
     this._buildWidthProfile();
+    // ---- W-CURVE-01.7 (r400): superelevation on gradient sharp curves ----
+    this._buildBanking();
 
     // Natural jumps. Must happen HERE — before any mesh is built — so the road
     // ribbon, its skirts, the ruts, the terrain blend and every prop placement
@@ -7466,6 +7468,76 @@ export class Track {
    *  hangs off, a pinched stretch of road). */
   _nearNarrow(i, pad = 0) {
     return (this._narrowSecs ?? []).some((s) => this._circDist(i, s.mid) < s.half + pad);
+  }
+
+  /** W-CURVE-01.7 (r400): SUPERELEVATION. A sharp curve on a gradient banks
+   *  2-8 degrees inward — the inside edge drops, the outside rises, pivoting
+   *  on the centreline so gates, pickups and the profile's own y stand
+   *  unmoved. `_bank9[i]` stores the signed cross-slope dy/dlateral
+   *  (positive lateral = +nrm side); null when no station banks.
+   *
+   *  Sharpness comes from the circumcircle over ~30u of arc (the HRD
+   *  metric); the INSIDE is the circumcenter's side of the centreline —
+   *  computed from the actual circumcenter, never a chord-vs-normal sign
+   *  test (that read the wrong side at switchback stacks, r397 ledger).
+   *  Grade is |dy| over ±6 stations; below 2% no bank (the spec banks
+   *  "sharp curves on a gradient", and a flat-ground bank would move the
+   *  FT1 reference corners). Eased over 10 stations so the road twists in
+   *  and out; capped so the edge drop never exceeds what the deepened
+   *  corridor tuck in `_blendHeight` hides. */
+  _buildBanking() {
+    const N9 = this.center.length;
+    this._bank9 = null;
+    const KB = Math.max(3, Math.round(30 / this.segLen));
+    const raw = new Float32Array(N9);
+    let any = false;
+    for (let i = 0; i < N9; i++) {
+      const a = this.center[(i - KB + N9) % N9], b = this.center[i], c = this.center[(i + KB) % N9];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) continue;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz),
+        ac = Math.hypot(c.x - a.x, c.z - a.z);
+      const R = (ab * bc * ac) / (2 * Math.abs(cross));
+      if (R > 30) continue;
+      const grade = Math.abs(c.y - a.y) / Math.max(1, 2 * KB * this.segLen);
+      if (grade < 0.02) continue;
+      // circumcenter of (a,b,c) in the plane — the inside of the bend
+      const d2 = 2 * (a.x * (b.z - c.z) + b.x * (c.z - a.z) + c.x * (a.z - b.z));
+      if (Math.abs(d2) < 1e-6) continue;
+      const aa = a.x * a.x + a.z * a.z, bb = b.x * b.x + b.z * b.z, cc = c.x * c.x + c.z * c.z;
+      const ux = (aa * (b.z - c.z) + bb * (c.z - a.z) + cc * (a.z - b.z)) / d2;
+      const uz = (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d2;
+      const sIn = Math.sign((ux - b.x) * this.nrm[i].x + (uz - b.z) * this.nrm[i].z) || 1;
+      // 2 deg at R30 up to 8 deg at R<=16; inside edge LOWER
+      const theta = (2 + 6 * THREE.MathUtils.smoothstep(30 - R, 0, 14)) * Math.PI / 180;
+      raw[i] = -Math.tan(theta) * sIn;
+      any = true;
+    }
+    if (!any) return;
+    // footprint ease over +-10 stations (same shape as the flare's)
+    const bank = new Float32Array(N9);
+    for (let i = 0; i < N9; i++) {
+      if (raw[i] === 0) continue;
+      for (let k = -10; k <= 10; k++) {
+        const j = (i + k + N9) % N9;
+        const v = raw[i] * (1 - Math.abs(k) / 10);
+        if (Math.abs(v) > Math.abs(bank[j])) bank[j] = v;
+      }
+    }
+    this._bank9 = bank;
+  }
+
+  /** Cross-slope offset of the road surface at a signed lateral, 0 where the
+   *  world has no banking. Clamped at the drivable edge — beyond it the
+   *  terrain owns the ground. */
+  bankOffset(i, lateral) {
+    const b9 = this._bank9;
+    if (!b9) return 0;
+    const v = b9[((i % b9.length) + b9.length) % b9.length];
+    if (!v) return 0;
+    const w = this.widthAt(i) + 1.5;
+    return v * THREE.MathUtils.clamp(lateral, -w, w);
   }
 
   /** Deterministic per-theme narrow sections: 2–4 stretches of 34–68 samples
@@ -7863,7 +7935,9 @@ export class Track {
   /** Road surface height at a track position: the elevation profile, plus the
    *  ramp wedge height when inside a ramp zone (ramps ADD to road height). */
   groundHeightAt(i, lateral) {
-    let roadY = this.center[i].y;
+    // W-CURVE-01.7 (r400): the surface is banked through gradient sharp
+    // curves — the lateral matters before any ramp does
+    let roadY = this.center[i].y + this.bankOffset(i, lateral);
     // gorge jumps: the roadway is OUT across the chasm - the surface here IS
     // the collapsed span, and the crest detector launches anything fast
     if (this._jumpCut) roadY -= this._jumpCut[i];
@@ -8550,14 +8624,25 @@ export class Track {
     const tuck = 0.55 * (1 - THREE.MathUtils.smoothstep(d, 12, 30))
       + (this.T.retainingWalls || this.T.shelfRoad
         ? 0.75 * THREE.MathUtils.smoothstep(d, 2, 11) : 0);
+    // W-CURVE-01.7 (r400): where the road banks, the corridor datum follows
+    // the BANKED surface at this point's own signed lateral — the verge
+    // conforms to the twisted ribbon (7.11's no-step law holds on both
+    // edges), and the tuck stays a constant clearance under it, so the
+    // inside edge can drop without the terrain poking through.
+    let datum = roadY;
+    if (this._bank9 && bi !== undefined) {
+      const cs9 = this.center[bi], nv9 = this.nrm[bi];
+      datum += this.bankOffset(bi,
+        (x - cs9.x) * nv9.x + (z - cs9.z) * nv9.z);
+    }
     let h;
-    if (d <= near) h = roadY - tuck;
+    if (d <= near) h = datum - tuck;
     else {
       const n = this._hillNoise(x, z);
       if (d >= far) h = n;
       else {
         const f = THREE.MathUtils.smoothstep(d, near, far);
-        h = (roadY - tuck) * (1 - f) + n * f;
+        h = (datum - tuck) * (1 - f) + n * f;
       }
     }
     // THE VALLEY WALLS, added outside the corridor blend so the road never
@@ -10495,8 +10580,10 @@ export class Track {
       // be seen and could not be read. The roadway is OUT there; it has to
       // LOOK out.
       const y = c.y - this._deckDip(j) - (this._jumpCut ? this._jumpCut[j] : 0);
-      verts[o] = c.x + n.x * w; verts[o + 1] = y; verts[o + 2] = c.z + n.z * w;
-      verts[o + 3] = c.x - n.x * w; verts[o + 4] = y; verts[o + 5] = c.z - n.z * w;
+      // W-CURVE-01.7 (r400): the ribbon twists with the bank — each edge
+      // takes its own cross-slope offset, pivoting on the centreline
+      verts[o] = c.x + n.x * w; verts[o + 1] = y + this.bankOffset(j, w); verts[o + 2] = c.z + n.z * w;
+      verts[o + 3] = c.x - n.x * w; verts[o + 4] = y + this.bankOffset(j, -w); verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;
       uvs[i * 4] = 0; uvs[i * 4 + 1] = v;
       uvs[i * 4 + 2] = 1; uvs[i * 4 + 3] = v;
