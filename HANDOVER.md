@@ -4171,6 +4171,60 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r398 — THE WHITEOUT, THE GUN, AND THE SHAKING EYE (three owner reports, one session)
+
+THE WHITEOUT (owner phone frame, AVALANCHE ALLEY start: no road, no car,
+"1" over a white field). Root: the far-terrain ring's r392 sink was a
+FIXED -60, calibrated on CITADEL BAY's 32 u phantom — mountain hill
+noise outgrows it, and the sunk far mesh still stood 70.2 u ABOVE the
+road across 100 AVALANCHE stations including the whole grid. The race
+started inside a white hill; what the frame showed was the 40 u-facet
+far mesh, fog-washed, which also explains the "blur". Diagnosis was a
+five-stage visual bisect (hide contact-shadows / carpet / near terrain /
+1042 unnamed meshes / the two giant ones) after three mesh censuses
+missed it — InstancedMesh positions live in instance matrices, and the
+far mesh is a plain unnamed Mesh. Fix: inside the near patch's rim the
+far mesh now BLENDS TO -80 (under every carve in the game) instead of
+subtracting a constant; no noise amplitude can ever poke it through.
+78-world census: the bug was live on 8 worlds (worst OLIVE PASS +45.5
+over 174 stations, CAPE OLIVETO +54.5/137, AVALANCHE +70.2/100, OLIVE
+CROSSING +21.3/58, CITADEL BAY, BRACKEN MOOR, COSTA BRAVA, GRANITE
+NARROWS); the fix formula reads <= -66 on all 78.
+
+THE GUN (owner: "Firing the machine gun is broken"). Verified working
+end-to-end: the t-fire button is on top of its own hit area, a held
+touch dispatch fires 10 rounds/s with heat, ammo and tracers, zero page
+errors (the 220 "bullets" are a fixed ring pool, not a leak). The
+break the owner saw was the whiteout: on AVALANCHE the tracers and
+muzzle flashes rendered UNDER the phantom far mesh. Same root, same fix.
+
+THE SHAKING EYE (owner: "Car is still shaking"). The car is still: its
+grounded |dy| holds p95 0.083 u/frame on GLACIER (jolt tracer: zero
+events > 0.3 on three worlds). The CAMERA ran p95 0.383 u/frame with
+single-frame jumps of 3.57 u. Spike forensics (station + context flags
+per event) put every big jump at the TUNNEL: on the approach the ridge
+over the bore is a real wall between boom and car, so the sightline
+lift climbed the eye 30 u over the mountain, and the crown clamp then
+cut it down 41.7 u in ONE frame at the portal. Fix chain, each step
+measured: (1) a BORE APPROACH GLIDE — within 80 stations of a portal
+the eye obeys a ceiling that descends to the crown AT THE CLAMP'S OWN
+ENGAGE LINE (portal minus its 6-station pad, referencing that station's
+road height), so the bore clamp engages with nothing left to snap;
+(2) the sightline lift's delta rate-capped at 10 u/s (the (gh-sy)/(1-f)
+amplifier demanded 20-40 u in half a second beside every cutting face;
+a smoothed-residual version measured INERT because persistent camPos
+re-accumulates — only a hard per-frame cap slows it, and the release
+side is the mode lerp so nothing sawtooths); (3) window 80 not 40, so
+the ceiling stops binding before its edge instead of releasing 35 u at
+full lerp rate exactly there. After: max single-frame move 1.70 u
+(plus one bounded -3.4 at the portal and one +4.3 at bore exit), p95
+0.285, camstable 4/4. Three DEAD ENDS are recorded in the code: an
+absolute end-of-chain rate limiter (sawtooth pinned at its own up
+rate), a car-relative one (coupled the eye to the car's bob), and
+cliffWalls attribution (the clamp never runs on GLACIER — its theme
+does not set the flag).
+
+
 ## EVERGREEN AUDIT (post-r397 — closed with NO code change; larch exempt by owner)
 
 Owner rule, verbatim: "Rule: pine trees are never not green. They are
