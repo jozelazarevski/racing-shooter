@@ -4171,6 +4171,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r401 — T-01 PILOT: CURVATURE INJECTED INTO THE STRAIGHT WORLDS
+
+The master spec's T-01 (>= 12 distinct curves per stage, no straight
+over 400 u) was measured across the roster in the r397 census: ~70 of
+78 worlds exceed the straight cap and six have ZERO curves under R120 —
+GLACIER'S GRIND is one 5783 u straight ring.
+
+`_applyT01Weave` (opt-in `t01: true` while the pilot proves the look):
+runs of near-straight road (arc-window circumcircle R > 300) longer
+than 250 u take a lateral S-weave — wavelength 300 u, base amplitude
+34 u, minimum sweeper radius ~67 u (above every template corner
+floor) — eased 30 stations at run edges, amplitude clamped to
+other-leg clearance minus 26 u so a weave can never crowd a crossing
+carriageway. It runs BEFORE the kink pass and the uniform re-resample,
+so those tidy its output and every downstream builder — gates, pickups,
+ice walls, flanks, ribbon, banking — follows the moved centreline by
+construction.
+
+PILOTS, measured: GLACIER'S GRIND 0 curves / 5783 u straight ->
+40 curves / 32 u max straight; GRANITE NARROWS 0 curves / 1757 u ->
+25 curves / 76 u. Both T-01-lawful outright. Nothing-on-road clean on
+both; a full bot lap of the reshaped GRIND runs glass-smooth (car dy
+p95 0.028, camera 0.062, zero spikes) and the frame shows the road
+weaving between the sculpted ice walls, which followed the new line
+unasked. ROLLOUT: the remaining zero-curve worlds next (LOG FLUME,
+AEGEAN/CITADEL shared shape, COTE D AZUR), then the straight-cap
+violators family by family, each batch behind the full gate.
+
+
 ## r400 — SUPERELEVATION (W-CURVE-01.7: sharp curves on a gradient bank 2-8 deg inward)
 
 The road surface gains its first cross-slope law. `_buildBanking`:
