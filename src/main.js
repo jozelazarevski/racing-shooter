@@ -11777,7 +11777,7 @@ class Game {
     } else if (tk?.terrainHeight) {
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;
-      let lift = 0;
+      let lift = 0, liftHard = 0;
       const STEPS = 7;
       // A sample close to the car divides by a small (1 - f), so a modest
       // intrusion there becomes an enormous lift — measured at 57 to 105 u on
@@ -11820,6 +11820,7 @@ class Game {
         const sx = cp.x + dx * f, sz = cp.z + dz * f;
         if (tk.tunnelAt && tk.tunnelAt(probe.set(sx, 0, sz), p.trackIndex, 10)) continue;
         let gh = tk.terrainHeight(sx, sz) + 1.1;
+        const ghT9 = gh;                     // terrain alone, before solids
         for (const sld of this._camSolids) {
           const dxs = sx - sld.x, dzs = sz - sld.z;
           if (dxs * dxs + dzs * dzs < sld.r * sld.r) {
@@ -11829,7 +11830,8 @@ class Game {
           }
         }
         const sy = cp.y + dy * f;
-        if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
+        if (ghT9 > sy) lift = Math.max(lift, (ghT9 - sy) / (1 - f));
+        if (gh > sy) liftHard = Math.max(liftHard, (gh - sy) / (1 - f));
       }
       // r398 (owner: "Car is still shaking"): the lift's DELTA is rate-capped
       // at 10 u/s. Spike forensics traced the mountain-world camera pump to
@@ -11842,7 +11844,18 @@ class Game {
       // accumulates at nearly the instant rate. Only a hard per-frame delta
       // cap actually slows the climb; there is no sawtooth because the
       // release side is the slow mode lerp, not a clamp.)
-      if (lift > 0) cp.y += Math.min(lift, 18, (this._camDt ?? dt) * 10);
+      // ...TERRAIN occlusion eases; a BUILDING on the sightline lifts
+      // INSTANTLY. The first cut of the cap eased both, and the r381b S5
+      // rule (the boom never sits inside a structure, checked by snapshot)
+      // went red at 5.6 u inside IL VICOLO's biggest block — a structure is
+      // a hard occluder with a hard rule, and only the ridge-climb rate was
+      // ever the problem.
+      {
+        const soft9 = Math.min(lift, 18, (this._camDt ?? dt) * 10);
+        const hard9 = liftHard > lift + 1e-6 ? Math.min(liftHard, 18) : 0;
+        const add9 = Math.max(soft9, hard9);
+        if (add9 > 0) cp.y += add9;
+      }
       // ...and never underground wherever it ended up (PATCH_02 v1.2 fix 13
       // names this clearance; 2.2 is this engine's measured-good value)
       const gCam = tk.terrainHeight(cp.x, cp.z)
@@ -11879,7 +11892,8 @@ class Game {
       // the overhead anchor rides the rim, so the allowance carries it —
       // without this the cap clipped the camera right back into the slot
       // (measured: target 54.8, capped to 27.3, wall interiors again).
-      const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift + (lift > 0 ? 4 : 0.5));
+      const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift
+        + (lift > 0 || liftHard > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
         // r381b (stagerules S5, IL VICOLO): the pull-in asked only the
