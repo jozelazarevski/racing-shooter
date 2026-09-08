@@ -4171,6 +4171,35 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r400 — SUPERELEVATION (W-CURVE-01.7: sharp curves on a gradient bank 2-8 deg inward)
+
+The road surface gains its first cross-slope law. `_buildBanking`:
+stations that are circumcircle-sharp (R <= 30 over ~30 u of arc, the
+HRD metric) AND on a >= 2% grade bank 2 deg (at R30) to 8 deg (at
+R <= 16) toward the INSIDE — the actual circumcenter's side, never a
+chord-vs-normal sign test (the r397 ledger's trap) — eased over +-10
+stations, pivoting on the centreline so gates, pickups and the
+elevation profile stand unmoved.
+
+ONE LAW, EVERY CONSUMER: `bankOffset(i, lateral)` is the single
+cross-slope source. `groundHeightAt` rides it, so wheels at their own
+lateral and the gL/gR roll samples follow for free; the ribbon's two
+edge vertices twist with it; and `_blendHeight`'s corridor datum
+follows the banked surface at each point's OWN signed lateral, so both
+verges conform (7.11's no-step law holds on the risen and the dropped
+edge alike) and the constant tuck keeps clear air under the dipped
+inside edge — the vanishing-road failure mode this file documents
+cannot re-open.
+
+Census: GLACIER COL banks 229 stations across its 6 switchback ladders
+(max 8 deg, edge drop 1.83 u); CLIFF KNOT, SERPENTINA, SERPENT PASS
+and PINE VALLEY bank zero — their bends fail the sharp+grade pair,
+which is the spec's own scope. Regression: GLACIER camera p95 0.289 /
+max 1.69 (identical to pre-banking), drift 6/6 (FT floor), camstable
+4/4, no page errors. Remaining W-CURVE debts: arc-following road UVs,
+apex solidity validator.
+
+
 ## r399 — THE FOREST IS A MASS (owner: "Car should not drive between the trees")
 
 Rule recorded as CLAUDE.md 7.15. The trunks were never the hole: a
