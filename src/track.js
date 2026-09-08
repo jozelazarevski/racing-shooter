@@ -13306,7 +13306,7 @@ export class Track {
 
   _buildGuardFence() {
     const S = this.T.guardFence;
-    const LAT = S.lateral, MAX = S.max || 190;
+    const LAT = S.lateral, MAX = S.max || 240;   // r397: hairpin outer arcs add bays
     const geo = mergeBoxes([
       { w: 0.24, h: 1.5, d: 0.24, x: -2.5, y: 0.75, z: 0 },
       { w: 0.24, h: 1.5, d: 0.24, x: 2.5, y: 0.75, z: 0 },
@@ -13327,7 +13327,17 @@ export class Track {
     for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
       if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
-      if (this.curvature[i] > 0.045) continue;                 // gap through hairpins
+      // W-CURVE-01.4 (r397): a sharp curve whose outer edge faces a drop
+      // keeps a CONTINUOUS barrier along the outer arc — the old blanket
+      // "gap through hairpins" skip left exactly the drop the rule guards
+      // open at exactly the corner where cars leave the road. Through sharp
+      // stations bays continue on the OUTER side of the bend only; an
+      // inner-side drop at an apex stays open (that verge is the
+      // fold-protected zone, and W-CURVE allows one opening per curve).
+      const sharp9 = this.curvature[i] > 0.045;
+      const inner9 = sharp9 ? Math.sign(
+        (this.center[(i + 6) % N].x - this.center[i].x) * this.nrm[i].x
+        + (this.center[(i + 6) % N].z - this.center[i].z) * this.nrm[i].z) || 1 : 0;
       // r393 (owner RULE: "nothing stands at the middle of the road"): the
       // theme's fixed lateral predates the width laws — on the rebuilt
       // GLACIER COL, 33 of 54 bays anchored INSIDE the 9 u carriageway and
@@ -13342,6 +13352,7 @@ export class Track {
         if (d > drop) { drop = d; side = sd; }
       }
       if (!side || drop < 1.4) continue;
+      if (sharp9 && side === inner9) continue;   // outer arc only through a sharp curve
       const p = this.pointAt(i, lat9 * side);
       // ...and never stands inside ANY leg of the lap: a bay whose beam end
       // reaches a carriageway — its own station's or a fold's — is skipped
