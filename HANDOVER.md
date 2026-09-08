@@ -4171,6 +4171,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r396 — THE TERRAIN READS FINISHED (owner: "This is really unfinished visual. Scann across the game and fix")
+
+The owner's cliff frame diagnosed to three compounding causes in the
+terrain colour bake, all fixed here (rendering only, one system):
+
+- THE HEIGHT RAMP DOES NOT STOP AT FIVE METRES. The base low->high lerp
+  saturates at h = 5 (written when relief was ±27 u); on mandate-era
+  worlds the whole massif above the first two metres was ONE colour.
+  _paintAltitude continues the tone toward the theme's own rock, keyed
+  to each world's roof (route max y + headroom, floored at 60 so flat
+  worlds provably never engage — WR-8's per-stage bands), and
+  snow-capable themes (rockSnowCap/snowPatches/glacier) whiten the top
+  quarter toward peakColor. Both bakes share it, so near and far
+  terrain agree.
+- STEEP GROUND IS THE THEME'S SCREE, NOT DARKER GRASS. _slopeRock's
+  wall tone was terrainHigh x 0.60 — the same green, murkier. It is now
+  the theme scree at up to 0.78 mix, and near-vertical verts carry
+  HORIZONTAL STRATA (an elevation-hashed value band), so a tall face
+  breaks into ledges like the owner's reference rock.
+- THE MOSAIC WORKS ON WALLS. The facet shader's hash keys on the plan
+  (XZ) uv, which collapses to one cell on a vertical face — the wall
+  was a single smear. A world-Y varying folds an elevation band into
+  the cell key on steep facets.
+
+Measured: boot 7/7, PORTO GRANDE p95 3.8 ms (the varying costs
+nothing), dusk readability green — and GLACIER's F7 grass-top read
+came back IN BAND at 69% (the r395 flank hands the harness honest flat
+runways), leaving only PINE VALLEY's documented thrust-equilibrium
+waiver. The flaky screenshot rig (chromium dying mid-evaluate on this
+box) is noted; the paint is uniformly theme-derived and the gate's
+rendered checks stand in for it.
+
 ## r395 — THE MOUNTAIN SIDE (HRD-5/6)
 
 Owner, with a reference frame: "Replicate this design. Add more rules,

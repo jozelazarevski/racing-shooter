@@ -20785,11 +20785,46 @@ export class Track {
    *  a cutting shows earth. Slope comes from grid-neighbour differencing on
    *  the already-computed heights - no extra height samples, build-time only.
    */
+  /** r396: the altitude continuation both terrain bakes share. Roof is this
+   *  world's own (route max y with headroom, floored at 60 so flat worlds
+   *  never engage); tone walks from wherever the base ramp left off toward
+   *  the theme's rock, and snow-capable themes (rockSnowCap / snowPatches /
+   *  glacier / a light peakColor world) whiten the top quarter. */
+  _paintAltitude(tmp, h) {
+    if (this._altRoof === undefined) {
+      let m = 0;
+      for (const c of this.center) if (c.y > m) m = c.y;
+      this._altRoof = Math.max(60, m * 1.1);
+      this._altTone = new THREE.Color(
+        this.T.terrainScree !== undefined ? this.T.terrainScree : this.T.terrainDirt)
+        .lerp(new THREE.Color(this.T.terrainHigh), 0.35).multiplyScalar(0.96);
+      this._altSnowy = !!(this.T.rockSnowCap || this.T.snowPatches || this.T.glacier);
+      this._altSnow = new THREE.Color(this.T.peakColor ?? 0xf2f5f8);
+    }
+    if (h <= 6 || this._altRoof <= 20) return;
+    const t2 = THREE.MathUtils.clamp((h - 6) / (this._altRoof - 6), 0, 1);
+    tmp.lerp(this._altTone, Math.pow(t2, 1.3) * 0.8);
+    if (this._altSnowy && h > this._altRoof * 0.72) {
+      const t3 = THREE.MathUtils.clamp(
+        (h - this._altRoof * 0.72) / (this._altRoof * 0.24), 0, 1);
+      tmp.lerp(this._altSnow, t3 * 0.9);
+    }
+  }
+
   _slopeRock(pos, colors, cHigh) {
     const W = Math.round(Math.sqrt(pos.count));
     if (W * W !== pos.count) return;
     const cell = Math.abs(pos.getX(1) - pos.getX(0)) || 1;
-    const rock = cHigh.clone().multiplyScalar(0.60);
+    // r396 (owner: "This is really unfinished visual. Scann across the game
+    // and fix"): the wall tone is the THEME'S SCREE, not terrainHigh x 0.60
+    // — that was the same green, darker, which is why a carved cliff filled
+    // the screen as one dark-green smear. The mix also goes deeper (0.78 at
+    // vertical vs 0.52), and steep verts get HORIZONTAL STRATA: a value band
+    // hashed on elevation, so a tall face breaks into ledges the way the
+    // owner's reference rock does. Build-time colours only.
+    const rock = new THREE.Color(
+      this.T.terrainScree !== undefined ? this.T.terrainScree : this.T.terrainDirt)
+      .multiplyScalar(0.92);
     const tmp = new THREE.Color();
     for (let iz = 0; iz < W; iz++) {
       for (let ix = 0; ix < W; ix++) {
@@ -20798,10 +20833,14 @@ export class Track {
         const yx = pos.getY(iz * W + (ix + 1 < W ? ix + 1 : ix - 1));
         const yz = pos.getY((iz + 1 < W ? iz + 1 : iz - 1) * W + ix);
         const slope = Math.max(Math.abs(yx - y0), Math.abs(yz - y0)) / cell;
-        const k = THREE.MathUtils.smoothstep(slope, 0.45, 1.15) * 0.52;
+        const k = THREE.MathUtils.smoothstep(slope, 0.45, 1.15) * 0.78;
         if (k < 0.02) continue;
         tmp.setRGB(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]);
         tmp.lerp(rock, k);
+        if (slope > 0.7) {
+          const band = Math.sin(Math.floor(y0 / 3.5) * 37.719) * 43758.5453;
+          tmp.multiplyScalar(0.86 + (band - Math.floor(band)) * 0.26);
+        }
         colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
       }
     }
@@ -22218,6 +22257,17 @@ export class Track {
       // of 9/255 in the low sections, so there was no way to see where to
       // drive. Form, not a hole.
       tmp.multiplyScalar(0.93 + 0.07 * t);
+      // r396: THE HEIGHT RAMP DOES NOT STOP AT FIVE METRES. The base lerp
+      // above saturates at h = 5, written when relief was ±27 u — on a
+      // mandate-era world climbing 300 u the entire massif above the first
+      // two metres came out ONE flat colour (the owner's "really unfinished
+      // visual"). Above the old ceiling the tone continues toward a rock
+      // tone derived from the theme's own scree, keyed to THIS WORLD'S roof
+      // (WR-8: altitude bands are relative to each stage's own max), and
+      // snow-capable themes whiten the top quarter toward their peak
+      // colour. Flat worlds never reach the ramp and are provably
+      // unchanged.
+      this._paintAltitude(tmp, h);
       // the hero gorge is cut through red-rock strata: banded ochre/rust walls
       // fading back to the snowfield at the rim
       if (this._gorge || this._jumpGorges?.length) {
@@ -22317,6 +22367,7 @@ export class Track {
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
       tmp.multiplyScalar(0.93 + 0.07 * t);      // matches the near patch
+      this._paintAltitude(tmp, h);              // r396: and so does the ramp
       // facet life: a per-vertex tone wobble (deterministic, rebuild-stable)
       // so gentle ground that saturates the height ramp still breaks into a
       // soft patchwork instead of one flat sheet
@@ -22371,25 +22422,38 @@ export class Track {
       sh.uniforms.uScree = { value: scree };
       sh.uniforms.uScreeRange = { value: new THREE.Vector2(range[0], range[1]) };
       sh.uniforms.uScreeMax = { value: T.screeMax !== undefined ? T.screeMax : 0.45 };
+      // r396: a world-Y varying so the mosaic works on WALLS. The hash keys
+      // on the map uv, which is the plan (XZ) projection — on a near-vertical
+      // face every triangle's footprint collapses into one cell and the whole
+      // wall came out a single smear (the owner's cliff frame). Steep facets
+      // now fold an elevation band into the cell key, so a wall breaks into
+      // the same hand-placed mosaic the flat ground has.
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+          varying float vWY9;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vWY9 = (modelMatrix * vec4(transformed, 1.0)).y;`);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
           uniform float uFacetCell, uFacetAmp, uScreeMax;
           uniform vec3 uScree;
-          uniform vec2 uScreeRange;`)
+          uniform vec2 uScreeRange;
+          varying float vWY9;`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
           {
+            vec3 wN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+            float slope = 1.0 - clamp(abs(wN.y), 0.0, 1.0);
             // sine-free hash: the classic fract(sin(dot(..))*43758) DEGENERATES
             // here — the cell index runs to ~420, and sin() of an argument that
             // large is near-constant on SwiftShader and on plenty of mobile
             // GPUs, so the whole field came out one flat tone. This one is
             // exact in float and costs less.
-            vec2 fcell = floor(vMapUv * uFacetCell);
+            vec2 fcell = floor(vMapUv * uFacetCell)
+              + floor(vWY9 / 5.0) * step(0.5, slope);
             vec3 fp = fract(vec3(fcell.xyx) * 0.1031);
             fp += dot(fp, fp.yzx + 33.33);
             float fh = fract((fp.x + fp.y) * fp.z);
             diffuseColor.rgb *= 1.0 + (fh - 0.5) * uFacetAmp;
-            vec3 wN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
-            float slope = 1.0 - clamp(abs(wN.y), 0.0, 1.0);
             diffuseColor.rgb = mix(diffuseColor.rgb, uScree,
               uScreeMax * smoothstep(uScreeRange.x, uScreeRange.y, slope));
           }`);
