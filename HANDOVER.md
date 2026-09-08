@@ -4171,6 +4171,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r402 — T-01 BATCH 2: THE LAST ZERO-CURVE WORLDS, COAST-GUARDED
+
+The remaining four zero-curve worlds take the weave: LOG FLUME FURY
+0 -> 35 curves (170 u max straight), AEGEAN BLUE 0 -> 18 (188),
+COTE D AZUR 0 -> 26 (123), CITADEL BAY 0 -> 26 (188). All four
+T-01-lawful outright; nothing-on-road clean on the flume and the coast
+reference; the AZUR frame shows the cobbled lane curving through town
+with the buildings re-seated around the new line unasked.
+
+NEW IN THE WEAVE — THE COAST GUARD: on a coast world an unguarded
+S-weave pushes the road over the water, and the corridor blend then
+carries it as a causeway over the sea, the exact ridge-run HRD-6
+outlaws. Per straight run the seaward side is the one where the coast
+depression digs deeper 40 u out from the run's middle; offsets toward
+it keep 30% of their amplitude, so the S still bends but leans
+landward.
+
+Six of the census's six zero-curve worlds are now lawful. Next: the
+straight-cap violators (~64 worlds over 400 u), family by family,
+starting with the shared-shape route families where one fix covers
+several worlds.
+
+
 ## r401 — T-01 PILOT: CURVATURE INJECTED INTO THE STRAIGHT WORLDS
 
 The master spec's T-01 (>= 12 distinct curves per stage, no straight
