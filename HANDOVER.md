@@ -4171,6 +4171,141 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r403 — THE SEA AND THE BRIDGE (and the climbs, built and held)
+
+Three photographs and three sentences, in the order they arrived.
+
+**"I don't see any sea in olive coast. That is amiss."** The sea was
+drawn — 4696 u of it — and 0 of 55 coastal stations had a sightline to
+it: worst ground 117.7 u above the line from the driver's eye to the
+water. Three faults, each measured. The r387 approach cap eased over
+260 u, so it still allowed ~71 u halfway in. Seaward of the coast line
+the beach smoothstep carried only 7% of the way to the floor at sd=11,
+so 95 u of noise stood IN THE WATER 80 u off the road — that was the
+actual wall, and it was on the wrong side of the shoreline from every
+probe that had looked. And the roadside exemption (24-44 u) let a
+seafront cutting's own bank block the view.
+
+`_coastDepress` now carries the law rather than a taper: a rolling knoll
+ceiling on both sides of the waterline, a shore ceiling seaward falling
+to sea level within 30 u, a tighter shore exemption (10-22 u, so the
+corridor blend still owns the bench), and — the part that makes it a law
+— the ceiling follows THE LINE OF SIGHT from the eye to the water. Hills
+stand where the road can see over them and the shore flattens where it
+cannot, which is also the owner's earlier "small hills next to the sea"
+delivered honestly instead of as a flat beach.
+
+OLIVE COAST after: seafront visibility 0% -> 78%, coastal 0% -> 80%,
+worst wall 117.7 -> 12.8 u.
+
+**"Lower the height difference across the game. Instead of the straight
+climb introduce more interesting snake turns going up and down"** — and,
+on a HEDGEROW DASH frame, **"Make it more playful. It is too straight
+and limited."** BUILT, MEASURED, AND HELD OUT OF THIS DEPLOY.
+
+The work is done and the numbers are good: mandates halved (passes
+1200 -> 600, terraces 500 -> 260) with a hard 240 u ceiling over the
+grade-lawful figure; three summits on the ramp so a pass crests, drops
+into a saddle and climbs again; hand-keyed ascents undulating; the T-01
+weave no longer opt-in; hedgerow country opened up. TORRI CORSA 528 ->
+240 u range and its longest climb 4969 -> 2236 u; COL DE VERNAY
+undulations 1 -> 5; HEDGEROW DASH 8 -> 28 curves and 945 -> 188 u max
+straight; PINE VALLEY untouched at 17 u.
+
+It is reverted for one round because the gate came back red on three
+assertions and all three bisect to it alone — reverting it turns every
+one green on the same base:
+
+  - **The world lost its edge.** At 30 m/s outward from r=1650 the car
+    gained 165 u instead of sliding 463 u back. The compression dropped
+    FALKEN RIDGE's massif ~76 u and took the terrain grade at the rim's
+    engage line from 0.52 to 0.448 — just under the 0.45 at which the
+    engine stops pulling. `_rimWall`'s own `u*u` ramp reaches only 0.23
+    grade 30 u out, so for the first third of its run THE BORDER WAS
+    BEING HELD BY THE MASSIF UNDERNEATH IT, and the compression moved
+    that number. The border must carry its own grade.
+  - **The hinterland stopped costing you**, by 0.2 m/s against a 1.5 m/s
+    allowance: the flatter world turns the far ring from flank into
+    rolling ground.
+  - **A stone collider 0.82 u inside BRACKEN MOOR's carriageway** at
+    station 320, where the now-universal weave moved the line under a
+    road-edge builder that places mesh and collider separately — the
+    open item on that builder, finally with a reproduction.
+
+TRIED AND REVERTED: steepening the rim ramp to `u^1.5` so the wall
+carries its own grade from the foot. It read WORSE (1815 -> 1852), and
+tracing the run showed why — test-shortcut sets `pos` without
+`trackIndex`, so the car spends the whole 3 s roughly 265 u UNDER the
+terrain and the suite is measuring an underground creep, not a hill.
+That harness has to be repaired before any rim number it prints means
+anything. Next round: the containment law made independent of the
+massif, the rim harness fixed, the road-edge builder's collider moved
+with its mesh, and this build re-landed.
+
+**"Bridge fix"**, on a frame of RED CENTRE RUN's finish gantry.
+
+The finish line crosses the lap's own lower leg on a flyover, and the
+flyover was parapets and (in theory) piers over a road ribbon that has
+no thickness. Stations 898-1: the road stands 11.9 u over the cut floor
+with 11.7 and 12.1 u of unbacked edge either side, and NOT ONE PIER —
+`_clearsRoad` had correctly refused every column over the lower
+carriageway, and the ramp-end columns failed the 2.5 u test on level
+ground. Both refusals are right. Between them the span carried nothing
+at all, and from the road underneath the bridge was an edge-on sliver
+with two stone rails floating beside it.
+
+Three faults in one structure:
+
+  1. **No deck body.** `_buildDeckBody` sweeps a soffit and a fascia
+     girder down each edge along the raised run, capped at the
+     springings. The run is MEASURED — walk out from the crossing while
+     the road still stands clear of the ground under it — because
+     `o.half` is the RAIL run and the raise is usually shorter. Depth is
+     bounded by the clearance the crossing owes the road below
+     (test-sculpt-road holds >= 9 u road-to-road and MOUNTAIN TO SEA
+     sits on that floor at 9.53), so a tight crossing thins to a slab
+     rather than becoming a low roof. Roster census: 19 crossings on 8
+     worlds, 18 bodies; CLIFF KNOT's fifth crossing digs rather than
+     lifts and correctly takes none.
+
+  2. **The apron fell out of the bridge.** r392's cross-leg tuck slammed
+     all six skirt vertices at stations 899 and 0 — the only two the
+     flyover spans — from the deck edge down to the LOWER road's level,
+     both sides, so a flat sheet dropped 11.8 u out of the bridge in one
+     sample and came back up in the next. That is the slab in the photo.
+     The tuck exists to stop an apron surfacing THROUGH a neighbouring
+     carriageway, and 12 u above one there is nothing to surface
+     through, so it now yields to the same pass-over line the deck rails
+     use. Separately the span collapse was a BOOLEAN, so one sample
+     outside the span the apron opened to its full 2.6 u face over a 7 u
+     void; it now runs over `_spanFactor`'s ramp and reads the ground
+     drop itself, terrace worlds exempt.
+
+  3. **The gantry stood at the bottom of the chasm.** Every foot reaches
+     "the ground", which on a deck is the floor of the cutting the
+     finish line crosses: both masts were built 22 u tall and driven
+     through the deck to stand 11.8 u under the start line. Where the
+     start line is a span, the deck is the floor — 10.8 u now.
+
+ALSO IN THIS BUILD — F7 STOPPED MEASURING THE BRUSH. `test-phase4`'s
+grass-floor runway search priced trees at their 1.8 u TRUNK radius while
+r399's underbrush drag fires on three trees within 8 u, so the search was
+free to pick the most heavily braked line on the world and read it as the
+surface: PINE VALLEY 20% of road top and 6.32 s to 30 km/h. The search now
+uses the physics' own brush test, and disqualifies rather than scores it —
+the drag is a step, so half a brushed runway is a fully braked one. PINE
+reads 68% and 1.75 s, both bounds clean, and comes OFF the waiver list it
+had been sitting on. GLACIER COL stays waived and its entry is rewritten
+to say what it actually measures now (81%, the other way, on a
+slope-assisted verge with no brush-free corridor on any load).
+
+THE SHAPE WORTH KEEPING from all of it: each defect was a rule that is
+right on ordinary ground and silent about the one place the ground is not
+there. The apron reaches the ground; the gantry foot reaches the ground;
+the coast cap eases toward the shore; the border wall leans on the massif;
+the F7 runway is picked as if the brush were not on it. Every one of them
+needed the case where there IS no ground under the thing asking.
+
 ## r402 — T-01 BATCH 2: THE LAST ZERO-CURVE WORLDS, COAST-GUARDED
 
 The remaining four zero-curve worlds take the weave: LOG FLUME FURY

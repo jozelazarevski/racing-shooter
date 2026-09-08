@@ -42,14 +42,29 @@ const FULL_EXTRA = [
 
 // Known standing marginals — each entry NEEDS a ledger reference.
 const WAIVERS = [
-  // The 52-54% grass-top read is the THRUST-EQUILIBRIUM bound (r388
-  // ledger), a property of the global surface table, not of a world. The
-  // harness's tree-free runway pick is load-dependent (tree placement
-  // rolls Math.random), so any F7 world can land on an equilibrium-bound
-  // corridor on a given load — GLACIER COL measured 70% and 54% across
-  // loads of the same build.
-  { suite: 'test-phase4.mjs', match: /(PINE VALLEY|GLACIER COL): grass tops/,
-    reason: 'thrust-equilibrium marginal 52-54% vs [55,75]; r388 ledger; corridor pick is load-dependent' },
+  // r403 NARROWED THIS TO ONE WORLD, AND RE-MEASURED IT.
+  //
+  // The old entry covered both F7 worlds for a 52-54% (too SLOW) read
+  // blamed on the thrust-equilibrium bound. That is no longer what either
+  // world does. PINE VALLEY's low read was the r399 BRUSH: the harness
+  // priced trees at their 1.8 u trunk radius while the drag fires on three
+  // trees within 8 u, so the pick was the most heavily braked line on the
+  // world (20% of road, 6.32 s to 30 km/h). With the runway search using
+  // the physics' own brush test, PINE reads 68% and 1.75 s and needs no
+  // waiver at all — it is out of this list.
+  //
+  // GLACIER COL now reads the other way: 81% vs [55,75] on its flattest
+  // verge, which has NO brush-free corridor on any load (best 2 brushed
+  // samples of 13). Its 'furka' theme maps to the canyon template, so the
+  // row IS grass and the band IS the right band; the excess is the runway,
+  // which the 20 u grade probe passes as flat while the car runs downhill
+  // into the frames the 3% frame filter counts. Walking the runway at 4 u
+  // to match that filter was tried and read worse on BOTH worlds (PINE
+  // 68 -> 84%, GLACIER 81 -> 40%), so the search and the filter need
+  // separate work — a steady-state top-speed read, booked as its own item
+  // rather than smuggled into a bridge build.
+  { suite: 'test-phase4.mjs', match: /GLACIER COL: grass tops/,
+    reason: 'r403: 81% vs [55,75] on the only flat verge, which is slope-assisted and has no brush-free corridor; the 4 u runway probe was tried and read worse on both F7 worlds; steady-state read booked separately' },
 ];
 
 const runSuite = (file) => new Promise((resolve) => {

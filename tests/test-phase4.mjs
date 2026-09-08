@@ -72,6 +72,12 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
     // measures the mountain, not the surface law. Search the lap for the
     // flattest runway per surface instead.
     const N = t.center.length;
+    // TRIED AND REVERTED (r403): walking the runway at 4 u instead of 20 u,
+    // to match the 4 u lookahead the top-speed frame filter uses. It moved
+    // both picks and read WORSE on both worlds — PINE 68 -> 84%, GLACIER
+    // 81 -> 40% — so the finer probe is not simply a stricter version of
+    // this one; it selects a different population. The runway search and the
+    // frame filter want separate work, and it is not this build's.
     const runwayGrade = (i, lat) => {
       const h = t.headingAt(i), pt = t.pointAt(i, lat);
       const dx = Math.sin(h), dz = Math.cos(h);
@@ -93,17 +99,43 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
     // 60 u corridors (start plateau, lat ±9-12, <=4% grade), so the search
     // now walks both verges at several offsets and prices trees at their
     // real collision radius instead of assuming one fixed shoulder.
-    const treesOn = (i, lat) => {
-      if (lat === 0 || !t.camTreesNear) return 0;
+    // ...AND THE RUNWAY MUST BE FREE OF THE BRUSH TOO, BY THE PHYSICS'S OWN
+    // TEST (r403). `treesOn` prices TRUNKS at their 1.8 u collision radius,
+    // which is the r391 threshing question. r399 added a second, entirely
+    // separate off-road penalty for the owner's "car should not drive
+    // between the trees": in vehicles.js the player loses 3.2/s of velocity
+    // wherever THREE trees stand within 8 u. A corridor whose nearest trunk
+    // is 3 u away scores ZERO here and is fully inside that, so the harness
+    // was picking the most heavily braked line on the world and reading it
+    // as the surface — PINE VALLEY 20% of road top and 6.32 s to 30 km/h,
+    // against a surface table that produces 52-54%. Brush is measured by the
+    // same rule that applies it, and it DISQUALIFIES rather than scoring:
+    // the drag is a step, so half a brushed runway is a fully braked one.
+    const sample = (i, lat, f) => {
       const h = t.headingAt(i), pt = t.pointAt(i, lat);
       const dx = Math.sin(h), dz = Math.cos(h);
       let n = 0;
-      for (let s = 0; s <= 60; s += 5) {
-        for (const tr of t.camTreesNear(pt.x + dx * s, pt.z + dz * s)) {
-          if (Math.hypot(tr.x - (pt.x + dx * s), tr.z - (pt.z + dz * s)) < 1.8) n++;
-        }
-      }
+      for (let s = 0; s <= 60; s += 5) n += f(pt.x + dx * s, pt.z + dz * s);
       return n;
+    };
+    const treesOn = (i, lat) => {
+      if (lat === 0 || !t.camTreesNear) return 0;
+      return sample(i, lat, (x, z) => {
+        let n = 0;
+        for (const tr of t.camTreesNear(x, z)) if (Math.hypot(tr.x - x, tr.z - z) < 1.8) n++;
+        return n;
+      });
+    };
+    const brushOn = (i, lat) => {
+      if (lat === 0 || !t.camTreesNear) return 0;
+      return sample(i, lat, (x, z) => {
+        let n = 0;
+        for (const tr of t.camTreesNear(x, z)) {
+          const dx2 = x - tr.x, dz2 = z - tr.z;
+          if (dx2 * dx2 + dz2 * dz2 < 64 && ++n >= 3) return 1;
+        }
+        return 0;
+      });
     };
     const flattest = (latAsk) => {
       if (latAsk === 0) {
@@ -114,7 +146,14 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         }
         return { idx: best, lat: 0 };
       }
-      let best = { idx: 220, lat: latAsk }, bg = Infinity;
+      // TWO KEYS, AND FLATNESS IS THE ONE THAT GATES. Sorting on brush
+      // alone put GLACIER COL on its flattest BRUSH-FREE line at 830@-12,
+      // which climbs: the top-speed read only counts frames whose ground is
+      // flat to 3%, so not one frame counted and the world read 0 km/h out
+      // of 187. A runway the flat-frame filter can never sample is not a
+      // measurement at all. So take the runways flat enough to BE measured
+      // first, and among those prefer the one clear of brush.
+      const cands = [];
       for (let i = 0; i < N; i += 5) {
         // the run must START and STAY off-road: the classifier is
         // |lateral| > widthAt + 1, and the grid apron widens the road, so a
@@ -122,14 +161,20 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         const wHere = t.widthAt?.(i) ?? 5;
         for (const lat of [9, 12, 16, 20, -9, -12, -16, -20]) {
           if (Math.abs(lat) < wHere + 3) continue;
-          const w = runwayGrade(i, lat) + treesOn(i, lat) * 0.03;
-          if (w < bg) { bg = w; best = { idx: i, lat }; }
+          const grade = runwayGrade(i, lat);
+          cands.push({ idx: i, lat, grade,
+            score: grade + treesOn(i, lat) * 0.03, brush: brushOn(i, lat) });
         }
       }
-      return best;
+      if (!cands.length) return { idx: 220, lat: latAsk };
+      const flat = cands.filter((c) => c.grade < 0.03);
+      const pool = flat.length ? flat : cands;
+      pool.sort((a, b) => (a.brush - b.brush) || (a.score - b.score));
+      const pick = pool[0];
+      return { idx: pick.idx, lat: pick.lat, brushed: pick.brush };
     };
     const run = (latAsk) => {
-      const { idx, lat } = flattest(latAsk);
+      const { idx, lat, brushed } = flattest(latAsk);
       const place = (sp) => {
         c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
         const pt = t.pointAt(idx, lat);
@@ -155,15 +200,18 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         if (gg4 < 0.03) vTop = Math.max(vTop, v);
         if (t30 === null && v * 3.6 >= 30) t30 = +(k / 60).toFixed(2);
       }
-      return { top: +(vTop * 3.6).toFixed(0), t30 };
+      return { top: +(vTop * 3.6).toFixed(0), t30, brushed: brushed ?? 0, idx, lat };
     };
     const road = run(0), grass = run(14);
     return { road: road.top, grass: grass.top, t30: grass.t30,
+      brushed: grass.brushed, at: `${grass.idx}@${grass.lat}`,
       pct: +(grass.top / road.top * 100).toFixed(0) };
   });
+  const where = `${r.at}${r.brushed ? `, NO brush-free corridor (best ${r.brushed} brushed samples)` : ''}`;
   check(`F7   ${name}: grass tops at 55-75% of road`, r.pct >= 55 && r.pct <= 75,
-    `${r.grass} vs ${r.road} km/h = ${r.pct}%`);
-  check(`F7   ${name}: grass 0-30 km/h under 3 s`, r.t30 !== null && r.t30 < 3, `${r.t30} s`);
+    `${r.grass} vs ${r.road} km/h = ${r.pct}%  runway ${where}`);
+  check(`F7   ${name}: grass 0-30 km/h under 3 s`, r.t30 !== null && r.t30 < 3,
+    `${r.t30} s  runway ${where}`);
   await p.close();
 }
 
