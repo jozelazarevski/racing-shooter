@@ -11850,8 +11850,22 @@ class Game {
       // went red at 5.6 u inside IL VICOLO's biggest block — a structure is
       // a hard occluder with a hard rule, and only the ridge-climb rate was
       // ever the problem.
+      // ...and a TELEPORT gets the instant lift back for 0.7 s: after a
+      // placeAt/respawn the boom swings through whatever stands beside the
+      // new spot, and easing the recovery there is wrong generally (a
+      // respawn wants instant framing) and failed S5 specifically — the
+      // rig teleports beside the town's biggest block, and on the sloped
+      // street the eased TERRAIN lift arrived 0.9 u short of the rooftop
+      // for two frames (intrusion 2.1). The shake fix only ever needed to
+      // slow the ridge climb during CONTINUOUS driving.
       {
-        const soft9 = Math.min(lift, 18, (this._camDt ?? dt) * 10);
+        const mv9 = this._liftPrevCar
+          ? Math.hypot(p.pos.x - this._liftPrevCar.x, p.pos.z - this._liftPrevCar.z) : 1e9;
+        (this._liftPrevCar ??= { x: 0, z: 0 }).x = p.pos.x; this._liftPrevCar.z = p.pos.z;
+        if (mv9 > 15) this._liftJumpT = 0.7;
+        this._liftJumpT = Math.max(0, (this._liftJumpT ?? 0) - (this._camDt ?? dt));
+        const soft9 = Math.min(lift, 18,
+          this._liftJumpT > 0 ? 18 : (this._camDt ?? dt) * 10);
         const hard9 = liftHard > lift + 1e-6 ? Math.min(liftHard, 18) : 0;
         const add9 = Math.max(soft9, hard9);
         if (add9 > 0) cp.y += add9;
