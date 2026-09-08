@@ -11831,7 +11831,18 @@ class Game {
         const sy = cp.y + dy * f;
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }
-      if (lift > 0) cp.y += Math.min(lift, 18);
+      // r398 (owner: "Car is still shaking"): the lift's DELTA is rate-capped
+      // at 10 u/s. Spike forensics traced the mountain-world camera pump to
+      // this line — beside a ridge or cutting face the (gh - sy)/(1 - f)
+      // amplifier demanded 20-40 u of height and got it in half a second,
+      // then the lerp let it back down: a violent vertical bob on every
+      // switchback shoulder that reads, from the seat, as the car shaking.
+      // (A smoothed-residual version measured INERT: cp.y persists across
+      // frames, so per-frame smoothing of a recomputed residual re-
+      // accumulates at nearly the instant rate. Only a hard per-frame delta
+      // cap actually slows the climb; there is no sawtooth because the
+      // release side is the slow mode lerp, not a clamp.)
+      if (lift > 0) cp.y += Math.min(lift, 18, (this._camDt ?? dt) * 10);
       // ...and never underground wherever it ended up (PATCH_02 v1.2 fix 13
       // names this clearance; 2.2 is this engine's measured-good value)
       const gCam = tk.terrainHeight(cp.x, cp.z)
@@ -11929,7 +11940,13 @@ class Game {
         const portal = fi9 < T9.s ? T9.s : T9.e;
         const info9 = tk.tunnelAt(tk.center[portal], portal, 0);
         if (!info9) continue;
-        const ceil9 = tk.center[portal].y + info9.apex - 1.3
+        // reference the ENGAGE-LINE station's road height, not the portal's:
+        // the bore clamp works from the camera's local station, whose floor
+        // sits below the portal on a climbing bore — the portal reference
+        // left a 6.4 u snap at the engage line (measured, GLACIER s118)
+        const eng9 = Math.max(0, Math.min(tk.center.length - 1,
+          fi9 < T9.s ? T9.s - 6 : T9.e + 6));
+        const ceil9 = tk.center[Math.round(eng9)].y + info9.apex - 1.3
           + Math.max(0, dIn - 6) * (tk.segLen ?? 6) * 0.18;
         if (cp.y > ceil9) cp.y = ceil9;
         break;
