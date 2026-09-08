@@ -4192,6 +4192,13 @@ VALLEY 25 -> 18.6 u penetration, crawling at 1-2 km/h; DEEPWOOD
 dense stand AND the apron crossed, so drift exits over grass and verge
 grazes cost nothing (drift 6/6, shortcut 8/8 green).
 
+LEDGER NOTE (F7 waiver, cause changed): PINE VALLEY's waived F7 grass
+reading moved 53% -> 39% of road top speed under this build — the
+harness's off-road corridor pick crosses a dense stand and now measures
+BRUSH, not grass. The waiver covers the red by name; the honest fix is
+the drift-rig doctrine applied to F7 (strip camTrees for the staged
+grass run, measure the LAW not the lottery) — follow-up, not a blocker.
+
 
 ## r398 — THE WHITEOUT, THE GUN, AND THE SHAKING EYE (three owner reports, one session)
 
