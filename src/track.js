@@ -44,7 +44,7 @@ export const LEVELS = [
   { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
   { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
-  { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
+  { id: 13, name: 'LOG FLUME FURY', t01: true, theme: 'flume', region: 'PINE VALLEY' },
   { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
   { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK', t01: true,
     tune: { tunnels: { count: 1 } } },
@@ -204,13 +204,13 @@ export const LEVELS = [
   // crosses itself and tunnels where a headland gets in the way.
   { id: 50, name: 'CINQUE BORGHI', theme: 'liguria', region: 'MEDITERRANEAN', cost: 22, fresh: true,
     route: 'liguriaRun', tune: { tunnels: { count: 1 } } },
-  { id: 51, name: 'AEGEAN BLUE', theme: 'aegean', region: 'MEDITERRANEAN', cost: 23, fresh: true,
+  { id: 51, name: 'AEGEAN BLUE', t01: true, theme: 'aegean', region: 'MEDITERRANEAN', cost: 23, fresh: true,
     route: 'aegeanRun' },
   { id: 52, name: 'COSTA BRAVA', theme: 'brava', region: 'MEDITERRANEAN', cost: 24, fresh: true,
     route: 'bravaRun', tune: { tunnels: { count: 1 } } },
   { id: 53, name: 'DALMATIA DRIVE', theme: 'dalmatia', region: 'MEDITERRANEAN', cost: 25, fresh: true,
     route: 'dalmatiaRun' },
-  { id: 54, name: 'COTE D AZUR', theme: 'azur', region: 'MEDITERRANEAN', cost: 26, fresh: true,
+  { id: 54, name: 'COTE D AZUR', t01: true, theme: 'azur', region: 'MEDITERRANEAN', cost: 26, fresh: true,
     route: 'azurRun', tune: { tunnels: { count: 1 } } },
   // ON LAND, deliberately. First cut put this on a coastal theme and part of
   // the lap ran through the sea - the chase frame was the car floating in a
@@ -231,7 +231,7 @@ export const LEVELS = [
   // standing over the whole thing. Shares the Aegean route because that lap
   // hugs its coast for most of its length, which is what puts the citadel in
   // frame from the road.
-  { id: 58, name: 'CITADEL BAY', theme: 'citadel', region: 'MEDITERRANEAN',
+  { id: 58, name: 'CITADEL BAY', t01: true, theme: 'citadel', region: 'MEDITERRANEAN',
     cost: 30, fresh: true, route: 'aegeanRun', routeFlipX: true },
   // SKETCH D, drawn and handed over with its own labels on it: tunnels where
   // the north-south strand crosses the two straights, a bridge where the
@@ -7541,6 +7541,21 @@ export class Track {
       while ((len < N) && straight[(s + len) % N]) len++;
       if (allStraight) len = N;
       if (len >= minRun) {
+        // COAST GUARD (r402): on a coast world an unguarded weave pushes
+        // the road over the water, and the corridor blend then carries it
+        // as a causeway — the exact ridge-run HRD-6 outlaws. Per run, the
+        // seaward side is the one where the coast depression digs deeper
+        // 40 u out from the run's middle; offsets toward it keep 30% of
+        // their amplitude (the S still bends, it just leans landward).
+        let seaSign = 0;
+        if (this.T.coast && this._coastDepress) {
+          const m9 = this.center[(s + (len >> 1)) % N], nm9 = this.nrm[(s + (len >> 1)) % N];
+          const dp = (sd) => {
+            const x9 = m9.x + nm9.x * 40 * sd, z9 = m9.z + nm9.z * 40 * sd;
+            return this._coastDepress(x9, z9, 0, 9999);
+          };
+          seaSign = dp(1) < dp(-1) ? 1 : -1;
+        }
         let arc = 0;
         for (let k = 0; k < len; k++) {
           const j = (s + k) % N;
@@ -7548,7 +7563,8 @@ export class Track {
             : THREE.MathUtils.smoothstep(Math.min(k, len - 1 - k), 0, ease);
           const amp = Math.min(base * edge, Math.max(0, legClear(j) - 26));
           if (amp > 0.5) {
-            const off = amp * Math.sin((2 * Math.PI * arc) / lam);
+            let off = amp * Math.sin((2 * Math.PI * arc) / lam);
+            if (seaSign && Math.sign(off) === seaSign) off *= 0.3;
             this.center[j].x += this.nrm[j].x * off;
             this.center[j].z += this.nrm[j].z * off;
           }
