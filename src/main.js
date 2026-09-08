@@ -12012,6 +12012,39 @@ class Game {
         }
       }
     }
+    // r398 (owner: "Car is still shaking"): THE CAR IS STILL — THE CAMERA
+    // WAS SHAKING. Measured with the fine-jitter probe on GLACIER COL: the
+    // car's grounded |dy| holds p95 0.083 u/frame, but the CAMERA ran p95
+    // 0.383 u/frame with single-frame jumps of 3.57 u. The sightline lift
+    // and its neighbour guards are instant clamps, and beside the r395
+    // mountain flank they engage and release on alternate frames through
+    // every switchback — on screen a fluttering eye is indistinguishable
+    // from a shaking car. The final eye HEIGHT is rate-limited here
+    // (26 u/s up, 15 u/s down), and the hard never-underground floor is
+    // re-applied after it so safety stays instant. Exempt: fast falls (the
+    // plunge rider must move faster than any limit), tunnel and deck
+    // frames (their crown/soffit clamps are architecture, not flutter),
+    // and any teleport or leash snap (memory resets on a big horizontal
+    // jump).
+    {
+      const cp = this.camPos;
+      const cdt = this._camDt ?? dt;
+      const prevY = this._camYSm;
+      const jumped = prevY === undefined
+        || Math.hypot(cp.x - (this._camXSm ?? cp.x), cp.z - (this._camZSm ?? cp.z)) > 20;
+      const deck9 = tk?.deckOverhead
+        && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(cp, p.trackIndex));
+      if (!(jumped || vyNow < -9 || tun || deck9)) {
+        const up9 = 26 * cdt, dn9 = 15 * cdt;
+        if (cp.y > prevY + up9) cp.y = prevY + up9;
+        else if (cp.y < prevY - dn9) cp.y = prevY - dn9;
+        if (tk?.terrainHeight) {
+          const g9 = tk.terrainHeight(cp.x, cp.z) + 2.2;
+          if (cp.y < g9) cp.y = g9;
+        }
+      }
+      this._camYSm = cp.y; this._camXSm = cp.x; this._camZSm = cp.z;
+    }
     this._applyCamera(dt, speedZoom, M);
   }
 
