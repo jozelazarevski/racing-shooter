@@ -27,7 +27,15 @@ for (const LVL of LVLS) {
         if (radE(i) > 30) continue;
         sharp++;
         const c = t.center[i], n = t.nrm[i], w = t.widthAt(i);
-        for (const s of [1, -1]) {
+        // inside of the bend = circumcenter side (never a chord sign test)
+        const a2 = t.center[(i - KE + N) % N], c2 = t.center[(i + KE) % N];
+        const d2 = 2 * (a2.x * (c.z - c2.z) + c.x * (c2.z - a2.z) + c2.x * (a2.z - c.z));
+        if (Math.abs(d2) < 1e-6) continue;
+        const aa = a2.x * a2.x + a2.z * a2.z, bb = c.x * c.x + c.z * c.z, cc = c2.x * c2.x + c2.z * c2.z;
+        const ux = (aa * (c.z - c2.z) + bb * (c2.z - a2.z) + cc * (a2.z - c.z)) / d2;
+        const uz = (aa * (c2.x - c.x) + bb * (a2.x - c2.x) + cc * (c.x - a2.x)) / d2;
+        const sIn = Math.sign((ux - c.x) * n.x + (uz - c.z) * n.z) || 1;
+        for (const s of [sIn]) {
           const edgeY = c.y + (t.bankOffset ? t.bankOffset(i, w * s) : 0);
           for (const d of [0.5, 1.5, 2.5, 3.5]) {
             const x = c.x + n.x * (w + d) * s, z = c.z + n.z * (w + d) * s;
