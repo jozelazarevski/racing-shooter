@@ -16,7 +16,7 @@ for (const LVL of LVLS) {
     await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 240000 });
     const r = await p.evaluate(() => {
       const t = window.__game.track, N = t.center.length;
-      const segL = t.totalLen ? t.totalLen / N : 6;
+      const segL = t.segLen;
       const K = Math.max(3, Math.round(30 / segL));   // fixed ~30u arc window
       const radAt = (i) => {
         const a = t.center[(i - K + N) % N], b = t.center[i], c = t.center[(i + K) % N];

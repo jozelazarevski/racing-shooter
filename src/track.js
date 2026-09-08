@@ -13323,31 +13323,54 @@ export class Track {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const step = Math.max(2, Math.round(5.6 / this.segLen));   // one bay ≈ 5.6u
+    // W-CURVE-01.4 (r397): a sharp curve whose outer edge faces a drop keeps
+    // a CONTINUOUS barrier along the outer arc. The r393 blanket "gap through
+    // hairpins" skip (`curvature > 0.045`) died silently when r394 made the
+    // curvature array arc-true — the roster maximum now reads 0.034, so the
+    // skip matched nothing and, worse, sharpness could no longer be seen at
+    // all on that scale. Sharpness here is the circumcircle over ~30u of ARC
+    // (a station-count window spans 140u on long-segLen worlds and smooths
+    // hairpins invisible — the roster census read ZERO sharp stations on
+    // SERPENTINA through a ±6-station window). Through sharp stations bays
+    // run at every station (gap = segLen − 5.4u ≤ 8u roster-wide, the
+    // W-CURVE cap) on the OUTER side of the bend only, anchored at the
+    // verge lip (widthAt + 0.9, where §7.11's conform law guarantees real
+    // ground under the posts — the theme lateral would hang them over the
+    // very drop they guard). An inner-side drop at an apex stays open: that
+    // verge is the fold-protected zone, and W-CURVE allows one opening per
+    // curve.
+    const KF = Math.max(3, Math.round(30 / this.segLen));
+    const radF = (i) => {
+      const a = this.center[(i - KF + N) % N], b = this.center[i], c = this.center[(i + KF) % N];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz),
+        ac = Math.hypot(c.x - a.x, c.z - a.z);
+      return (ab * bc * ac) / (2 * Math.abs(cross));
+    };
     let k = 0;
-    for (let i = 0; i < N && k < MAX; i += step) {
+    for (let i = 0; i < N && k < MAX; i++) {
+      const sharp9 = radF(i) <= 30;
+      if (!sharp9 && i % step) continue;                       // theme cadence off the arcs
       if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
       if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
-      // W-CURVE-01.4 (r397): a sharp curve whose outer edge faces a drop
-      // keeps a CONTINUOUS barrier along the outer arc — the old blanket
-      // "gap through hairpins" skip left exactly the drop the rule guards
-      // open at exactly the corner where cars leave the road. Through sharp
-      // stations bays continue on the OUTER side of the bend only; an
-      // inner-side drop at an apex stays open (that verge is the
-      // fold-protected zone, and W-CURVE allows one opening per curve).
-      const sharp9 = this.curvature[i] > 0.045;
       const inner9 = sharp9 ? Math.sign(
-        (this.center[(i + 6) % N].x - this.center[i].x) * this.nrm[i].x
-        + (this.center[(i + 6) % N].z - this.center[i].z) * this.nrm[i].z) || 1 : 0;
+        (this.center[(i + KF) % N].x - this.center[i].x) * this.nrm[i].x
+        + (this.center[(i + KF) % N].z - this.center[i].z) * this.nrm[i].z) || 1 : 0;
       // r393 (owner RULE: "nothing stands at the middle of the road"): the
       // theme's fixed lateral predates the width laws — on the rebuilt
       // GLACIER COL, 33 of 54 bays anchored INSIDE the 9 u carriageway and
       // one lay across the hairpin the owner drove into. The anchor now
       // respects the LOCAL width like the edge-rails do...
-      const lat9 = Math.max(LAT, this.widthAt(i) + 1.8);
-      // downhill side: the edge that falls away
+      const dropLat9 = Math.max(LAT, this.widthAt(i) + 1.8);
+      const lat9 = sharp9 ? this.widthAt(i) + 0.9 : dropLat9;
+      // downhill side: the edge that falls away (probed at the theme lateral
+      // even for sharp bays, whose anchor sits at the lip — the fall is out
+      // there, not under the posts)
       let side = 0, drop = 0;
       for (const sd of [1, -1]) {
-        const p = this.pointAt(i, lat9 * sd);
+        const p = this.pointAt(i, dropLat9 * sd);
         const d = p.y - this._terrainMeshHeight(p.x, p.z);
         if (d > drop) { drop = d; side = sd; }
       }
