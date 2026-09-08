@@ -9861,6 +9861,23 @@ export class Track {
     return false;
   }
 
+  /** How much of a bridge sample i is: 1 mid-span, easing to 0 over RAMP
+   *  samples past the springing, covering the hero gorge and every flyover.
+   *  Anything that CHANGES at a span edge — the road apron, for one — reads
+   *  this instead of a boolean, so the change is a taper and not a shard. */
+  _spanFactor(i) {
+    const RAMP = 6;
+    let best = 0;
+    const at = (d, half) => THREE.MathUtils.smoothstep(half + RAMP - d, 0, RAMP);
+    if (this._gorge) {
+      best = at(this._circDist(i, this._gorge.i), this._spanSamples() + 4);
+    }
+    for (const o of this._overpasses ?? []) {
+      best = Math.max(best, at(this._circDist(i, o.up), o.half + 4));
+    }
+    return best;
+  }
+
   /** A GORGE IS A TRENCH, AND THE TRENCH IS `len` LONG EITHER SIDE OF THE ROAD.
    *  That length is what makes the chasm read as a canyon running off into the
    *  distance rather than a slot cut to size for the carriageway — but on a
@@ -10965,21 +10982,42 @@ export class Track {
         // below the road; a fixed-depth toe would hang in the air there)
         // over the gorge the road is a bridge deck: the apron collapses to a
         // thin lip instead of hanging a curtain down into the chasm
-        const onSpan = (this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4)
-          || this._onOverpass(j, 4);
+        // THE SPAN COLLAPSE IS A TAPER, NOT A STEP (owner "Bridge fix",
+        // RED CENTRE RUN). `onSpan` was a boolean, so at the springing the
+        // apron went from a 0.25 u lip to a full 2.6 u face with a toe that
+        // reaches down to LOCAL ground — and local ground at a springing is
+        // the cut floor, 7 u below. One sample apart, that drew a wide dark
+        // wing flaring out of each side of the bridge and hanging in the air:
+        // photographed from the road below as a slab beside the deck. The
+        // collapse now runs over `_spanFactor`'s ramp, so the apron narrows
+        // and lifts into the deck across half a dozen samples.
         // ---- width-variation: skirts hug the (possibly pinched) road edge ----
         const wOff = WALL_OFF + this.widthAt(j) - ROAD_HALF;
-        const face = onSpan ? 0.5 : steep
+        const faceFull = steep
           ? 1.35 + Math.sin(9 * t + side) * 0.18
           : 2.6 + Math.sin(9 * t + side) * 0.4;
-        const latToe = Math.min(wOff + face + (onSpan ? 0.3 : steep ? 1.1 : 2.8), maxLat);
+        // AN APRON THAT CANNOT REACH THE GROUND IS A CURTAIN IN THE AIR, and
+        // span membership does not predict where that happens. At a bridge
+        // springing the ground falls into the cut ONE sample outside the
+        // span, so the apron opened to its full 2.6 u face over a 7 u void
+        // and drew a dark wing hanging off the deck. Read the drop itself:
+        // where the apron's own toe can no longer find ground it narrows to
+        // a lip on the edge, the same shape the span already used. Terrace
+        // worlds are exempt — their curtain IS the stone-faced shelf.
+        const latFull = Math.min(wOff + faceFull + (steep ? 1.1 : 2.8), maxLat);
+        const sf = Math.max(this._spanFactor(j), steep ? 0 : THREE.MathUtils.smoothstep(
+          c.y - this._terrainMeshHeight(c.x + n.x * latFull * side, c.z + n.z * latFull * side),
+          3.0, 6.0));
+        const mix = (off, on) => off + (on - off) * sf;
+        const face = mix(faceFull, 0.5);
+        const latToe = Math.min(wOff + face + mix(steep ? 1.1 : 2.8, 0.3), maxLat);
         const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
         // on a bridge span the apron collapses to a hair under the deck edge
-        const toeY = onSpan ? c.y - 1.6 : Math.min(c.y - 2.9, ground - 0.6);
+        const toeY = mix(Math.min(c.y - 2.9, ground - 0.6), c.y - 1.6);
         const rowSpec = [
-          [Math.min(wOff + 0.55, maxLat), c.y - (onSpan ? 0.34 : 0.06), dirt],
+          [Math.min(wOff + 0.55, maxLat), c.y - mix(0.06, 0.34), dirt],
           [Math.min(wOff + face, maxLat),
-            c.y - (steep ? 1.5 : 2.1) - Math.sin(17 * t - side) * 0.35, dirt],
+            c.y - mix(steep ? 1.5 : 2.1, 1.0) - Math.sin(17 * t - side) * 0.35 * (1 - sf), dirt],
           [latToe, toeY, dark],
         ];
         for (let r = 0; r < rows; r++) {
@@ -11016,7 +11054,21 @@ export class Track {
           if (this._circDist(j, s.i) <= 10
             && Math.abs(this.center[s.i].y - this.center[j].y) < 0.5) continue;
           if (s.d > this.widthAt(s.i) + 1.2) continue;         // clear of that deck
-          const cap = this.center[s.i].y - 0.5;
+          // ...BUT A FLYOVER IS NOT A DRAPE (owner "Bridge fix", RED CENTRE
+          // RUN). This tuck exists to stop an apron SURFACING THROUGH a
+          // neighbouring carriageway, and above the crossing there is
+          // nothing to surface through: the apron is the edge of a bridge
+          // standing 12 u clear. Measured at RED CENTRE RUN stations 899 and
+          // 0 — the only two the flyover spans — all six vertices were
+          // slammed from the deck edge down to the lower road's level, both
+          // sides, so a flat sheet fell 11.8 u out of the bridge in one
+          // sample and back up in the next. Photographed from the road
+          // below as a slab beside the deck. Use the same line the deck
+          // rails use for "the car passes underneath": clear of that road's
+          // surface by a roof-height, and the apron is left where it is.
+          const other = this.center[s.i].y;
+          if (verts[o + 1] > other + 2.3) continue;
+          const cap = other - 0.5;
           if (verts[o + 1] > cap) verts[o + 1] = cap;
         }
       }
@@ -11384,6 +11436,15 @@ export class Track {
     // road at the start line, which is the surface the structure spans and the
     // one the heights were always chosen against.
     const y0 = c.y;
+    // A GANTRY OVER A BRIDGE STANDS ON THE BRIDGE (owner "Bridge fix", RED
+    // CENTRE RUN). Every foot below reaches "the ground", which is right on
+    // ground and wrong on a deck: RED CENTRE's start line spans the
+    // underpass cutting, so `terrainHeight` under the verge is the cut floor
+    // 11.8 u down, and both masts were built 22 u tall — driven straight
+    // through the deck to stand at the bottom of the chasm the finish line
+    // crosses. Where the start line is a span, the deck is the floor.
+    const footFloor = y0 - this._terrainMeshHeight(c.x, c.z) > 3
+      ? y0 - 0.6 : -Infinity;
     this.group.add(strip);
 
     // scaffold towers + banner
@@ -11464,7 +11525,7 @@ export class Track {
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         // and a leg reaches the GROUND under its own tower, which on a world
         // that starts on a shelf is not the road's height either
-        const gy = Math.min(y0, this.terrainHeight(bx + ox, bz + oz));
+        const gy = Math.max(footFloor, Math.min(y0, this.terrainHeight(bx + ox, bz + oz)));
         // A LEG THAT CANNOT STAND CLEAR OF THE ROAD DOES NOT COME DOWN TO THE
         // GROUND (r253).
         //
@@ -11551,7 +11612,7 @@ export class Track {
       const halfW0 = this.widthAt ? this.widthAt(0) : ROAD_HALF;
       const px = c.x + n.x * (halfW0 + 1.6) * side;
       const pz = c.z + n.z * (halfW0 + 1.6) * side;
-      const gy = Math.min(y0, this.terrainHeight(px, pz));
+      const gy = Math.max(footFloor, Math.min(y0, this.terrainHeight(px, pz)));
       const postH = (y0 + 10.2) - gy;
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, postH, 8), steel);
       post.position.set(px, gy + postH / 2, pz);
@@ -18983,6 +19044,90 @@ export class Track {
     }
   }
 
+  /** A BRIDGE HAS A BODY (owner, 2026-09-08: "Bridge fix", photographed on
+   *  RED CENTRE RUN's finish straight).
+   *
+   *  `_buildOverpassDecks` built the parapets and the piers and nothing in
+   *  between, because the carriageway was assumed to BE the deck. It isn't:
+   *  the road ribbon is a surface with no thickness, so from underneath a
+   *  flyover was an edge-on sliver with two stone rails floating beside it
+   *  and the desert showing straight through the crossing. Measured at RED
+   *  CENTRE RUN station 899-1: road 11.9 u over the cut floor, 11.7 and 12.1
+   *  u of unbacked edge either side, and not one pier — `_clearsRoad` had
+   *  correctly refused every column over the lower carriageway and the
+   *  ramp-end columns failed the 2.5 u test on level ground, which is right
+   *  in both cases and left the span with nothing at all.
+   *
+   *  So give it the thing a bridge is: a soffit under the carriageway and a
+   *  fascia girder down each edge, swept along the raised run and capped at
+   *  the springings. The run is measured, not assumed — walk out from the
+   *  crossing while the road still stands clear of the ground under it —
+   *  because `o.half` is the RAIL run and the raise is usually shorter.
+   *
+   *  Depth is bounded by the clearance the crossing owes the road below
+   *  (test-sculpt-road holds every deck at >= 9 u road-to-road, and MOUNTAIN
+   *  TO SEA sits on that floor at 9.53), so on a tight crossing the body
+   *  thins to a slab rather than becoming a low roof over the lane. */
+  _buildDeckBody(o, g) {
+    const N = this.center.length;
+    const clearOf = (j) => this.center[j].y
+      - this._terrainMeshHeight(this.center[j].x, this.center[j].z);
+    if (clearOf(o.up) < 1.2) return;                 // the crossing digs, not lifts
+    const LIM = o.half + 12;
+    let a = 0, b = 0;
+    while (a < LIM && clearOf((o.up - a - 1 + N) % N) > 1.0) a++;
+    while (b < LIM && clearOf((o.up + b + 1) % N) > 1.0) b++;
+    if (a + b < 1) return;                           // a single sample is not a span
+    const road2road = this.center[o.up].y - this.center[o.down].y;
+    const depth = THREE.MathUtils.clamp(
+      Math.min(road2road, clearOf(o.up)) - 7.6, 0.35, 1.15);
+    const rings = [];
+    for (let s = -a; s <= b; s++) {
+      const j = (o.up + s + N) % N;
+      const c = this.center[j], n = this.nrm[j];
+      // The fascia carries the parapet, so it reaches just past where the
+      // rail loop puts one — `max(10.2, width + 1.15)`, its base offset
+      // before any step-out — and never inside the carriageway. On a narrow
+      // world the rail line is the wider of the two, and a girder tucked to
+      // the tarmac edge would leave its own parapet standing in the air.
+      const lat = Math.max(10.2, this.widthAt(j) + 1.15) + 0.35;
+      const ring = [];
+      for (const side of [1, -1]) {
+        const x = c.x + n.x * lat * side, z = c.z + n.z * lat * side;
+        const top = c.y + this.bankOffset(j, lat * side) + 0.05;
+        ring.push([x, top, z], [x, top - depth, z]);
+      }
+      rings.push(ring);                              // topL, botL, topR, botR
+    }
+    const verts = new Float32Array(rings.length * 4 * 3);
+    for (let k = 0; k < rings.length; k++) {
+      for (let v = 0; v < 4; v++) {
+        const p = rings[k][v], off = (k * 4 + v) * 3;
+        verts[off] = p[0]; verts[off + 1] = p[1]; verts[off + 2] = p[2];
+      }
+    }
+    const idx = [];
+    for (let k = 0; k < rings.length - 1; k++) {
+      const A = k * 4, B = (k + 1) * 4;
+      idx.push(A + 0, A + 1, B + 1, A + 0, B + 1, B + 0);      // left fascia
+      idx.push(A + 1, A + 3, B + 3, A + 1, B + 3, B + 1);      // soffit
+      idx.push(A + 2, A + 3, B + 3, A + 2, B + 3, B + 2);      // right fascia
+    }
+    const L = (rings.length - 1) * 4;
+    idx.push(0, 1, 3, 0, 3, 2);                                // springing caps
+    idx.push(L + 0, L + 1, L + 3, L + 0, L + 3, L + 2);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const deck = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: 0x807a70, flatShading: true, roughness: 1, side: THREE.DoubleSide,
+    }));
+    deck.name = 'overpass-deck';
+    deck.receiveShadow = true;
+    g.add(deck);
+  }
+
   /** OVERPASS DECKS: parapet rails and piers under every flyover span, so
    *  the raised leg reads as a BRIDGE (the sketch's own word) and not a
    *  floating ramp. Solids ride the parapets - falling off is not on. */
@@ -19052,6 +19197,7 @@ export class Track {
     };
     for (const o of this._overpasses) {
       const g = new THREE.Group();
+      this._buildDeckBody(o, g);
       for (let sN = -o.half; sN <= o.half; sN += 2) {
         const j = (o.up + sN + N) % N;
         const c = this.center[j], n = this.nrm[j];
