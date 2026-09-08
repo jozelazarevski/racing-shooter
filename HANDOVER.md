@@ -4171,6 +4171,32 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r398 — EVERGREEN LAW (owner: "Rule: pine trees are never not green. They are evergreen. Apply this across the game")
+
+The audit found the rule already MOSTLY law: the r393 conifer tint case
+forces the sheet green through the canopy material on every theme, so
+pineA/pineB/fir render green on autumn, volcano-scorch and snow palettes
+alike (verified by screenshot on LARCH GOLD, HARVEST RUN, EMBER PASS,
+FROST PEAK; FROST PEAK's cold-light cast is lighting on green needles,
+not a tint). Distant stands were erased in r287; the horizon rings are
+gradient silhouettes, not drawn pines.
+
+THE OFFENDER WAS THE LARCH. It rode the theme band ("paler,
+yellow-shifted"), which on the amber autumn worlds painted it fully
+gold — and at game scale its tiered cones read as A PINE. The
+screenshot census showed the yellow spiky trees beside the green firs:
+exactly the non-green pines of the owner's report. The larch case now
+sets a theme-independent yellow-green (H .29-.33, paler and warmer than
+the conifer's #236555 so the species still read apart) divided through
+the canopy material like the conifer case. LARCH GOLD keeps its gold
+lawfully — maple, birch and oak carry it (larch is 16% of the autumn
+mix); after the fix its frame reads as red maples burning against green
+conifers, which is the r370 reference look.
+
+Rule recorded: CLAUDE.md 7.14, master spec owner-clarification V-03.
+Broadleaf lobed crowns (maple, oak, birch, poplar) keep seasonal colour.
+
+
 ## r397 — W-CURVE-01.4: THE BARRIER LAW LIVES IN THE EDGE RAILS
 
 Round 5 of the x70 program: the master spec's W-CURVE-01.4 (continuous
