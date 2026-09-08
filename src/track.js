@@ -4302,13 +4302,7 @@ const THEMES = {
     // one, which is why the start straight above is dead straight.
     narrows: { count: 3, min: 0.52 },
     // THE BANK. See _buildHedgeBanks — this is the region's hazard signature.
-    // r403 (owner, HEDGEROW DASH frame: "too straight and limited"): the
-    // hedge ran unbroken down both sides and the lap read as a tube. Real
-    // hedgerow country is a patchwork — banks in stretches, open field edges
-    // between them — so two thirds of the lap is hedged and the rest opens
-    // onto the fields. The AUTUMN farmland (harvestvale) already ships 0.5.
-    hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2,
-      max: 640, coverage: 0.66 },
+    hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2, max: 640 },
     // streams in the valley bottoms, washing over the lane
     fords: { count: 2 }, riverBank: { base: '#5a5442' }, reedColor: 0x5f7a3a,
     // height fog in the field hollows + a wet squall; NEVER a tree corridor —
@@ -6473,28 +6467,16 @@ const NEON_THEMES = new Set(['neon', 'undercity']);
 // profile: worlds short of their mandate get a pass-shaped climb added —
 // valley at the start line, one summit opposite. A world's tune can
 // override with `minElevRange` (0 disables).
-// r404 OWNER OVERRIDE (2026-09-08): "Lower the height difference across the
-// game. Instead of the straight climb introduce more interesting snake turns
-// going up and down." This table is what built the straight climb. The r364/
-// r378 mandates (passes 1200 m, terraces 500 m) are a MINIMUM range, and
-// `_stretchToMandate` reaches it with ONE symmetric ramp over the lap — the
-// census measured the result: twenty worlds at 425-528 u of range, gained in
-// a single monotone climb (undulation count 1) 4.0-5.8 km long at 13-20%
-// grade, above the master spec's own 4-12% band. The mandates are halved
-// here, and the ramp that delivers them now carries THREE summits instead of
-// one, so a pass climbs, crests, drops into a saddle and climbs again. The
-// owner's newer sentence outranks the older mandate; CLAUDE.md 7.17 records
-// both.
 const ELEV_MANDATE = {
-  alpine: 600, pass: 600, tremola: 600, furka: 600,
-  avalanche: 600, dolomiti: 600,
+  alpine: 1200, pass: 1200, tremola: 1200, furka: 1200,
+  avalanche: 1200, dolomiti: 1200,
   // r380c (owner's CITADEL BAY shot — buildings hanging in the sky): the
   // owner said "olive and VINE YARDS", and the first cut mandated the whole
   // Mediterranean family — including the HARBOR TOWNS, whose street blocks
   // then stacked 500 m over each other where route legs pass in plan. The
   // mandate now binds only true terrace and field country; azur, liguria,
   // aegean, brava and dalmatia keep their coastal town profiles.
-  vineyard: 260, olivecountry: 260, medterrace: 260, sanremo: 260,
+  vineyard: 500, olivecountry: 500, medterrace: 500, sanremo: 500,
 };
 // r368: the winter chapter — the four themes that get the winter dressing
 // pass (the autumn r365/r366 treatment translated into snow and ice).
@@ -6807,14 +6789,7 @@ export class Track {
         // bands are relative to the stage's own max, so summits stay snowy).
         this._gradeStretch = Math.min(1.35, Math.max(1, 4500 / Math.max(1, per)));
         const lawful9 = per * this._gradeStretch * (0.12 / 2) * (1 - 0.16);
-        // r404 (owner: "Lower the height difference across the game"): and
-        // a HARD CEILING over both. `lawful9` only asks what the grade law
-        // permits at this lap's length, which on a 10 km lap is ~500 u — so
-        // the compression never bit and the measured ranges stayed 425-528.
-        // The owner's sentence is a design limit, not a grade limit: the
-        // road's own height range is capped here, and the mountains around
-        // it carry the drama (they are terrain, untouched by this).
-        this._mandLawful = Math.min(mand9, lawful9, T.elevRangeU ?? 240);
+        this._mandLawful = Math.min(mand9, lawful9);
       }
     }
     // the coast line was scaled by ROUTE_SCALE where T was assembled; a
@@ -7067,16 +7042,7 @@ export class Track {
           const need = mand - (hi - lo);
           for (let i = 0; i < N; i++) {
             const u = i / N;
-            // r404: THREE SUMMITS, NOT ONE. `S(1 - |2u - 1|)` is a single
-            // symmetric ramp: up for half the lap, down for the other half,
-            // which is precisely the "straight climb" the owner asked to be
-            // replaced. The same total range now arrives as a main summit
-            // with two lesser ones either side of it, so the road crests,
-            // falls into a saddle and climbs again — snake turns going up
-            // AND down. The start stays flat (S is 0 at u = 0 and 1).
-            const ramp = S(1 - Math.abs(2 * u - 1));
-            const lobes = 0.5 - 0.5 * Math.cos(6 * Math.PI * u);   // 3 humps
-            this.center[i].y += need * (0.62 * ramp + 0.38 * ramp * lobes);
+            this.center[i].y += need * S(1 - Math.abs(2 * u - 1));
           }
           // "at least" means AT LEAST: the octave texture can shave the
           // summit, so measure the result and stretch to the mandate exactly
@@ -7467,46 +7433,6 @@ export class Track {
    *  flat around the start line so the grid/gate/grandstand sit at y=0. All
    *  phases are fixed per theme — layouts stay deterministic across loads. */
   _elevProfile(i) {
-    // r404 (owner: "Lower the height difference across the game. Instead of
-    // the straight climb introduce more interesting snake turns going up and
-    // down"). The census found the roster split in two: a median lap range of
-    // 17 u, and twenty worlds at 425-528 u gained in ONE monotone climb
-    // (undulation count: 1) running 4.0-5.8 km at 13-20% grade — over the
-    // master spec's own 4-12% band, and exactly the straight ramp T-04
-    // prohibits.
-    //
-    // Two corrections, both here so every consumer of road height follows:
-    // (a) a soft ceiling on the lap's height RANGE — worlds already inside it
-    //     are untouched (the 17 u median pays nothing), tall ones compress to
-    //     it, which also divides their grades by the same factor and brings
-    //     them back inside WR-2.1; (b) a hand-keyed ascent now UNDULATES, so
-    //     the climb rises and falls on its way up instead of ramping.
-    const E = this.T.elev || { amp: 0, ph: [0, 0, 0] };
-    const flat = THREE.MathUtils.smoothstep(this._circDist(i, 0), 45, 130);
-    if (this._elevK === undefined) {
-      let lo = Infinity, hi = -Infinity;
-      for (let k = 0; k < 240; k++) {
-        const v = this._elevRaw(Math.round((k * N) / 240));
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-      const rng = hi - lo;
-      const target = this.T.elevRangeU ?? 190;
-      this._elevK = rng > target ? target / rng : 1;
-    }
-    let y = this._elevRaw(i) * this._elevK;
-    if (E.profile === 'ascent') {
-      // ~11 rises and falls over the lap, ±5 u: enough that the climb reads
-      // as a snaking road with brows and dips, small beside the compressed
-      // range so the pass still climbs to its summit.
-      y += 5 * Math.sin((i / N) * Math.PI * 2 * 11 + 1.3) * flat;
-    }
-    return y;
-  }
-
-  /** The unscaled elevation shape — see `_elevProfile` for the range ceiling
-   *  and the ascent undulation applied on top of it. */
-  _elevRaw(i) {
     const E = this.T.elev || { amp: 0, ph: [0, 0, 0] };
     const flat = THREE.MathUtils.smoothstep(this._circDist(i, 0), 45, 130);
     if (E.profile === 'ascent') {
@@ -7566,17 +7492,7 @@ export class Track {
    *  against every station more than 40 stations away around the ring, so
    *  the injected sweepers can never crowd a crossing or parallel leg. */
   _applyT01Weave() {
-    // r403 (owner, on a HEDGEROW DASH frame: "Make it more playful. It is
-    // too straight and limited"): the weave is no longer opt-in. The census
-    // put ~64 of 78 worlds over T-01's 400 u straight cap, and the owner has
-    // now said it twice in different words — the roster is too straight. Two
-    // exclusions, both structural rather than taste: a world may opt out with
-    // `t01: false` (a hand-drawn map whose shape is the point), and STREET
-    // worlds never weave — their buildings line the carriageway from a
-    // frontage table that is laid out against the centreline, so moving the
-    // line would walk the road into the houses.
-    if (!this.level || this.level.t01 === false) return;
-    if (this.T.frontage) return;
+    if (!this.level || !this.level.t01) return;
     const N = this.center.length;
     let arcTotal = 0;
     for (let i = 0; i < N; i++) {
@@ -13999,9 +13915,7 @@ export class Track {
         // one five-bar gateway every ~18 bays, staggered between the sides —
         // roughly a gate every 110 u of hedge, which is the Bible's field
         // entrance rate. They are the only way off the lane; that is the point.
-        // r403: a five-bar gateway every ~10 bays rather than ~18 — the
-        // openings are what stop a hedged lane reading as a corridor
-        if ((bay + (side > 0 ? 0 : 5)) % 10 === 0) continue;
+        if ((bay + (side > 0 ? 0 : 9)) % 18 === 0) continue;
         const p = this.pointAt(i, LAT * side);
         // AN OFFSET IS NOT A DISTANCE. `pointAt` measures along one sample's
         // normal; on the inside of a bend the road swings under it. The bank
