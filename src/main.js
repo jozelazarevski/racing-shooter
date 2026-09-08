@@ -11900,6 +11900,33 @@ class Game {
       }
     }
 
+    // r398 (owner: "Car is still shaking") — THE BORE APPROACH GLIDE.
+    // Spike forensics on GLACIER COL put every big camera jump at the
+    // tunnel: on the approach the ridge over the bore is a REAL wall
+    // between boom and car, so the sightline lift climbed the eye 30 u
+    // over the mountain (frames 1873-1885, camY 78 -> 108 over a car at
+    // 70), and one frame later the crown clamp cut it down 41.7 u in a
+    // single frame when the bore activated. Neither guard is wrong alone;
+    // the pair is a cliff. Within 40 stations of a portal the eye now obeys
+    // a ceiling that DESCENDS toward the crown (≈0.45 u of extra height per
+    // u of road), so the lift cannot climb the ridge it is about to fly
+    // under, and the bore clamp engages with zero left to snap.
+    if (!tun && tk?._tunnels?.length && tk.center?.length) {
+      const cp = this.camPos;
+      for (const T9 of tk._tunnels) {
+        const ti9 = p.trackIndex;
+        const dIn = (ti9 >= T9.s - 40 && ti9 < T9.s) ? T9.s - ti9
+          : (ti9 > T9.e && ti9 <= T9.e + 40) ? ti9 - T9.e : null;
+        if (dIn === null) continue;
+        const portal = ti9 < T9.s ? T9.s : T9.e;
+        const info9 = tk.tunnelAt(tk.center[portal], portal, 0);
+        if (!info9) continue;
+        const ceil9 = tk.center[portal].y + info9.apex - 1.3
+          + dIn * (tk.segLen ?? 6) * 0.45;
+        if (cp.y > ceil9) cp.y = ceil9;
+        break;
+      }
+    }
     // a solid pine on the camera->player sightline fills the whole frame —
     // slide the camera sideways off the trunk instead
     if (tk?.trees) {
