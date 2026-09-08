@@ -4171,6 +4171,28 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r399 — THE FOREST IS A MASS (owner: "Car should not drive between the trees")
+
+Rule recorded as CLAUDE.md 7.15. The trunks were never the hole: a
+head-on run into a dense stand wedges 6 u past the tree line (measured,
+standing start, densest belt on PINE VALLEY). The hole was STEERING —
+the carpet forest is paint with a 60%-keep trunk deflection (FIX-5), so
+a weaving car threaded the gaps 25 u deep at up to 61 km/h through a
+median-density stand.
+
+Between the trunks now stands UNDERBRUSH: three or more registered
+carpet trees within 8 u, car off the road apron (widthAt + 3), and
+brush drag (3.2/s) bogs it to a crawl inside a second. Physics, not an
+invisible wall (standing decision 1 stands): the wood is visibly dense
+and the car visibly ploughs into scrub; UNSTUCK remains the way out.
+Player-only, like the trunk deflection — rivals never leave the line
+and their recovery law returns any that do. Measured after: PINE
+VALLEY 25 -> 18.6 u penetration, crawling at 1-2 km/h; DEEPWOOD
+24 -> 13.4 u at 2-7 km/h. Racing feel untouched: the drag needs a
+dense stand AND the apron crossed, so drift exits over grass and verge
+grazes cost nothing (drift 6/6, shortcut 8/8 green).
+
+
 ## r398 — THE WHITEOUT, THE GUN, AND THE SHAKING EYE (three owner reports, one session)
 
 THE WHITEOUT (owner phone frame, AVALANCHE ALLEY start: no road, no car,
