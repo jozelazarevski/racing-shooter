@@ -11831,7 +11831,30 @@ class Game {
         const sy = cp.y + dy * f;
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }
-      if (lift > 0) cp.y += Math.min(lift, 18);
+      // r398 (owner: "Car is still shaking"): THE CAR IS STILL — THE EYE WAS.
+      // Measured on GLACIER COL: the car's grounded |dy| holds p95 0.083
+      // u/frame while the CAMERA ran p95 0.383 with single-frame jumps of
+      // 3.57 u. This lift is why: a sample near the car divides by a small
+      // (1 - f), so a 0.4 u graze of the r395 mountain flank becomes a
+      // multi-unit correction, recomputed from scratch every frame as the
+      // boom sweeps a switchback — it engaged and released on alternate
+      // frames, and on screen a fluttering eye is indistinguishable from a
+      // shaking car. The RESIDUAL lift is now applied through an asymmetric
+      // ease (~100 ms up, ~550 ms release) so the eye takes a lift once and
+      // lets it go gently; the never-underground floor below stays instant.
+      // (Two end-of-chain rate limiters were tried first and reverted: an
+      // absolute one pinned the flutter into a sawtooth at its own up rate,
+      // a car-relative one coupled the eye to the car's bob — both measured
+      // WORSE. Smooth the source, not the sum.)
+      {
+        const want9 = Math.min(lift, 18);
+        const cdt9 = this._camDt ?? dt;
+        const ls9 = this._liftSm ?? 0;
+        this._liftSm = want9 > ls9
+          ? ls9 + (want9 - ls9) * Math.min(1, 10 * cdt9)
+          : ls9 + (want9 - ls9) * Math.min(1, 1.8 * cdt9);
+        if (this._liftSm > 0.01) cp.y += this._liftSm;
+      }
       // ...and never underground wherever it ended up (PATCH_02 v1.2 fix 13
       // names this clearance; 2.2 is this engine's measured-good value)
       const gCam = tk.terrainHeight(cp.x, cp.z)
@@ -12011,50 +12034,6 @@ class Game {
           if (this.camPos.y < gh2) this.camPos.y = gh2;
         }
       }
-    }
-    // r398 (owner: "Car is still shaking"): THE CAR IS STILL — THE CAMERA
-    // WAS SHAKING. Measured with the fine-jitter probe on GLACIER COL: the
-    // car's grounded |dy| holds p95 0.083 u/frame, but the CAMERA ran p95
-    // 0.383 u/frame with single-frame jumps of 3.57 u. The sightline lift
-    // and its neighbour guards are instant clamps, and beside the r395
-    // mountain flank they engage and release on alternate frames through
-    // every switchback — on screen a fluttering eye is indistinguishable
-    // from a shaking car. The final eye HEIGHT is rate-limited here
-    // (26 u/s up, 15 u/s down), and the hard never-underground floor is
-    // re-applied after it so safety stays instant. Exempt: fast falls (the
-    // plunge rider must move faster than any limit), tunnel and deck
-    // frames (their crown/soffit clamps are architecture, not flutter),
-    // and any teleport or leash snap (memory resets on a big horizontal
-    // jump).
-    // The limit runs on the eye's height RELATIVE TO THE CAR, not absolute:
-    // absolute limiting turned the flutter into a sawtooth pinned at the up
-    // rate (re-measured p95 0.433/frame — the cap itself), because the
-    // oscillation source still fired and the eye kept slewing between the
-    // lifted and the released height. Relative, with a SLOW release, the eye
-    // takes the lift once and holds it through the switchback instead of
-    // dropping back between clamp engagements — while driving downhill (car
-    // and eye descending together) costs nothing.
-    {
-      const cp = this.camPos;
-      const cdt = this._camDt ?? dt;
-      const rel = cp.y - p.pos.y;
-      const prevRel = this._camRelSm;
-      const jumped = prevRel === undefined
-        || Math.hypot(cp.x - (this._camXSm ?? cp.x), cp.z - (this._camZSm ?? cp.z)) > 20;
-      const deck9 = tk?.deckOverhead
-        && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(cp, p.trackIndex));
-      if (!(jumped || vyNow < -9 || tun || deck9)) {
-        const up9 = 26 * cdt, dn9 = 4 * cdt;
-        let rel2 = rel;
-        if (rel > prevRel + up9) rel2 = prevRel + up9;
-        else if (rel < prevRel - dn9) rel2 = prevRel - dn9;
-        cp.y = p.pos.y + rel2;
-        if (tk?.terrainHeight) {
-          const g9 = tk.terrainHeight(cp.x, cp.z) + 2.2;
-          if (cp.y < g9) cp.y = g9;
-        }
-      }
-      this._camRelSm = cp.y - p.pos.y; this._camXSm = cp.x; this._camZSm = cp.z;
     }
     this._applyCamera(dt, speedZoom, M);
   }
