@@ -12026,24 +12026,35 @@ class Game {
     // frames (their crown/soffit clamps are architecture, not flutter),
     // and any teleport or leash snap (memory resets on a big horizontal
     // jump).
+    // The limit runs on the eye's height RELATIVE TO THE CAR, not absolute:
+    // absolute limiting turned the flutter into a sawtooth pinned at the up
+    // rate (re-measured p95 0.433/frame — the cap itself), because the
+    // oscillation source still fired and the eye kept slewing between the
+    // lifted and the released height. Relative, with a SLOW release, the eye
+    // takes the lift once and holds it through the switchback instead of
+    // dropping back between clamp engagements — while driving downhill (car
+    // and eye descending together) costs nothing.
     {
       const cp = this.camPos;
       const cdt = this._camDt ?? dt;
-      const prevY = this._camYSm;
-      const jumped = prevY === undefined
+      const rel = cp.y - p.pos.y;
+      const prevRel = this._camRelSm;
+      const jumped = prevRel === undefined
         || Math.hypot(cp.x - (this._camXSm ?? cp.x), cp.z - (this._camZSm ?? cp.z)) > 20;
       const deck9 = tk?.deckOverhead
         && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(cp, p.trackIndex));
       if (!(jumped || vyNow < -9 || tun || deck9)) {
-        const up9 = 26 * cdt, dn9 = 15 * cdt;
-        if (cp.y > prevY + up9) cp.y = prevY + up9;
-        else if (cp.y < prevY - dn9) cp.y = prevY - dn9;
+        const up9 = 26 * cdt, dn9 = 4 * cdt;
+        let rel2 = rel;
+        if (rel > prevRel + up9) rel2 = prevRel + up9;
+        else if (rel < prevRel - dn9) rel2 = prevRel - dn9;
+        cp.y = p.pos.y + rel2;
         if (tk?.terrainHeight) {
           const g9 = tk.terrainHeight(cp.x, cp.z) + 2.2;
           if (cp.y < g9) cp.y = g9;
         }
       }
-      this._camYSm = cp.y; this._camXSm = cp.x; this._camZSm = cp.z;
+      this._camRelSm = cp.y - p.pos.y; this._camXSm = cp.x; this._camZSm = cp.z;
     }
     this._applyCamera(dt, speedZoom, M);
   }
