@@ -171,7 +171,7 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
     };
     const ws = []; for (let i = 0; i < N; i++) ws.push(t.widthAt(i));
     const wBase = [...ws].sort((a, b) => a - b)[Math.floor(N * 0.5)];
-    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0, minR = 1e9;
+    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0, minR = 1e9, apexDip = 0;
     for (let i = 0; i < N; i++) {
       wMin = Math.min(wMin, ws[i]);
       wStep = Math.max(wStep, Math.abs(ws[(i + 1) % N] - ws[i]));
@@ -185,9 +185,32 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
         const owed = Math.min(wBase * 1.19, Math.max(wBase, R - 6)) - 0.45;
         if (ws[i] < owed) flareBad++;
       }
+      // W-CURVE-01.5 (r401): SOLID APEX. At every sharp station (R <= 30)
+      // the INNER verge — the circumcenter's side, where a cutting car
+      // crosses — must be solid ground close under the road edge. A fold
+      // or pit (the pre-r394 V-seam class) reads 8-30 u here; the steepest
+      // lawful inner bank measured is 4.15 (GLACIER station 478).
+      if (R <= 30) {
+        const c = t.center[i], n = t.nrm[i], w = ws[i];
+        const a2 = t.center[(i - 6 + N) % N], c2 = t.center[(i + 6) % N];
+        const dd = 2 * (a2.x * (c.z - c2.z) + c.x * (c2.z - a2.z) + c2.x * (a2.z - c.z));
+        if (Math.abs(dd) > 1e-6) {
+          const aa = a2.x * a2.x + a2.z * a2.z, bb = c.x * c.x + c.z * c.z,
+            cc = c2.x * c2.x + c2.z * c2.z;
+          const ux = (aa * (c.z - c2.z) + bb * (c2.z - a2.z) + cc * (a2.z - c.z)) / dd;
+          const uz = (aa * (c2.x - c.x) + bb * (a2.x - c2.x) + cc * (c.x - a2.x)) / dd;
+          const sIn = Math.sign((ux - c.x) * n.x + (uz - c.z) * n.z) || 1;
+          const edgeY = c.y + (t.bankOffset ? t.bankOffset(i, w * sIn) : 0);
+          for (const d of [0.5, 1.5, 2.5, 3.5]) {
+            const x = c.x + n.x * (w + d) * sIn, z = c.z + n.z * (w + d) * sIn;
+            const g = (t._drawnGroundY ? t._drawnGroundY(x, z) : null) ?? t.terrainHeight(x, z);
+            apexDip = Math.max(apexDip, edgeY - g);
+          }
+        }
+      }
     }
     return { wMin: +wMin.toFixed(2), wStep: +wStep.toFixed(2), hairN, flareBad,
-      wBase: +wBase.toFixed(2), minR: +minR.toFixed(1) };
+      wBase: +wBase.toFixed(2), minR: +minR.toFixed(1), apexDip: +apexDip.toFixed(2) };
   });
   ok(H.wMin >= 3.0, `HRD-3 [${tag}] half-width floor 3.0 u`, `min ${H.wMin}`);
   ok(H.wStep <= 0.6, `HRD-4 [${tag}] width tapers, never steps`, `max step ${H.wStep} u/station`);
@@ -197,6 +220,9 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
   ok(H.minR >= 15.5,
     `HRD-7 [${tag}] the road never turns tighter than it is wide (R floor)`,
     `min circumcircle R ${H.minR} u`);
+  ok(H.apexDip <= 5.0,
+    `W-CURVE-01.5 [${tag}] the apex verge is solid (inner ground close under the edge)`,
+    `worst inner-verge dip ${H.apexDip} u (steepest lawful bank measured 4.15; a fold reads 8+)`);
   if (lvl === 66) {
     // HRD-5/6 (owner: always a mountain on one side in steep country; no
     // ridges/causeways). Census: at every station outside the start zone,
