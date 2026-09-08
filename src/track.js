@@ -24036,23 +24036,19 @@ export class Track {
               Math.min(1, color.b / Math.max(0.2, M.b)));
             break;
           }
-          case 'larch': { // 7.14 evergreen law (owner 2026-09-08: "pine trees
-            // are never not green. They are evergreen. Apply this across the
-            // game"): at game scale the larch's tiered cones read as a PINE,
-            // and riding the theme band painted them amber on every autumn
-            // world — the screenshot census showed they were exactly the
-            // yellow "pines" of the report. Theme-independent yellow-green
-            // now (paler and warmer than the conifer's #236555 so the two
-            // species still read apart), divided through the canopy material
-            // like the conifer case so the product survives amber materials.
-            color.setHSL(0.29 + Math.random() * 0.035, 0.40 + Math.random() * 0.08,
-              0.30 + Math.random() * 0.06);
-            const M = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
-            color.setRGB(Math.min(1, color.r / Math.max(0.2, M.r)),
-              Math.min(1, color.g / Math.max(0.2, M.g)),
-              Math.min(1, color.b / Math.max(0.2, M.b)));
-            break;
-          }
+          case 'larch':   // paler, yellow-shifted soft needles. 7.14 note:
+            // the larch is EXEMPT from the evergreen law by the owner's own
+            // word ("Larch is getting yellow. All good", 2026-09-08, closing
+            // the r398 census) — it is the deciduous conifer, and its gold
+            // on the autumn band is the LARCH GOLD look, not a violation.
+            // If a tint here ever changes, it MUST keep exactly two
+            // Math.random() draws: a third draw per larch shifted the global
+            // RNG stream for every world built after a larch world in the
+            // same page, re-rolling HARVEST RUN's stones into the
+            // carriageway (LAW 6) and the shortcut hinterland (both suites
+            // build the roster sequentially in one context).
+            color.setHSL(F.h - 0.045 + Math.random() * F.hVar, F.s * 0.85,
+              Math.min(0.6, F.l + 0.10 + Math.random() * F.lVar)); break;
           case 'birch':   // light airy crown
             color.setHSL(F.h + 0.02 + Math.random() * F.hVar, F.s * 0.8,
               Math.min(0.62, F.l + 0.16 + Math.random() * F.lVar)); break;
