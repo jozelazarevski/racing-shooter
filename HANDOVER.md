@@ -4171,6 +4171,62 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r397 — W-CURVE-01.4: THE BARRIER LAW LIVES IN THE EDGE RAILS
+
+Round 5 of the x70 program: the master spec's W-CURVE-01.4 (continuous
+grounded drop-side barriers through sharp curves, gaps <= 8 u). The
+round's finding is that the roster mostly already obeys it — and that
+the checks which should have proven that were blind.
+
+THE DEAD THRESHOLD. `_buildGuardFence` gapped its bays through hairpins
+with `curvature > 0.045`. r394's arc-true curvature rewrite rescaled the
+array (roster maximum now 0.034), so the skip had been matching NOTHING
+since that build — silently. It now reads the circumcircle over ~30 u of
+arc, the same metric the HRD gate uses. Lesson repeated from r394: every
+consumer of `curvature` needs auditing when its scale changes; this one
+was missed.
+
+THE BLIND CENSUS, TWICE. The first roster census (16 mountain worlds)
+read ZERO sharp stations on SERPENTINA DESCENT — a switchback stage —
+because a ±6-STATION circumcircle window spans 140 u on long-segLen
+worlds and smooths hairpins invisible. The second census "fixed" the
+window via `t.totalLen`, which does not exist; the `?: 6` fallback
+silently pinned every world to a 6 u window again. Third census, on
+`t.segLen`, found the truth: one genuinely exposed sharp-drop station on
+the whole roster (SUMMIT CLIMB station 289, drop 6.3 u).
+
+TWO WRONG BUILDS, REVERTED SAME TURN. First attempt put verge-anchored
+fence bays along sharp arcs, picking the outer side by a chord-vs-normal
+sign test — which reads the WRONG side at switchback stacks, where
+adjacent legs alternate sides of the local bend (measured: all 6 GLACIER
+candidates chose the fold side, whose "drop" is the lower carriageway).
+Second attempt dropped the sign test for drop-ordered both-side
+candidates — then the survey showed `_buildEdgeRails` already walls
+drops (>= 2.5) and tight corners BOTH SIDES roster-wide with SOLID
+rails, and fence bays on the same stations would re-create the GOTTHARD
+two-overlapping-barriers push (documented in the rails' own guarded
+check). Both attempts erased; the fence keeps its hairpin gap.
+
+THE REAL HOLES, in the rails: (1) TIGHT (0.02) reads the smoothed
+curvature array, which under-reads short hairpin cusps (GLACIER's true
+R18-23 stations read R>=45 through it) — the circumcircle now joins it,
+so the owner's "steep curves fully walled" rule finally reaches every
+true hairpin; (2) MINRUN 3 swallowed 1-2 station runs at sharp bends —
+exactly SUMMIT CLIMB 289 — and a short run now survives when it
+contains a tight station.
+
+MEASURED AFTER: GLACIER 54 lawful-stand sharp-drop station-sides, worst
+rail distance 0.0; SUMMIT CLIMB 2 (incl. 289), worst 0.0; CLIFF KNOT
+and SEA CLIFF RUN zero qualifying stations. Gate: W-CURVE-01.4 check in
+test-stagerules on GLACIER + SUMMIT (barrier segment within 8 u of every
+lawful stand; stations with no lawful stand are the spec's allowed apex
+openings). Stagerules 38/38.
+
+STILL OPEN from the W-CURVE debt list (#102): 2-8[deg] inward banking on
+gradient sharp curves (its own build — ribbon mesh + groundHeightAt +
+vehicle roll), arc-following road UVs, apex solidity validator.
+
+
 ## r396 — THE TERRAIN READS FINISHED (owner: "This is really unfinished visual. Scann across the game and fix")
 
 The owner's cliff frame diagnosed to three compounding causes in the

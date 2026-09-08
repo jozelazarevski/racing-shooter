@@ -231,6 +231,66 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
   await p.close();
 }
 
+// ---- W-CURVE-01.4: continuous drop-side barriers through sharp curves ------
+// At every sharp station (circumcircle over ~30u of arc <= 30) whose side
+// falls >= 2.5 u at (half+7) — the edge-rail builder's own DROP law — and
+// where a rail can lawfully stand (outside gate/jump-gorge/ford/tunnel zones
+// and clear of every carriageway), a barrier segment must lie within 8 u of
+// the rail point (the spec's gap cap). Stations with no lawful stand are the
+// apex openings the spec allows. Measured r397: worst distance 0.0 on
+// GLACIER (54 stations) and SUMMIT CLIMB (2, incl. the station 289 hole the
+// MINRUN fix closed); CLIFF KNOT and SEA CLIFF RUN have no qualifying
+// stations at all.
+for (const [lvl, tag] of [[66, 'GLACIER COL'], [6, 'SUMMIT CLIMB']]) {
+  const { p, errors } = await boot(lvl);
+  const W = await p.evaluate(() => {
+    const t = window.__game.track, N = t.center.length;
+    const KE = Math.max(3, Math.round(30 / t.segLen));
+    const radE = (i) => {
+      const a = t.center[(i - KE + N) % N], b = t.center[i % N], c = t.center[(i + KE) % N];
+      const cross = (b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x);
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      return (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(c.x - b.x, c.z - b.z)
+        * Math.hypot(c.x - a.x, c.z - a.z)) / (2 * Math.abs(cross));
+    };
+    const segDist = (px, pz, q) => {
+      const dx = q.x2 - q.x1, dz = q.z2 - q.z1;
+      const L2 = dx * dx + dz * dz || 1;
+      const u = Math.max(0, Math.min(1, ((px - q.x1) * dx + (pz - q.z1) * dz) / L2));
+      return Math.hypot(px - (q.x1 + dx * u), pz - (q.z1 + dz * u));
+    };
+    let checked = 0, worst = 0; const holes = [];
+    for (let i = 0; i < N; i++) {
+      if (radE(i) > 30) continue;
+      if (t._circDist(i, 0) < 30) continue;
+      if ((t._jumpGorges ?? []).some((G) => t._circDist(i, G.i) < 40)) continue;
+      if (t.fords.some((f) => t._circDist(i, f.i) < 14)) continue;
+      if (t._tunnels.some((tu) => i >= tu.s - 6 && i <= tu.e + 6)) continue;
+      const half = t.widthAt(i);
+      for (const s of [1, -1]) {
+        const out = t.pointAt(i, (half + 7.0) * s);
+        if (t.center[i].y - t.terrainHeight(out.x, out.z) < 2.5) continue;
+        const pr = t.pointAt(i, (half + 1.8) * s);
+        const tg = t.tan[i];
+        const okStand = [[0, 0], [tg.x * 2.4, tg.z * 2.4], [-tg.x * 2.4, -tg.z * 2.4]]
+          .every(([ox, oz]) => t._distToTrack(pr.x + ox, pr.z + oz) >= half + 0.25);
+        if (!okStand) continue;
+        checked++;
+        let best = 1e9;
+        for (const q of t.barriers) best = Math.min(best, segDist(pr.x, pr.z, q));
+        if (best > worst) worst = best;
+        if (best > 8) holes.push(i);
+      }
+    }
+    return { checked, worst: +worst.toFixed(1), holes: holes.length };
+  });
+  ok(W.holes === 0,
+    `W-CURVE-01.4 [${tag}] sharp drop curves carry a barrier within 8 u`,
+    `${W.checked} station-side(s) checked, worst distance ${W.worst} u, ${W.holes} hole(s)`);
+  ok(errors.length === 0, `W-CURVE [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
