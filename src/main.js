@@ -11933,9 +11933,15 @@ class Game {
     if (!tun && tk?._tunnels?.length && tk.center?.length) {
       const cp = this.camPos;
       const fi9 = tk.fracIndexAt ? tk.fracIndexAt(p.pos, p.trackIndex) : p.trackIndex;
+      // 80 stations, not 40: at 40 the ceiling still bound (~+37 vs a
+      // top-down anchor at +46) and vanished at the window edge, so the eye
+      // regained ~35 u at full lerp rate right there — the last measured
+      // climb cluster sat EXACTLY at e+40. By 80 the ceiling exceeds every
+      // mode's anchor long before the edge, so it stops binding smoothly
+      // and the window boundary is unobservable.
       for (const T9 of tk._tunnels) {
-        const dIn = (fi9 >= T9.s - 40 && fi9 < T9.s) ? T9.s - fi9
-          : (fi9 > T9.e && fi9 <= T9.e + 40) ? fi9 - T9.e : null;
+        const dIn = (fi9 >= T9.s - 80 && fi9 < T9.s) ? T9.s - fi9
+          : (fi9 > T9.e && fi9 <= T9.e + 80) ? fi9 - T9.e : null;
         if (dIn === null) continue;
         const portal = fi9 < T9.s ? T9.s : T9.e;
         const info9 = tk.tunnelAt(tk.center[portal], portal, 0);
