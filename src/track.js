@@ -22399,9 +22399,22 @@ export class Track {
       // noise OVER the carved near ground — on CITADEL BAY a 32 u phantom
       // hill covered the quay, the grid and the car, and the whole race ran
       // inside it. The sink now tracks the near patch's own rim.
+      //
+      // r398 (owner phone frame, AVALANCHE ALLEY start: total whiteout, no
+      // road, no car): the r392 sink was a FIXED −60, calibrated on
+      // CITADEL's 32 u phantom — but mountain-world hill noise reaches far
+      // past it. Measured on AVALANCHE: the sunk far mesh still stood
+      // 70.2 u ABOVE the road across 100 stations including the whole grid,
+      // and the race started inside a white hill. A subtraction can always
+      // be outgrown; inside the rim the mesh now BLENDS TO A FIXED DEEP
+      // LEVEL (−80, under every carve in the game — gorges bottom at −30)
+      // so no noise amplitude can ever poke it through again. At the rim
+      // band the same smoothstep still hands over to raw hill noise, where
+      // the near patch agrees by construction.
       const sinkTo9 = (this._patchHalf ?? 1000) - 180;
       const m = Math.max(Math.abs(x), Math.abs(z));
-      h -= 60 * (1 - smoothstep01((m - sinkTo9) / 80));
+      const s9 = smoothstep01((m - sinkTo9) / 80);
+      h = -80 + (h + 80) * s9;
       pos.setY(i, h - 0.52);                    // 0.4 under the near patch
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
