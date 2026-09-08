@@ -10291,10 +10291,18 @@ export class Track {
   /** Seaward of the coastline the land sinks to the sea floor over a beach
    *  band. The road corridor is exempt exactly the way the river carve
    *  exempts it, so the seafront straight keeps its shoulder. */
-  _coastDepress(x, z, h, dRoad) {
+  _coastDepress(x, z, h, dRoad, roadY = null) {
     const C = this.T.coast;
     const sd = this._coastSide(x, z);
     const roadW = THREE.MathUtils.smoothstep(dRoad, 24, 44);
+    // r403: the SHORE caps use a tighter road exemption than the inland
+    // envelope. At 24-44 u the roadside bank of a seafront cutting kept its
+    // full natural height and was itself the wall — measured 25.5 u above the
+    // sightline on OLIVE COAST's 34 seafront stations after the outer mass
+    // came down. The road's own bench is not at risk from the tighter band:
+    // `_blendHeight` pulls the ground to the road datum within its 15 u
+    // corridor and tucks it below, so nothing inside 15 u is shaped here.
+    const shoreW = THREE.MathUtils.smoothstep(dRoad, 10, 22);
     if (sd <= 0) {
       // r387 (owner's OLIVE COAST frame — "make it pretty with sea on the
       // side"): the sea existed and was invisible — the mandate-scaled
@@ -10305,16 +10313,94 @@ export class Track {
       // waterline — land stairs DOWN to a shore, which is what a shore is.
       // The road corridor is exempt like every carve, so a seafront leg
       // keeps its bench.
+      // r403 (owner: "Olive coast make it like small hills next to the sea"
+      // and, on the live build, "I don't see any sea in olive coast"):
+      // THE APPROACH CEILING WAS STILL A WALL. r387's cap eases from the
+      // waterline over the full 260 u band, so 130 u inland it still allowed
+      // ap*0.55/2 ≈ 71 u — and the mandate-scaled noise took every unit of
+      // it. Measured on OLIVE COAST before this: 80-92 u of terrain standing
+      // between the road and water that lies 60 u away, and ZERO of 55
+      // coastal stations with any sightline to their own bay (worst ground
+      // 117.7 u above the line of sight). The sea was drawn, 4696 u of it,
+      // and nobody could see it.
+      //
+      // The last `kb` metres before the water are now a KNOLL BAND: the
+      // ceiling there is small-hill sized — a rolling field (λ ≈ 115 u and
+      // 57 u, ±9 u about a 7 u mean) rather than a ramp — so the mass carves
+      // down into SMALL HILLS with the bay open behind them. The knolls fade
+      // to beach level over the last 40 u so the shore itself stays a shore,
+      // and the band eases back into r387's inland envelope behind, which is
+      // untouched. Both are ceilings: ground already lower than the knolls
+      // stays lower, so the shore reads as hills and hollows, not a plateau.
       const ap = 260;
       if (sd > -ap && h > (C.level ?? -2)) {
         const t9 = Math.max(0, 1 + sd / ap);      // 0 inland -> 1 at the line
-        const cap = (C.level ?? -2) + (1 - smoothstep01(t9)) * ap * 0.55;
-        if (h > cap) h = h * (1 - roadW) + cap * roadW;
+        const rise = (1 - smoothstep01(t9)) * ap * 0.55;
+        const inland = -sd;                       // metres from the waterline
+        const kb = C.knollBand ?? 190;
+        const near = 1 - smoothstep01(inland / kb);          // 1 at water -> 0 inland
+        // r403b: the knolls sit BACK from the water. At a 42 u fade they
+        // reached full height 40 u out and became the wall themselves (17 of
+        // 34 seafront stations still blind): a 16 u knoll 40 u from the
+        // waterline stands above the sightline of a road 60-100 u inland.
+        // Full height only 130 u back, so the strip the eye looks across
+        // stays dune-low and the hills read behind it.
+        const shore = smoothstep01(inland / 130);
+        let cap = (C.level ?? -2)
+          + rise * (1 - near) + this._coastKnoll(x, z) * near * shore;
+        // r403c: THE SIGHTLINE IS THE LAW (7.16). Capping by height alone
+        // cannot know whether a knoll blocks the bay: measured, the blind
+        // seafront stations were all where the road runs AT sea level
+        // (y 0.2-2.6) with 14-36 u of ground 45 u out — from a beach road
+        // the line to the water is nearly flat, so anything standing there
+        // hides it, while from a corniche 18 u up the same knoll is scenery
+        // under the view. So the ceiling follows the LINE OF SIGHT from the
+        // driver's eye to the waterline: the shore fills the room under it
+        // and never above. Hills where the road can see over them, beach
+        // where it cannot — which is what a coast looks like.
+        if (roadY !== null) {
+          const toWater = inland;                  // this point -> waterline
+          const roadToWater = inland + dRoad;      // road -> waterline
+          if (roadToWater > 1) {
+            const eye = roadY + 2;
+            const f = (roadToWater - toWater) / roadToWater;
+            const lineY = eye + ((C.level ?? -2) - eye) * f;
+            cap = Math.min(cap, Math.max((C.level ?? -2) + 0.8, lineY - 1.2));
+          }
+        }
+        if (h > cap) h = h * (1 - shoreW) + cap * shoreW;
       }
       return h;
     }
     const w = smoothstep01(Math.min(1, sd / (C.beach ?? 60))) * roadW;
-    return h * (1 - w) + (C.floor ?? -7) * w;
+    let h2 = h * (1 - w) + (C.floor ?? -7) * w;
+    // r403: AND A SHORE CEILING, because the blend alone is not a shore.
+    // Seaward of the coast line the beach smoothstep ramps over `beach`
+    // metres, so at sd = 11 it carries only 7% of the way to the floor —
+    // and with mandate-scaled noise at 100 u that left 95 u of terrain
+    // STANDING IN THE WATER, 80 u off the road, which is the wall the owner
+    // could not see the sea past ("I don't see any sea in olive coast").
+    // Past the line the ground may not stand above the knoll line, and that
+    // allowance falls to sea level within 30 u: the shore is where the land
+    // ends. The road corridor keeps its exemption, so a causeway or a
+    // seafront bench is untouched.
+    const capS = (C.level ?? -2)
+      + this._coastKnoll(x, z) * (1 - smoothstep01(sd / 30));
+    if (h2 > capS) h2 = h2 * (1 - shoreW) + capS * shoreW;
+    return h2;
+  }
+
+  /** r403 (owner: "small hills next to the sea"): the shore's height
+   *  allowance — a rolling knoll field (λ ≈ 115 u and 57 u, ±9 u about a 7 u
+   *  mean, never negative) that the coast band uses as a CEILING on both
+   *  sides of the waterline, so the land fringing a bay reads as small hills
+   *  and hollows instead of one mass. Deterministic in world space, so the
+   *  physics, the near mesh, the far mesh and the paint all agree. */
+  _coastKnoll(x, z) {
+    const C = this.T.coast;
+    return Math.max(0, (C.knollAmp ?? 7)
+      + 6.2 * Math.sin(x * 0.0546 + 0.7) * Math.cos(z * 0.0491 - 1.2)
+      + 2.8 * Math.sin(x * 0.1103 + 2.3) * Math.cos(z * 0.0972 + 0.5));
   }
 
   /** Nothing gets BUILT in the sea — no cottage on the seabed, no sheep
@@ -10378,7 +10464,7 @@ export class Track {
     const ns = this._nearestSample(x, z);
     const nd = ns.d, bi = ns.i;
     let h = this._blendHeight(nd, this.center[bi].y, x, z, bi);
-    if (this.T.coast) h = this._coastDepress(x, z, h, nd);
+    if (this.T.coast) h = this._coastDepress(x, z, h, nd, this.center[bi].y);
     // r350 (owner: tunnels under mountains): the ridge is built inside
     // _blendHeight, and on a coast world _coastDepress then pulled it to the
     // SEABED wherever the bore sits seaward of the coastline — SERPENT PASS
@@ -10641,7 +10727,7 @@ export class Track {
     // mesh the player SEES, terrainHeight() the ground physics STANDS ON.
     // With the term only in the latter, the physics said "seabed at -7" while
     // the rendered land stayed dry — the sea existed as scattered pokes.
-    if (this.T.coast) h = this._coastDepress(x, z, h, d);
+    if (this.T.coast) h = this._coastDepress(x, z, h, d, this.center[bi].y);
     // r350: the headland re-application, in BOTH ground functions like the
     // coast term itself — see terrainHeight.
     if (this.T.coast && this._tunnels?.length) h = this._tunnelRidge(x, z, h);
