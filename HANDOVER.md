@@ -4291,13 +4291,21 @@ ALSO IN THIS BUILD — F7 STOPPED MEASURING THE BRUSH. `test-phase4`'s
 grass-floor runway search priced trees at their 1.8 u TRUNK radius while
 r399's underbrush drag fires on three trees within 8 u, so the search was
 free to pick the most heavily braked line on the world and read it as the
-surface: PINE VALLEY 20% of road top and 6.32 s to 30 km/h. The search now
+surface: PINE VALLEY 6.32 s to 30 km/h against a 3 s bar. The search now
 uses the physics' own brush test, and disqualifies rather than scores it —
-the drag is a step, so half a brushed runway is a fully braked one. PINE
-reads 68% and 1.75 s, both bounds clean, and comes OFF the waiver list it
-had been sitting on. GLACIER COL stays waived and its entry is rewritten
-to say what it actually measures now (81%, the other way, on a
-slope-assisted verge with no brush-free corridor on any load).
+the drag is a step, so half a brushed runway is a fully braked one.
+Flatness still gates the pick, because a runway the 3% frame filter can
+never sample is not a measurement (sorting on brush alone put GLACIER COL
+on a climbing line that read 0 of 187 km/h). THE 0-30 BOUND NOW PASSES ON
+BOTH F7 WORLDS UNWAIVED, which it had not.
+
+The top-speed bound stays waived on both, and the waiver's own text is
+now the measurement rather than a story: it is the thrust-equilibrium
+instability of a load-dependent corridor pick, and on this base it shows
+BOTH directions at once — PINE 53%, GLACIER 89%. Tried and rejected:
+walking the runway at 4 u to match the frame filter, which read worse on
+both worlds (PINE 68 -> 84%, GLACIER 81 -> 40%). The search and the
+filter want separate work; a steady-state top-speed read is booked.
 
 THE SHAPE WORTH KEEPING from all of it: each defect was a rule that is
 right on ordinary ground and silent about the one place the ground is not
