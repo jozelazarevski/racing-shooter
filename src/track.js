@@ -7212,6 +7212,10 @@ export class Track {
     // bore then runs through a hill that genuinely exists.
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
+    // r395 HRD-5 (owner: "there is always a mountain range from one of the
+    // sides of the road", scoped same evening to steep mountains — field
+    // roads are fine): plan WHICH side of each station carries the range.
+    this._buildMountainSide();
 
     this.animated = { flags: [], clouds: [], whales: [], rooks: [], cloudBank: null };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
@@ -8456,10 +8460,78 @@ export class Track {
     return (V.h ?? 60) * smoothstep01((d - far) / (V.run ?? 240));
   }
 
+  /** r395 HRD-5 — THE MOUNTAIN SIDE OF EVERY STATION (owner: "there is
+   *  always a mountain range from one of the sides of the road. No road
+   *  floats or is on a ridge", reference frame 2026-09-07 20:31; scoped by
+   *  the owner the same evening: "there can be field roads. That is fine.
+   *  This should apply in steep mountains").
+   *
+   *  Scope is the MOUNTAIN scenery tag — the same classification the
+   *  filters use — so field, coast-town and city worlds are untouched.
+   *  Per station: the side whose NATURAL ground (raw hill noise, probed
+   *  46 u out) stands higher is the mountain side, landward forced on
+   *  coast worlds; a ±14-station majority filter run three times makes
+   *  the side a decision per RUN, never a flicker (the owner's "never
+   *  flipping mid-run"), and the strength dips to zero through each
+   *  genuine side change and through the start zone. The EFFECT lives in
+   *  _blendHeight: where the flank falls below road level, ground on the
+   *  mountain side is lifted into a ridge band — rising from the verge,
+   *  holding, then fading back out — so the road reads as a shelf cut
+   *  into a face, exactly the reference frame. Gorse cuts, tunnel
+   *  corridors and river beds all apply AFTER the lift in the same
+   *  function, so a bridge still spans its chasm, a bore still opens its
+   *  portal and a river still cuts its bed; _roadCeil holds every other
+   *  leg's carriageway clear through the raised ground. */
+  _buildMountainSide() {
+    const kinds = SCENERY[(this.level && this.level.theme) || ''] ?? [];
+    if (!kinds.includes('MOUNTAIN')) { this._mtnSide = null; return; }
+    const side = new Int8Array(N), amt = new Float32Array(N);
+    const probe = 46;
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i], n = this.nrm[i];
+      const hL = this._hillNoise(c.x + n.x * probe, c.z + n.z * probe);
+      const hR = this._hillNoise(c.x - n.x * probe, c.z - n.z * probe);
+      side[i] = hL >= hR ? 1 : -1;
+    }
+    if (this.T.coast) {
+      // the sea side is the one the coast depression bites: mountain lands
+      // on the other — a corniche keeps its view
+      for (let i = 0; i < N; i++) {
+        const c = this.center[i], n = this.nrm[i];
+        const pL = this._coastDepress(c.x + n.x * probe, c.z + n.z * probe, 10, 9999);
+        const pR = this._coastDepress(c.x - n.x * probe, c.z - n.z * probe, 10, 9999);
+        if (pL < 9.5 && pR >= 9.5) side[i] = -1;
+        else if (pR < 9.5 && pL >= 9.5) side[i] = 1;
+      }
+    }
+    for (let pass = 0; pass < 3; pass++) {
+      const out = new Int8Array(N);
+      for (let i = 0; i < N; i++) {
+        let s = 0;
+        for (let k = -14; k <= 14; k++) s += side[(i + k + N) % N];
+        out[i] = s >= 0 ? 1 : -1;
+      }
+      side.set(out);
+    }
+    for (let i = 0; i < N; i++) {
+      amt[i] = THREE.MathUtils.smoothstep(this._circDist(i, 0), 60, 110);
+    }
+    for (let i = 0; i < N; i++) {
+      if (side[i] !== side[(i + 1) % N]) {
+        for (let k = -8; k <= 8; k++) {
+          const j = (i + k + N) % N;
+          amt[j] = Math.min(amt[j], Math.abs(k) / 8);
+        }
+      }
+    }
+    this._mtnSide = side;
+    this._mtnAmt = amt;
+  }
+
   /** Shared road→hills height blend. `tuck` eases the corridor slightly UNDER
    *  the ribbon (full 0.45 by d=14, zero at the drivable edge) so residual
    *  mesh interpolation error stays hidden below the road surface. */
-  _blendHeight(d, roadY, x, z) {
+  _blendHeight(d, roadY, x, z, bi) {
     const B = this.T.blend;
     const near = B ? B.near : 15, far = B ? B.far : 70;
     // Pass worlds stack road strands 26-30u apart at different heights, so the
@@ -8491,6 +8563,26 @@ export class Track {
     // THE VALLEY WALLS, added outside the corridor blend so the road never
     // sees them. See `_valleyWall`.
     h += this._valleyWall(d);
+    // r395 HRD-5: the mountain side rises. A ridge BAND, not a mesa — it
+    // climbs from the verge, holds, and fades back to the natural field, so
+    // it reads as a range hugging the road. Applied BEFORE the gorge cut,
+    // tunnel ridge and river carve below, all of which dig through it; only
+    // ever raising (Math.max), so where nature already provides the flank
+    // nothing changes. See _buildMountainSide.
+    if (this._mtnSide && bi !== undefined && this._mtnAmt[bi] > 0) {
+      const sideQ = ((x - this.center[bi].x) * this.nrm[bi].x
+        + (z - this.center[bi].z) * this.nrm[bi].z) >= 0 ? 1 : -1;
+      if (sideQ === this._mtnSide[bi]) {
+        // face foot 6 u past the drivable edge (W-EDGE-01 allows 8 m to the
+        // edge geometry; 2.5 crushed the chase camera into the rock — both
+        // staged screenshots came back as a blurred wall filling the frame)
+        const d0 = (this.widthAt ? this.widthAt(bi) : 9) + 6;
+        const flank = 19 * this._mtnAmt[bi]
+          * smoothstep01((d - d0) / 30)
+          * (1 - smoothstep01((d - d0 - 60) / 80));
+        if (flank > 0.01) h = Math.max(h, roadY + flank);
+      }
+    }
     // the hero gorge is carved out of whatever the ground would otherwise be,
     // road corridor included — that is the hole the suspension bridge spans
     if (this._gorge || this._jumpGorges?.length) h -= this._gorgeCut(x, z);
@@ -10087,7 +10179,7 @@ export class Track {
     // rather than an accident of sampling.
     const ns = this._nearestSample(x, z);
     const nd = ns.d, bi = ns.i;
-    let h = this._blendHeight(nd, this.center[bi].y, x, z);
+    let h = this._blendHeight(nd, this.center[bi].y, x, z, bi);
     if (this.T.coast) h = this._coastDepress(x, z, h, nd);
     // r350 (owner: tunnels under mountains): the ridge is built inside
     // _blendHeight, and on a coast world _coastDepress then pulled it to the
@@ -10346,7 +10438,7 @@ export class Track {
     // diverge by construction.
     const ns = this._nearestSample(x, z);
     const bi = ns.i, d = ns.d;
-    let h = this._blendHeight(d, this.center[bi].y, x, z);
+    let h = this._blendHeight(d, this.center[bi].y, x, z, bi);
     // the coast term must live in BOTH ground functions: this one builds the
     // mesh the player SEES, terrainHeight() the ground physics STANDS ON.
     // With the term only in the latter, the physics said "seabed at -7" while

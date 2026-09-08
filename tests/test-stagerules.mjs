@@ -197,6 +197,36 @@ for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDE
   ok(H.minR >= 15.5,
     `HRD-7 [${tag}] the road never turns tighter than it is wide (R floor)`,
     `min circumcircle R ${H.minR} u`);
+  if (lvl === 66) {
+    // HRD-5/6 (owner: always a mountain on one side in steep country; no
+    // ridges/causeways). Census: at every station outside the start zone,
+    // at least one side carries ground at road level or rising within the
+    // corridor. Residue allowance 25 covers stations where ANOTHER LEG
+    // runs on the mountain side and the road-ceiling clamp rightly holds
+    // the flank down — a mountain cannot be built through a carriageway
+    // (measured 13 such stations, all beside crossing legs).
+    const M = await p.evaluate(() => {
+      const t = window.__game.track, N = t.center.length;
+      let bad = 0;
+      for (let i = 0; i < N; i++) {
+        if (t._circDist(i, 0) < 110) continue;
+        const c = t.center[i], n = t.nrm[i];
+        let okS = false;
+        for (const s of [1, -1]) {
+          for (const d of [14, 24, 38]) {
+            if (t.terrainHeight(c.x + n.x * d * s, c.z + n.z * d * s) >= c.y - 1) { okS = true; break; }
+          }
+          if (okS) break;
+        }
+        if (!okS) bad++;
+      }
+      return { bad, planned: !!t._mtnSide };
+    });
+    ok(M.planned, `HRD-5 [${tag}] the mountain-side plan exists on a MOUNTAIN world`);
+    ok(M.bad <= 25,
+      `HRD-5/6 [${tag}] every station carries rising ground on one side (no causeways)`,
+      `${M.bad} station(s) with both sides falling (crossing-leg allowance 25)`);
+  }
   ok(errors.length === 0, `HRD [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
   await p.close();
 }

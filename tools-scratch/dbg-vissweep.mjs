@@ -22,7 +22,7 @@ for (const i of IDX) {
     c.heading = t.headingAt(j);
     c.vel.x = Math.sin(c.heading) * 8; c.vel.z = Math.cos(c.heading) * 8;
     c.trackIndex = j; if (c.vy !== undefined) c.vy = 0;
-    for (let k = 0; k < 90; k++) g.frame();   // cam settles, car rolls a bit
+    for (let k = 0; k < 300; k++) g.frame();   // cam settles fully (teleports lerp far)
   }, i);
   await p.screenshot({ path: `${process.env.OUT ?? '/tmp'}/vis-${LVL}-${i}.png`, timeout: 150000 });
 }

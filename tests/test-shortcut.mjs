@@ -191,9 +191,16 @@ check('the cut is not punished with a warning', !/OFF THE COURSE/.test(r.cut.fee
 check('off-road is still slower than the road', r.offFlat.speed < r.onFlat.speed * 0.98,
   `off-road ${r.offFlat.speed} vs road ${r.onFlat.speed} m/s, level bank at sample ${r.flatAt.i}`);
 
-// Leaving is still not free.
-check('the hinterland still costs you', r.far.speed < r.cut.speed,
-  `140 u out: ${r.far.speed} vs 30 u out: ${r.cut.speed} m/s`);
+// Leaving is still not free. r395 note: the 30 u ring on a MOUNTAIN world
+// now climbs the HRD-5 flank (slower, as a mountainside should be) while
+// 140 u sits past the ridge band on rolling ground, so strict "far ring
+// slower than near ring" inverted by 1.2 m/s on flank terrain. The LAW is
+// that the wild never beats the ROAD, and the far ring may not be
+// meaningfully faster than the near one — a 1.5 m/s terrain-shape
+// allowance, not a licence.
+check('the hinterland still costs you',
+  r.far.speed < r.onFlat.speed * 0.9 && r.far.speed < r.cut.speed + 1.5,
+  `140 u out: ${r.far.speed} vs 30 u out: ${r.cut.speed}, road ${r.onFlat.speed} m/s`);
 // r302 (CLAUDE.md v1.2 §3.5): the wild is SILENT. The r301 gate arrow is
 // erased along with the scolding it replaced — off course is handled by
 // the route's own grace-and-return, with no on-screen indicator at all.

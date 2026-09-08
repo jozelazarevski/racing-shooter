@@ -4171,6 +4171,44 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r395 — THE MOUNTAIN SIDE (HRD-5/6)
+
+Owner, with a reference frame: "Replicate this design. Add more rules,
+there is always a mountain range from one of the sides of the road. No
+road floats or is on a ridge" — scoped the same evening: "there can be
+field roads. That is fine. This should apply in steep mountains."
+
+One system (terrain shaping):
+
+- _buildMountainSide plans WHICH side of every station carries the
+  range, on MOUNTAIN-scenery worlds only (the filter classification, so
+  field, coast-town and city worlds are untouched): the side whose
+  natural hill noise stands higher wins, landward forced on coasts, a
+  ±14-station majority filter run three times so the side is a decision
+  per run (never flipping mid-run), strength zeroed through the start
+  zone and eased through genuine side changes.
+- The effect lives in _blendHeight beside the valley walls: on the
+  mountain side the ground rises into a RIDGE BAND — foot 6 u past the
+  drivable edge (2.5 crushed the chase camera into the rock; both
+  staged screenshots came back as a blurred wall), climbing 19 u over
+  30, holding ~60, fading out by ~140 — so the road reads as a shelf
+  cut into a face, not a causeway. Gorge cuts, tunnel corridors and
+  river beds all apply AFTER the lift in the same function (a bridge
+  still spans, a bore still opens, a river still cuts), and _roadCeil
+  holds every crossing leg's carriageway clear through the raised
+  ground.
+- Measured on GLACIER COL: stations with falling ground on both sides
+  899 -> 13-19 across loads, every survivor beside a CROSSING LEG where
+  the ceiling clamp rightly wins (a mountain cannot be built through a
+  carriageway). PINE VALLEY (forest road): untouched, as scoped.
+- The shortcut suite's hinterland ring check inverted by 1.2 m/s on
+  flank terrain (the 30 u ring now climbs a mountainside; 140 u sits
+  past the band) — re-anchored to the actual law: the wild never beats
+  the ROAD (28.7 vs 45.6 m/s) with a 1.5 m/s ring tolerance.
+- Gate: stagerules carries an HRD-5/6 census on GLACIER (both-sides-
+  falling stations <= 25, crossing-leg allowance); boot 7/7, camstable
+  4/4, shake probe 0.22 unchanged, shortcut 8/8.
+
 ## r394 — HRD: THE ROAD IS WIDE AT THE HAIRPIN AND NEVER TIGHTER THAN IT IS WIDE
 
 Owner, four directives in one evening, all recorded verbatim in CLAUDE.md
