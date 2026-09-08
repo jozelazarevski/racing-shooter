@@ -106,3 +106,4 @@ Keywords MUST, MUST NOT, MAY are normative per RFC 2119.
 ## Owner clarifications (recorded by directive, same authority as the clause they scope)
 
 - **HRD-5 / W-EDGE-01 scope (2026-09-07):** "there can be field roads. That is fine. This should apply in steep mountains." — The always-a-mountain-side rule binds roads in steep mountain terrain (and W-EDGE-01's narrow/canyon/gorge/valley classes); open field roads through flat country need no mountain edge.
+- **V-03, evergreens (2026-09-08):** "Rule: pine trees are never not green. They are evergreen. Apply this across the game." — Pine-silhouette conifers render green foliage on every palette and season, in every tree system (near meshes, imposters, horizon paintings). Scopes V-01/V-02: seasonal color belongs to broadleaf species (and larch, the deciduous conifer, unless the owner extends the rule).
