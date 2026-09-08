@@ -16,7 +16,7 @@ const r = await p.evaluate(() => {
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
   const su = Math.max(0.5, Math.hypot(t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
   const c = g.player;
-  const dys = [], d2ys = [], camDys = [];
+  const dys = [], d2ys = [], camDys = [], spikes = [];
   let py = c.pos.y, pdy = 0, pcy = g.camera.position.y;
   for (let k = 0; k < 3600; k++) {
     const sp = Math.hypot(c.vel.x, c.vel.z);
@@ -43,6 +43,14 @@ const r = await p.evaluate(() => {
     const dy = c.pos.y - py, cdy = g.camera.position.y - pcy;
     if (!c.airborne && sp > 11) {
       dys.push(Math.abs(dy)); d2ys.push(Math.abs(dy - pdy)); camDys.push(Math.abs(cdy));
+      if (Math.abs(cdy) > 1 && spikes.length < 14) {
+        const cp2 = g.camPos;
+        spikes.push({ k, i: c.trackIndex, cdy: +cdy.toFixed(2),
+          camY: +cp2.y.toFixed(1), carY: +c.pos.y.toFixed(1),
+          tun: !!(t.tunnelAt && (t.tunnelAt(c.pos, c.trackIndex, 6) || t.tunnelAt(cp2, c.trackIndex, 6))),
+          deck: !!(t.deckOverhead && (t.deckOverhead(c.pos, c.trackIndex) || t.deckOverhead(cp2, c.trackIndex))),
+          shk: +(g.shake ?? 0).toFixed(2) });
+      }
     }
     py = c.pos.y; pdy = dy; pcy = g.camera.position.y;
   }
@@ -50,7 +58,7 @@ const r = await p.evaluate(() => {
   return { world: g.level?.name, cliffWalls: cw0, n: dys.length,
     dy: { p50: pct(dys, 0.5), p95: pct(dys, 0.95), max: pct(dys, 0.999) },
     d2y: { p50: pct(d2ys, 0.5), p95: pct(d2ys, 0.95), max: pct(d2ys, 0.999) },
-    cam: { p50: pct(camDys, 0.5), p95: pct(camDys, 0.95), max: pct(camDys, 0.999) } };
+    cam: { p50: pct(camDys, 0.5), p95: pct(camDys, 0.95), max: pct(camDys, 0.999) }, spikes };
 });
 console.log(JSON.stringify(r));
 await browser.close();
