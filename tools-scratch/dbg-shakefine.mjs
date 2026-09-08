@@ -6,10 +6,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 p.setDefaultTimeout(300000);
-await p.goto(`http://localhost:8901/?level=${LVL}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });
+await p.goto(`http://localhost:8901/?level=${LVL}&go=1&unlockall=1${process.env.NOCW ? '#nocw' : ''}`, { waitUntil: 'load', timeout: 300000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout: 300000 });
 const r = await p.evaluate(() => {
   const g = window.__game, t = g.track, N = t.center.length;
+  const cw0 = t.T.cliffWalls;
+  if ((window.location.hash || '').includes('nocw')) t.T.cliffWalls = false;
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
   for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
   const su = Math.max(0.5, Math.hypot(t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
@@ -45,7 +47,7 @@ const r = await p.evaluate(() => {
     py = c.pos.y; pdy = dy; pcy = g.camera.position.y;
   }
   const pct = (arr, q) => { const s = [...arr].sort((x, y) => x - y); return +(s[Math.floor(s.length * q)] ?? 0).toFixed(3); };
-  return { world: g.level?.name, n: dys.length,
+  return { world: g.level?.name, cliffWalls: cw0, n: dys.length,
     dy: { p50: pct(dys, 0.5), p95: pct(dys, 0.95), max: pct(dys, 0.999) },
     d2y: { p50: pct(d2ys, 0.5), p95: pct(d2ys, 0.95), max: pct(d2ys, 0.999) },
     cam: { p50: pct(camDys, 0.5), p95: pct(camDys, 0.95), max: pct(camDys, 0.999) } };

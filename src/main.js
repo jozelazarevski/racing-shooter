@@ -11831,30 +11831,7 @@ class Game {
         const sy = cp.y + dy * f;
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }
-      // r398 (owner: "Car is still shaking"): THE CAR IS STILL — THE EYE WAS.
-      // Measured on GLACIER COL: the car's grounded |dy| holds p95 0.083
-      // u/frame while the CAMERA ran p95 0.383 with single-frame jumps of
-      // 3.57 u. This lift is why: a sample near the car divides by a small
-      // (1 - f), so a 0.4 u graze of the r395 mountain flank becomes a
-      // multi-unit correction, recomputed from scratch every frame as the
-      // boom sweeps a switchback — it engaged and released on alternate
-      // frames, and on screen a fluttering eye is indistinguishable from a
-      // shaking car. The RESIDUAL lift is now applied through an asymmetric
-      // ease (~100 ms up, ~550 ms release) so the eye takes a lift once and
-      // lets it go gently; the never-underground floor below stays instant.
-      // (Two end-of-chain rate limiters were tried first and reverted: an
-      // absolute one pinned the flutter into a sawtooth at its own up rate,
-      // a car-relative one coupled the eye to the car's bob — both measured
-      // WORSE. Smooth the source, not the sum.)
-      {
-        const want9 = Math.min(lift, 18);
-        const cdt9 = this._camDt ?? dt;
-        const ls9 = this._liftSm ?? 0;
-        this._liftSm = want9 > ls9
-          ? ls9 + (want9 - ls9) * Math.min(1, 10 * cdt9)
-          : ls9 + (want9 - ls9) * Math.min(1, 1.8 * cdt9);
-        if (this._liftSm > 0.01) cp.y += this._liftSm;
-      }
+      if (lift > 0) cp.y += Math.min(lift, 18);
       // ...and never underground wherever it ended up (PATCH_02 v1.2 fix 13
       // names this clearance; 2.2 is this engine's measured-good value)
       const gCam = tk.terrainHeight(cp.x, cp.z)
