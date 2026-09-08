@@ -3612,6 +3612,34 @@ export class Car {
       }
     }
 
+    // ---- 7.15 (owner: "Car should not drive between the trees") ----------
+    // A forest stand is a MASS, not a strainer. The trunks above already
+    // stop a head-on run (measured: 6 u past the tree line and wedged), but
+    // a STEERED car threads the gaps — measured 25 u deep at up to 61 km/h
+    // through a median-density stand on PINE VALLEY. Between the trunks
+    // stands underbrush: with three or more registered carpet trees within
+    // 8 u and the car off the road apron, heavy brush drag bogs it to a
+    // crawl in under a second. Physics, not an invisible wall (standing
+    // decision 1): the wood is visibly dense, the car visibly ploughs into
+    // scrub, and UNSTUCK remains the way out. Player-only, like the trunk
+    // deflection above — rivals never leave the line, and their recovery
+    // law already returns any that do.
+    if (this === gm.player && t.camTreesNear && !this.airborne) {
+      const s9 = t._nearestSample ? t._nearestSample(this.pos.x, this.pos.z) : null;
+      if (!s9 || s9.d > t.widthAt(s9.i) + 3) {
+        let n9 = 0;
+        for (const tr of t.camTreesNear(this.pos.x, this.pos.z)) {
+          const dx = this.pos.x - tr.x, dz = this.pos.z - tr.z;
+          if (dx * dx + dz * dz < 64 && ++n9 >= 3) break;
+        }
+        if (n9 >= 3) {
+          const k9 = Math.min(1, 3.2 * dt);
+          this.vel.x -= this.vel.x * k9;
+          this.vel.z -= this.vel.z * k9;
+        }
+      }
+    }
+
     // ---- puddles: heavy drag + slick grip + brown splash while inside ----
     const puddles = t.puddles ?? [];
     if (puddles.length && !this.airborne) {
