@@ -46,7 +46,7 @@ export const LEVELS = [
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
   { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
   { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
-  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK',
+  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK', t01: true,
     tune: { tunnels: { count: 1 } } },
   // a gallery through the slope is exactly what avalanche country builds
   { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK',
@@ -435,7 +435,7 @@ export const LEVELS = [
   //
   // Career order is this array and `starCost` prices by INDEX, so they are
   // APPENDED, never inserted, with ascending ids.
-  { id: 65, name: 'GRANITE NARROWS', theme: 'dolomiti', region: 'ALPINE PASSES',
+  { id: 65, name: 'GRANITE NARROWS', theme: 'dolomiti', region: 'ALPINE PASSES', t01: true,
     cost: 37, fresh: true, route: 'ouninpohja',
     // THE TIGHT ONE. `ouninpohja` is the roster's fastest shape — "almost no
     // slow corners" — and it is put in the narrowest valley in the game. The
@@ -6865,6 +6865,19 @@ export class Track {
     // census after r153c is zero worlds over 20. The pass that exists to stop
     // cusps was running before the cusps were made.
     this._applyRouteWarp(edit);
+    // T-01 (master spec, r401 PILOT): CURVATURE INJECTION. The census read
+    // ~70 of 78 worlds over the 400 u straight cap and six with ZERO curves
+    // under R120 — GLACIER'S GRIND is one 5783 u straight ring. Runs of
+    // near-straight road longer than 250 u take a smooth lateral S-weave
+    // (wavelength ~300 u, base amplitude 34 u -> min sweeper radius ~67 u,
+    // above every template's corner floor), eased in and out over 30
+    // stations, amplitude capped by the distance to any OTHER leg of the
+    // lap so a weave can never reach a crossing carriageway. It runs BEFORE
+    // the kink pass and the uniform re-resample, so those tidy its output
+    // and every downstream builder — gates, pickups, walls, flanks, the
+    // ribbon — follows the moved centreline by construction. Opt-in per
+    // world (`t01: true`) while the pilot proves the look.
+    this._applyT01Weave();
     {
       // r391 (MASTER §4): 13° per station silently FLOORED every corner at
       // ~R28 at mandate-era segLens — the composed GLACIER hairpins authored
@@ -7468,6 +7481,90 @@ export class Track {
    *  hangs off, a pinched stretch of road). */
   _nearNarrow(i, pad = 0) {
     return (this._narrowSecs ?? []).some((s) => this._circDist(i, s.mid) < s.half + pad);
+  }
+
+  /** T-01 pilot (r401): weave curvature into long straights. See the call
+   *  site's comment for the law; this is the mechanism. Straightness is the
+   *  circumcircle over ~30 u of arc (the HRD metric); a "run" is maximal
+   *  consecutive stations with R > 300; only runs longer than 250 u weave.
+   *  The amplitude at each station is the base 34 u eased by run-edge
+   *  distance AND clamped to (nearest other-leg distance - 26 u), measured
+   *  against every station more than 40 stations away around the ring, so
+   *  the injected sweepers can never crowd a crossing or parallel leg. */
+  _applyT01Weave() {
+    if (!this.level || !this.level.t01) return;
+    const N = this.center.length;
+    let arcTotal = 0;
+    for (let i = 0; i < N; i++) {
+      const a = this.center[i], b = this.center[(i + 1) % N];
+      arcTotal += Math.hypot(b.x - a.x, b.z - a.z);
+    }
+    const segL = arcTotal / N;
+    const K = Math.max(3, Math.round(30 / Math.max(1, segL)));
+    const radAt = (i) => {
+      const a = this.center[(i - K + N) % N], b = this.center[i], c = this.center[(i + K) % N];
+      const cross = (b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x);
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      return (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(c.x - b.x, c.z - b.z)
+        * Math.hypot(c.x - a.x, c.z - a.z)) / (2 * Math.abs(cross));
+    };
+    // other-leg clearance per station (coarse: stride 4, ring-distance > 40)
+    const legClear = (i) => {
+      const p = this.center[i];
+      let best = 1e9;
+      for (let j = 0; j < N; j += 4) {
+        const dc = Math.min((j - i + N) % N, (i - j + N) % N);
+        if (dc <= 40) continue;
+        const q = this.center[j];
+        const d = Math.hypot(q.x - p.x, q.z - p.z);
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    const straight = new Uint8Array(N);
+    for (let i = 0; i < N; i++) straight[i] = radAt(i) > 300 ? 1 : 0;
+    // walk maximal straight runs (the ring may be ALL straight — cap the walk)
+    const minRun = Math.ceil(250 / Math.max(1, segL));
+    const ease = 30;
+    const lam = 300, base = 34;
+    let i0 = 0;
+    while (i0 < N && straight[i0]) i0++;            // start at a bend if any
+    const allStraight = i0 >= N;
+    if (allStraight) i0 = 0;
+    let i = i0, seen = 0;
+    while (seen < N) {
+      // find next run start
+      while (seen < N && !straight[i]) { i = (i + 1) % N; seen++; }
+      if (seen >= N && !allStraight) break;
+      const s = i;
+      let len = 0;
+      while ((len < N) && straight[(s + len) % N]) len++;
+      if (allStraight) len = N;
+      if (len >= minRun) {
+        let arc = 0;
+        for (let k = 0; k < len; k++) {
+          const j = (s + k) % N;
+          const edge = allStraight ? 1
+            : THREE.MathUtils.smoothstep(Math.min(k, len - 1 - k), 0, ease);
+          const amp = Math.min(base * edge, Math.max(0, legClear(j) - 26));
+          if (amp > 0.5) {
+            const off = amp * Math.sin((2 * Math.PI * arc) / lam);
+            this.center[j].x += this.nrm[j].x * off;
+            this.center[j].z += this.nrm[j].z * off;
+          }
+          arc += segL;
+        }
+      }
+      i = (s + len) % N; seen += len;
+      if (allStraight) break;
+    }
+    // tangents and normals follow the moved line (the kink pass and the
+    // uniform re-resample downstream recompute them again regardless)
+    for (let j = 0; j < N; j++) {
+      const p0 = this.center[(j - 1 + N) % N], p2 = this.center[(j + 1) % N];
+      this.tan[j].set(p2.x - p0.x, 0, p2.z - p0.z).normalize();
+      this.nrm[j].set(this.tan[j].z, 0, -this.tan[j].x);
+    }
   }
 
   /** W-CURVE-01.7 (r400): SUPERELEVATION. A sharp curve on a gradient banks
