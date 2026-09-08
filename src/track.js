@@ -13093,6 +13093,20 @@ export class Track {
     const MAXBAY = 420;
     const LIFT = 0.35;                // rail foot sits just below the road plane
     const step = Math.max(1, Math.round(4.5 / this.segLen));   // one bay ~4.5 u
+    // circumcircle radius over ~30u of arc — the same metric the HRD gate
+    // reads. The smoothed curvature array under-reads short hairpin cusps
+    // (GLACIER's true R18-23 stations read R>=45 through it), so TIGHT alone
+    // missed exactly the corners the owner asked to have fully walled.
+    const KE = Math.max(3, Math.round(30 / this.segLen));
+    const radE = (i) => {
+      const a = this.center[(i - KE + N) % N], b = this.center[i % N], c = this.center[(i + KE) % N];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz),
+        ac = Math.hypot(c.x - a.x, c.z - a.z);
+      return (ab * bc * ac) / (2 * Math.abs(cross));
+    };
 
     // ---- where does the ground fall away, and is it already guarded? ----
     const want = [];                  // [i, side, tight] stations that need a rail
@@ -13152,7 +13166,7 @@ export class Track {
         // on the inside of a bend, but a car that runs wide out of one on
         // loose verge is just as gone.
         const TIGHT = 0.02;
-        const tightHere = this.curvature[i] > TIGHT;
+        const tightHere = this.curvature[i] > TIGHT || radE(i) <= 30;
         if (drop < DROP && !tightHere) { hits.push(0); continue; }
         // AN OFFSET IS NOT A DISTANCE — the same trap the hedge banks document.
         // `pointAt` steps along ONE sample's normal, and on the inside of a
@@ -13189,12 +13203,21 @@ export class Track {
         }
         hits.push(guarded ? 0 : tightHere ? 2 : 1);
       }
-      // keep only runs long enough to read as a rail
+      // keep only runs long enough to read as a rail — EXCEPT at a sharp
+      // curve. MINRUN exists so lone bays on straights don't read as litter,
+      // but a 1-2 station blip AT A TIGHT CORNER is a hole in the very wall
+      // the tight rule promises (SUMMIT CLIMB station 289: drop 6.3 u at a
+      // sharp bend, swallowed as a run of one), and W-CURVE-01.4 caps
+      // barrier gaps through sharp curves at 8 u.
       let run = 0;
       for (let k = 0; k <= hits.length; k++) {
         if (hits[k]) { run++; continue; }
-        if (run >= MINRUN) {
-          for (let j = k - run; j < k; j++) want.push([j * step, side, hits[j] === 2]);
+        if (run >= 1) {
+          let tight9 = false;
+          for (let j = k - run; j < k && !tight9; j++) tight9 = hits[j] === 2;
+          if (run >= MINRUN || tight9) {
+            for (let j = k - run; j < k; j++) want.push([j * step, side, hits[j] === 2]);
+          }
         }
         run = 0;
       }
@@ -13306,7 +13329,7 @@ export class Track {
 
   _buildGuardFence() {
     const S = this.T.guardFence;
-    const LAT = S.lateral, MAX = S.max || 240;   // r397: hairpin outer arcs add bays
+    const LAT = S.lateral, MAX = S.max || 190;
     const geo = mergeBoxes([
       { w: 0.24, h: 1.5, d: 0.24, x: -2.5, y: 0.75, z: 0 },
       { w: 0.24, h: 1.5, d: 0.24, x: 2.5, y: 0.75, z: 0 },
@@ -13323,22 +13346,14 @@ export class Track {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const step = Math.max(2, Math.round(5.6 / this.segLen));   // one bay ≈ 5.6u
-    // W-CURVE-01.4 (r397): a sharp curve whose outer edge faces a drop keeps
-    // a CONTINUOUS barrier along the outer arc. The r393 blanket "gap through
-    // hairpins" skip (`curvature > 0.045`) died silently when r394 made the
-    // curvature array arc-true — the roster maximum now reads 0.034, so the
-    // skip matched nothing and, worse, sharpness could no longer be seen at
-    // all on that scale. Sharpness here is the circumcircle over ~30u of ARC
-    // (a station-count window spans 140u on long-segLen worlds and smooths
-    // hairpins invisible — the roster census read ZERO sharp stations on
-    // SERPENTINA through a ±6-station window). Through sharp stations bays
-    // run at every station (gap = segLen − 5.4u ≤ 8u roster-wide, the
-    // W-CURVE cap) on the OUTER side of the bend only, anchored at the
-    // verge lip (widthAt + 0.9, where §7.11's conform law guarantees real
-    // ground under the posts — the theme lateral would hang them over the
-    // very drop they guard). An inner-side drop at an apex stays open: that
-    // verge is the fold-protected zone, and W-CURVE allows one opening per
-    // curve.
+    // Gap through hairpins, on a metric that still works: the r393 skip
+    // (`curvature > 0.045`) died silently when r394 made the curvature array
+    // arc-true — the roster maximum now reads 0.034, so it matched nothing.
+    // The intent stands (sharp drop curves are the SOLID edge-rail builder's
+    // job — its tight rule walls them both sides; scenery-grade fence bays
+    // through the same arc would double the barrier and re-create the
+    // GOTTHARD two-overlapping-barriers push), so the skip moves to the
+    // circumcircle over ~30u of arc, the same metric the HRD gate reads.
     const KF = Math.max(3, Math.round(30 / this.segLen));
     const radF = (i) => {
       const a = this.center[(i - KF + N) % N], b = this.center[i], c = this.center[(i + KF) % N];
@@ -13350,32 +13365,24 @@ export class Track {
       return (ab * bc * ac) / (2 * Math.abs(cross));
     };
     let k = 0;
-    for (let i = 0; i < N && k < MAX; i++) {
-      const sharp9 = radF(i) <= 30;
-      if (!sharp9 && i % step) continue;                       // theme cadence off the arcs
+    for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
       if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
-      const inner9 = sharp9 ? Math.sign(
-        (this.center[(i + KF) % N].x - this.center[i].x) * this.nrm[i].x
-        + (this.center[(i + KF) % N].z - this.center[i].z) * this.nrm[i].z) || 1 : 0;
+      if (radF(i) <= 30) continue;                             // hairpins belong to the edge rails
       // r393 (owner RULE: "nothing stands at the middle of the road"): the
       // theme's fixed lateral predates the width laws — on the rebuilt
       // GLACIER COL, 33 of 54 bays anchored INSIDE the 9 u carriageway and
       // one lay across the hairpin the owner drove into. The anchor now
       // respects the LOCAL width like the edge-rails do...
-      const dropLat9 = Math.max(LAT, this.widthAt(i) + 1.8);
-      const lat9 = sharp9 ? this.widthAt(i) + 0.9 : dropLat9;
-      // downhill side: the edge that falls away (probed at the theme lateral
-      // even for sharp bays, whose anchor sits at the lip — the fall is out
-      // there, not under the posts)
+      const lat9 = Math.max(LAT, this.widthAt(i) + 1.8);
+      // downhill side: the edge that falls away
       let side = 0, drop = 0;
       for (const sd of [1, -1]) {
-        const p = this.pointAt(i, dropLat9 * sd);
-        const d = p.y - this._terrainMeshHeight(p.x, p.z);
+        const p0 = this.pointAt(i, lat9 * sd);
+        const d = p0.y - this._terrainMeshHeight(p0.x, p0.z);
         if (d > drop) { drop = d; side = sd; }
       }
       if (!side || drop < 1.4) continue;
-      if (sharp9 && side === inner9) continue;   // outer arc only through a sharp curve
       const p = this.pointAt(i, lat9 * side);
       // ...and never stands inside ANY leg of the lap: a bay whose beam end
       // reaches a carriageway — its own station's or a fold's — is skipped
