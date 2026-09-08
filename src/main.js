@@ -11911,18 +11911,26 @@ class Game {
     // a ceiling that DESCENDS toward the crown (≈0.45 u of extra height per
     // u of road), so the lift cannot climb the ridge it is about to fly
     // under, and the bore clamp engages with zero left to snap.
+    // Measured calibration (GLACIER bore s118-e130): the bore clamp engages
+    // 6 stations before the portal (its pad), so the glide must reach the
+    // crown THERE — the first cut aimed at the portal itself and left a
+    // 25 u snap at the engage line. And 0.45 u of allowance per u of road
+    // let the exit-side climb reach +33 over the crown 12 stations out
+    // (camY 108 over a car at 70) — 0.18 caps that pump at ~+7. Fractional
+    // station distance so the ceiling walks down continuously instead of
+    // stepping 2.7 u at every station crossing.
     if (!tun && tk?._tunnels?.length && tk.center?.length) {
       const cp = this.camPos;
+      const fi9 = tk.fracIndexAt ? tk.fracIndexAt(p.pos, p.trackIndex) : p.trackIndex;
       for (const T9 of tk._tunnels) {
-        const ti9 = p.trackIndex;
-        const dIn = (ti9 >= T9.s - 40 && ti9 < T9.s) ? T9.s - ti9
-          : (ti9 > T9.e && ti9 <= T9.e + 40) ? ti9 - T9.e : null;
+        const dIn = (fi9 >= T9.s - 40 && fi9 < T9.s) ? T9.s - fi9
+          : (fi9 > T9.e && fi9 <= T9.e + 40) ? fi9 - T9.e : null;
         if (dIn === null) continue;
-        const portal = ti9 < T9.s ? T9.s : T9.e;
+        const portal = fi9 < T9.s ? T9.s : T9.e;
         const info9 = tk.tunnelAt(tk.center[portal], portal, 0);
         if (!info9) continue;
         const ceil9 = tk.center[portal].y + info9.apex - 1.3
-          + dIn * (tk.segLen ?? 6) * 0.45;
+          + Math.max(0, dIn - 6) * (tk.segLen ?? 6) * 0.18;
         if (cp.y > ceil9) cp.y = ceil9;
         break;
       }
