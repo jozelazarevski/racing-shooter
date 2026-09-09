@@ -8278,10 +8278,39 @@ export class Track {
 
   headingAt(i) { return Math.atan2(this.tan[i].x, this.tan[i].z); }
 
+  /** THE STARTING GRID IS MEASURED IN METRES, NOT IN SAMPLES (r409).
+   *
+   *  Owner, 2026-09-09: "The cars start really strange. I don't see an order
+   *  how do I win 1st place or 4th place. Also they all start super far
+   *  away. Unusual for a race."
+   *
+   *  Both halves of that are one bug. The row gap was the literal `row * 8`
+   *  — EIGHT CENTRELINE SAMPLES — written when a sample was a couple of
+   *  metres. Since the r340 length doubling `segLen` is 6.6 to 9.6 u, so
+   *  eight samples is 53 to 77 m between rows: FALKEN RIDGE measured 77 m
+   *  per row and 230 m from pole to the back row, with the front pair a
+   *  further 96 m up the road from the line (`N - 10`). That is not a grid,
+   *  it is a queue spread over a quarter of a kilometre — which is exactly
+   *  why no order is legible from the driver's seat and why the field looks
+   *  "super far away".
+   *
+   *  So the geometry is stated in metres and converted through this world's
+   *  own `segLen`, the way every other metre-reasoning system here already
+   *  does. The step is ROUNDED with a floor of one sample: rounding keeps
+   *  the gap near the 9 m target across the roster's 6.6-9.6 u sample
+   *  spacing (ceil would jump a 8.9 u world to 17.8 m rows and a 9.1 u world
+   *  back to 9.1), and the floor of one sample means two cars sharing a
+   *  lateral can never share a station — test-hardmode asserts eight
+   *  distinct slots.
+   */
   gridSlot(slot) {
+    const R = (typeof window !== 'undefined' && window.__DRIVING?.route) || {};
+    const seg = this.segLen > 0 ? this.segLen : 4;
+    const rowStep = Math.max(1, Math.round((R.gridRowGapM ?? 9) / seg));
+    const poleBack = Math.max(1, Math.round((R.gridPoleBackM ?? 8) / seg));
     const row = Math.floor(slot / 2);
-    const i = (N - 10 - row * 8 + N) % N;
-    const lateral = (slot % 2 === 0 ? -1 : 1) * 3.6;
+    const i = (N - poleBack - row * rowStep + N * 2) % N;
+    const lateral = (slot % 2 === 0 ? -1 : 1) * (R.gridLateralU ?? 3.6);
     return { index: i, lateral };
   }
 

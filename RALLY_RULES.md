@@ -72,6 +72,7 @@ owner decision, see §L) · SUPERSEDED.
 | D-3 | "Decide when track is 1 or 3 laps depending the length." (r381) — under `lapsShortTrackU` (3000 u) races 3 laps, longer races 1. | LIVE |
 | D-4 | R-FINISH-01: crossing the finish MUST end the race within 500 ms, in every vehicle state. MEASURED CAUSE: there is no trigger volume — the finish is an index wrap gated on a checkpoint mask, and r311's gate-0 guard seated a return ON the line, so the teleport CONSUMED the crossing. Fixed by seating before the line (carrying lap and wrap counts back with it) and by giving every placement two frames of immunity from both wrap tests. | BUILT (r408) |
 | D-5 | Kills affect position: a destroyed rival respawns at its last gate after a 4.0 s hold. (§6.6) | LIVE |
+| D-6 | "The cars start really strange. I don't see an order how do I win 1st place or 4th place. Also they all start super far away. Unusual for a race." (2026-09-09) — THE GRID IS MEASURED IN METRES. `gridSlot` spaced rows by `row * 8` centreline SAMPLES, written when a sample was a couple of metres; since the r340 length doubling `segLen` is 6.6-9.6 u, so eight samples is 53-77 m a row. FALKEN RIDGE measured 77 m per row, 230 m pole-to-back, pole itself 96 m up the road from the line. Now `gridRowGapM` 9 / `gridPoleBackM` 8 / `gridLateralU` 3.6 in driving.json, converted through each world's own segLen (rounded, floor one sample so two cars sharing a lateral can never share a station). Measured after: 10 m rows, 29 m depth. | BUILT (r409) |
 
 ## E. World and track
 
@@ -164,6 +165,7 @@ Never resolve one of these silently. Each was found by reading, not by a bug rep
 | K-8 | The owner titled the Race Integrity patch RALLY_PATCH_02, but `RALLY_PATCH_02.md` already holds the 2026-09-06 document RALLY_MASTER_SPEC.md supersedes. | Filed as RALLY_RACE_INTEGRITY.md so neither is lost. Cite it as RALLY_PATCH_02 (Race Integrity, R21). |
 | K-9 | Adding tiers above HARD vs three sites testing `difficulty.id === 'hard'` as shorthand for "top tier" (a contract gate, the rung ladder, a 1.25× payout). | Left alone, SAVAGE would pay like NORMAL and lock the hard rungs. All three compare `tier` now. |
 | K-10 | Switching `#speed-lines` off vs r309, which lowered its threshold to 95 km/h for the owner sentence "do not feel I go 70". Both are owner directives; the later one ("Still see the lines", after four earlier reports of the same artefact) is about the same pixels. | The later sentence wins on the overlay. The r309 INTENT is not abandoned — the FOV push and camera pull already carry the sense of speed — but it will not be carried by white lines the owner keeps filing as a defect. `speedLinesFromKmh` set to 9999 (above any reachable speed) rather than deleting the element, so a future implement can re-enable it deliberately with a design that does not read as a sliver. |
+| K-11 | "I don't see an order how do I win 1st place or 4th place" vs r363's REVERSE CHAMPIONSHIP GRID ("I should not be starting 1st always"), which deliberately puts the title leader at the back. | Not traded. The measured fault in the same sentence — 230 m of grid — is enough to explain an unreadable order on its own, and it is fixed (D-6). The reverse grid itself is left exactly as the owner asked for it in r363; whether it now reads as intended is a question for them (L-6), not a decision to take while fixing a units bug. |
 
 ## L. Open questions for the owner
 
@@ -174,6 +176,7 @@ Never resolve one of these silently. Each was found by reading, not by a bug rep
 | L-3 | W-EDGE-01a: set the lateral band yourself, or shall I derive it from measured sideways travel after a 250 km/h hit at the two known spots? |
 | L-4 | E-3: the elevation/weave build is reverted and held pending containment fixes. Re-land when? |
 | L-5 | G-AI-01: accept root-causing the bunching (H-5) instead of adding a band to bound? |
+| L-6 | The grid is now a real grid (10 m rows, 29 m deep) but still REVERSED by season standings, so leading the championship means starting 8th — your r363 request. With the spacing fixed, does the reverse order stay, or should the grid form the normal way round? |
 
 ---
 

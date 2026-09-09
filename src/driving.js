@@ -259,6 +259,17 @@ export const DRIVING = {
     // rescued, a scrabble against a bank is. On the road the 1 m bar stands.
     recoverOffroadProgressM: 8,
     recoverOffroadKmh: 25,
+    // THE GRID IS METRES (r409). The row gap used to be `row * 8` SAMPLES
+    // in track.js, which after the r340 length doubling is 53-77 m a row —
+    // FALKEN RIDGE measured 77 m per row, 230 m pole-to-back, and the front
+    // pair another 96 m up the road. Owner: "they all start super far away.
+    // Unusual for a race." Nine metres a row is a real starting box (F1's
+    // grid boxes are eight); eight metres puts pole just behind the line
+    // instead of a hundred metres back. Converted through each world's own
+    // segLen, so a short-sample world gets the same grid a long one does.
+    gridRowGapM: 9,
+    gridPoleBackM: 8,
+    gridLateralU: 3.6,
     stuckDetectS: 2.5,
     upsideDownS: 2.0,
     playerResetDelayS: 1.5,
