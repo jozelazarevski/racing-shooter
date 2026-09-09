@@ -3,7 +3,13 @@
 
 Version 2.3. Supersedes 2.2. Fourth pass on recording F (full-res crops of the status band and the far field): progress metric frozen, field-wide stall, floating building foundations, traffic blocking rivals. Third pass on recording F at 1 fps full resolution: pickups inside terrain, wet state toggling on grass, respawn velocity inconsistent, drop edges unreadable in daylight, regen numbers recorded. One earlier claim corrected (3.6 note). Evidence base: six recorded races, builds r293 to r31x (ledger in Appendix A).
 
-AUTHORITY: RALLY_RULES.md (race outcomes) > RALLY_DRIVING.md (vehicle physics constants) > this file > code. Tables win over prose. MUST / MUST NOT / SHOULD are binding (RFC 2119). Every tuning number lives in `driving.json`; a literal in `.ts` is a bug.
+AUTHORITY: RALLY_RULES.md (race outcomes) > RALLY_DRIVING.md (vehicle physics constants) > this file > code.
+RALLY_RULES.md NOW EXISTS (2026-09-09). Until then the top of this chain was a dangling
+reference and every rule was re-derived from prose, HANDOVER narrative or the code — which
+is why the same conflicts kept resurfacing. It is the register of every owner directive:
+verbatim sentence, operational rule, status, plus §K recorded conflicts and §L the questions
+still open for the owner. READ §K BEFORE IMPLEMENTING ANY RULE. A new owner sentence goes
+into that file first, as OPEN, before any code is written against it. Tables win over prose. MUST / MUST NOT / SHOULD are binding (RFC 2119). Every tuning number lives in `driving.json`; a literal in `.ts` is a bug.
 
 STANDING DECISIONS (owner, do not reopen):
 1. The world is fully drivable. No invisible walls, no rule-based speed caps, no return forces. Containment is physics (slope, surface, gravity, terrain collision) and race structure (gates).
