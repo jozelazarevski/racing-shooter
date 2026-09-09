@@ -79,6 +79,8 @@
     "obstacleMinHeightM": 1.6,
     "obstacleExclusionM": 4,
     "obstacleDensityPer20m": 1,
+    "iceTreelineUpM": 3.5,
+    "iceTreelinePadM": 14,
     "rivalCutChance": 0.3,
     "rivalLateralNoiseTrailM": 4,
     "rivalLateralNoiseOpenM": 12,

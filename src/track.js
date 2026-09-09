@@ -7332,8 +7332,157 @@ export class Track {
     this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
+    this._treelineLaw();     // r407: nothing grows inside a wall, nothing on the ice
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
     this._clearRoadSolids();  // r406: no collider left biting the carriageway
+  }
+
+  /** NOTHING GROWS IN THE ICE (owner, 2026-09-09: "Trees in the ice??", on a
+   *  GLACIAL PASS frame of conifers standing in the blue ice walls).
+   *
+   *  Two separate faults were photographed in the same frame and this pass
+   *  answers both, because they are one sentence: a tree stands on ground
+   *  that could grow it.
+   *
+   *  ONE - THE WALL. `cliffWalls` worlds put a stratified ribbon just outside
+   *  the road (ice on the glacial pair, rock on the canyons) and the ribbon is
+   *  built LAST, asking nothing about what was scattered there first. The
+   *  scatter, for its part, only ever looked INWARD: `_conformTrees` culls a
+   *  tree whose crown reaches the carriageway and nothing looked outward at
+   *  all. So on five themes the stand and the wall were laid in the same band
+   *  and the wall rose through the trees. The ribbon publishes its geometry,
+   *  so the test is exact: `_cliffProfile` gives the foot and the outer skirt
+   *  at each station and side, and a trunk between them is inside the wall.
+   *
+   *  TWO - THE ICE. On the ICE worlds the wall is only the near edge of the
+   *  problem. GLACIAL PASS carries 800 trees on `treeBelt: [13, 70]` - a
+   *  roster-wide "add thick forests" bump (r367/r368) applied without asking
+   *  what the ground was - and measured on r406 the stand climbed the canyon
+   *  flanks: median trunk 69 u out and 6.9 u above the road, 319 of 726
+   *  standing HIGHER than the wall rim beside them. That is a conifer forest
+   *  growing out of a glacier, which is what the photograph shows. A glacial
+   *  pass has its treeline BELOW the ice: bare walls beside the road, the
+   *  forest a band on the valley floor beyond. So on an ice-walled world a
+   *  tree may stand only on the floor - inside the canyon, or up its flanks,
+   *  it goes.
+   *
+   *  Culled the way a buried tree is culled - scaled away with its collider
+   *  off - rather than re-rolled, and deliberately so: the scatter draws off
+   *  one shared RNG stream, and moving a placement re-rolls every later world
+   *  in the roster. A cull spends no draws and shifts nothing.
+   *
+   *  This is NOT a rule about snow. FROST PEAK's snowy conifer forest is a
+   *  real place and is untouched; what goes is trees in the ICE. */
+  _treelineLaw() {
+    if (!this.trees?.length) return;
+    const T = this.T;
+    if (!T.cliffWalls || !this._cliffProfile) return;
+    // the ice-walled worlds: a winter palette AND a cliff ribbon. `snow` and
+    // `avalanche` are snowy FORESTS with no ribbon and never reach here.
+    const onIce = WINTER_THEMES.has(this.level && this.level.theme);
+    const R9 = (typeof window !== 'undefined' && window.__DRIVING?.route) || {};
+    const FLOOR_UP = R9.iceTreelineUpM ?? 3.5;   // m the treeline stands above the road
+    const FLOOR_PAD = R9.iceTreelinePadM ?? 14;  // m clear of the ribbon's outer skirt
+    const m4 = new THREE.Matrix4(), v9 = new THREE.Vector3();
+    const q9 = new THREE.Quaternion(), s9 = new THREE.Vector3();
+    const V = new THREE.Vector3();
+    const touched = new Set();
+    // 0 = the ground could grow it; 1 = inside the wall; 2 = up the ice.
+    // `rr` is the plant's own reach, so a crown leaning into the face goes
+    // with it. Shared by the solid stand and the carpet.
+    const verdict = (x, z, rr, i0 = null, lat0 = null) => {
+      const i = i0 ?? this.nearestIndex(V.set(x, 0, z));
+      const c = this.center[i], n = this.nrm[i];
+      const lat = lat0 ?? ((x - c.x) * n.x + (z - c.z) * n.z);
+      const P = this._cliffProfile(i, lat >= 0 ? 1 : -1);
+      if (!P || !Number.isFinite(P.base)) return 0;
+      const a = Math.abs(lat);
+      const skirt = P.base + (P.l2 ?? 0) + 12.5;       // ribbon row 4
+      if (a >= P.base - rr && a <= skirt + rr) return 1;
+      if (!onIce) return 0;
+      if (a < skirt + FLOOR_PAD) return 2;             // inside the canyon
+      return this._terrainMeshHeight(x, z) - c.y > FLOOR_UP ? 2 : 0;   // up its flanks
+    };
+    let wall = 0, ice = 0;
+    for (const tr of this.trees) {
+      if (tr.culled || !tr.parts?.length || tr.id == null) continue;
+      if (!Number.isFinite(tr.x)) continue;
+      const i = this.nearestIndex(V.set(tr.x, 0, tr.z));
+      const c = this.center[i], n = this.nrm[i];
+      const lat = (tr.x - c.x) * n.x + (tr.z - c.z) * n.z;
+      const why = verdict(tr.x, tr.z, Math.max(1.5, (tr.r ?? 2) * 1.6), i, lat);
+      if (!why) continue;
+      for (const part of tr.parts) {
+        part.getMatrixAt(tr.id, m4);
+        m4.decompose(v9, q9, s9);
+        s9.setScalar(0.0001);
+        m4.compose(v9, q9, s9);
+        part.setMatrixAt(tr.id, m4);
+        touched.add(part);
+      }
+      tr.r = 0; tr.solid = false; tr.culled = true;
+      if (why === 1) wall++; else ice++;
+    }
+    for (const part of touched) part.instanceMatrix.needsUpdate = true;
+    const carpet = onIce ? this._clearIceCarpet(verdict) : 0;
+    this._treelineCull = { wall, ice, carpet, onIce };
+  }
+
+  /** THE FOREST CARPET IS THE FOREST (r407, second half of the same law).
+   *
+   *  `this.trees` is only the SOLID stand - 800 trunks with colliders. What
+   *  the photograph is actually full of is `_buildForestCarpet`'s instanced
+   *  paint: ~40,000 cones per world across four rings, `carpet-foliage`, no
+   *  colliders, and on GLACIAL PASS it draws from the theme's own snow/ice
+   *  palette (r375). Culling the solid stand alone changed the frame by
+   *  almost nothing - measured on r406: 647 of 788 trunks removed and the
+   *  ice walls still stood in a green wood - because the carpet is two
+   *  orders of magnitude more trees, and it never asked what it was
+   *  standing on either.
+   *
+   *  Zeroed in place rather than rejected at placement, for the same reason
+   *  the trunks are: a rejected spot changes how many draws the shared RNG
+   *  stream spends here, and every world built after this one re-rolls. */
+  _clearIceCarpet(verdict) {
+    const m4 = new THREE.Matrix4(), v9 = new THREE.Vector3();
+    const q9 = new THREE.Quaternion(), s9 = new THREE.Vector3();
+    const memo = new Map();
+    const kill = new Set();
+    let culled = 0;
+    const sweep = this.group.children.filter(
+      (o) => o.isInstancedMesh && o.name === 'carpet-foliage')
+      .concat(this._groundCover ?? []);
+    for (const im of sweep) {
+      for (let k = 0; k < im.count; k++) {
+        im.getMatrixAt(k, m4);
+        m4.decompose(v9, q9, s9);
+        if (s9.x < 0.01) continue;                 // already zeroed
+        // tier meshes of one ring share exact matrices, so the key hits
+        const key = v9.x + ',' + v9.z;
+        let v = memo.get(key);
+        if (v === undefined) memo.set(key, v = verdict(v9.x, v9.z, 2));
+        if (!v) continue;
+        s9.setScalar(0.0001);
+        m4.compose(v9, q9, s9);
+        im.setMatrixAt(k, m4);
+        im.instanceMatrix.needsUpdate = true;
+        kill.add(key);
+        culled++;
+      }
+    }
+    // the verge ring registers its instances for the camera's foliage guard;
+    // a zeroed cone must stop pushing the boom around (PATCH_02 v3 C-C)
+    if (this.camTrees?.length && kill.size) {
+      // `instanceMatrix` is a Float32Array, so the position read back is the
+      // float32 rounding of the double the registry kept — match on that or
+      // nothing ever hits (measured: 0 of 9000 verge entries dropped).
+      const before = this.camTrees.length;
+      this.camTrees = this.camTrees.filter(
+        (t9) => !kill.has(Math.fround(t9.x) + ',' + Math.fround(t9.z)));
+      this._camTreeGrid = null;
+      this._camTreesDropped = before - this.camTrees.length;
+    }
+    return culled;
   }
 
   /** NOTHING INVISIBLE IN THE ROAD (HRD-1 / test-nothing-on-road LAW 6).
@@ -25997,6 +26146,10 @@ export class Track {
       map: gtex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1,
     });
     const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, T.tuftCount * 2);
+    // r407: grass on a glacier is the same sentence as trees in the ice.
+    // Registered rather than named, because `_applyShadowLaw` classes a mesh
+    // by its first NAMED ancestor and naming these would move them.
+    (this._groundCover ??= []).push(tufts);
     let k = 0;
     this._scatter(T.tuftCount,
       () => {
@@ -26056,6 +26209,7 @@ export class Track {
         side: (underKind === 'spray' || underKind === 'frond') ? THREE.DoubleSide : THREE.FrontSide }),
       T.bushCount
     );
+    (this._groundCover ??= []).push(bushes);           // r407, see the tufts
     const B = T.bush;
     const bcolor = new THREE.Color();
     let bk = 0;

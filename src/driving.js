@@ -224,6 +224,13 @@ export const DRIVING = {
     obstacleMinHeightM: 1.6,
     obstacleExclusionM: 4,
     obstacleDensityPer20m: 1,
+    // TREELINE (r407, owner: "Trees in the ice??"). On an ice-walled world a
+    // tree may stand only on the valley floor beyond the canyon: no higher
+    // than `iceTreelineUpM` above the road and no closer in than
+    // `iceTreelinePadM` past the cliff ribbon's outer skirt. Everything
+    // inside those is a conifer growing out of a glacier.
+    iceTreelineUpM: 3.5,
+    iceTreelinePadM: 14,
     rivalCutChance: 0.3,
     rivalLateralNoiseTrailM: 4,
     rivalLateralNoiseOpenM: 12,
