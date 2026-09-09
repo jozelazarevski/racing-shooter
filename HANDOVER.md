@@ -4171,6 +4171,84 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r405 — SHADOWS ARE A LAW, AND THE BOX COVERS WHAT IS ON SCREEN
+
+Owner, on a PRINCIPALITY STREETS frame: *"Shades needs to be consistent
+and constantly there."* Two separate defects, one per word, and the census
+found both.
+
+**CONSISTENT — fifty-odd builders, fifty-odd opinions.** Every builder
+decided for itself whether the thing it had just made casts or receives.
+On one street world:
+
+| class | instances | cast | note |
+|---|---|---|---|
+| `oldtown-chimneypots` | 884 | yes | |
+| `oldtown-chimneys` | 442 | **no** | the stacks the pots sit ON |
+| `frontage-awnings` | 274 | yes | |
+| `frontage-valances` | 274 | **no** | the cloth on that same awning |
+| `oldtown-bollards` | 483 (2 meshes) | 1 of 2 | the two disagreed |
+| unnamed main bucket | 656 meshes | 263 | **393 cast nothing** |
+
+A street of tall houses where half the geometry is transparent to the sun
+does not read as lit. It reads as flat — which is exactly the report.
+
+The decision now lives in ONE chokepoint, `Track._applyShadowLaw`, run
+after every builder, and it is made by CLASS rather than by whoever wrote
+the builder:
+
+- **nothing** — sky, cloud, horizon, haze, foam, particles, the world
+  skirt, painted contact-shadow blobs, decals. No body, or a shadow that
+  is already painted on.
+- **receive only** — ground: terrain, road, skirt, pavement, kerb, beds,
+  and WATER (a cliff's shadow across the bay is the whole reason the coast
+  worlds have a cliff). Ground does not cast: a heightfield casting on
+  itself is acne and a second pass of the whole map.
+- **cast AND receive** — everything else with a body.
+
+Run once at BUILD time on purpose. `_autoQuality`'s own note records why
+it must never move at runtime: changing the caster count rewrites every
+material's program cache key and recompiles the scene mid-race, measured
+at 1.2 s of dead screen.
+
+**CONSTANTLY THERE — the box was a tenth of the street.** The sun's shadow
+camera was ±72 u centred on the player. That is 144 u of a street that
+reads to about 300, and the frame shows the consequence plainly: houses to
+the left and ahead threw long shadows, houses to the right threw none, and
+between them ran a hard straight line. Shadows were not "constantly there"
+because two thirds of the visible street was outside the only box that had
+any.
+
+Two changes, neither costing a texel of map:
+
+1. The box goes to **±168**.
+2. The rig is biased **56 u down the camera's own heading**. Centred on
+   the car, half the map was spent on road already driven past and
+   invisible to a camera that looks ahead. Same map, same caster count, no
+   extra draw — the depth is bought for free.
+
+TEXEL COST, STATED RATHER THAN HIDDEN: 0.16 u at 2048, 0.33 u on a 1024
+phone map, against 0.07/0.14 before. Map size is deliberately NOT raised
+to pay for it — that is phone fill rate, and §6.7's budget is measured in
+the gate. This art is chunky and the PCF radius is wide, so a softer edge
+over the whole street beats a crisp one over a tenth of it.
+
+MEASURED AFTER:
+
+- **Q24 town budget**, PORTO GRANDE, the most urban world: p50 1.9 ms,
+  p95 4.2 ms against an 8 ms bar — no worse than the r404 baseline
+  (2.0 / 5.6). The wider box and the extra casters cost nothing on the
+  clock, which was the risk worth measuring rather than assuming.
+- The same street frame, before and after: shadows across the full frame
+  instead of the left half, and no cutoff line anywhere in it.
+- PINE VALLEY renders clean — no acne and no self-shadow artefacts on the
+  heightfield, which is why terrain stays receive-only.
+
+A NOTE FOR THE NEXT PASS. ±168 with one map is a compromise, not a
+solution: a genuinely long view still runs out of box eventually. The
+proper answer is cascaded shadow maps, which is its own build and its own
+perf argument. Booked, not smuggled in here.
+
 ## r404 — THE GRID BRINGS A COMPARABLE CAR
 
 Owner: *"Opponents should [match] my cars strength. Needs to be a constant
