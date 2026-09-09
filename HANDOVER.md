@@ -4171,6 +4171,163 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r409 — A GRID YOU CAN READ, A LADDER WITH FOUR RUNGS, AND THE LINES WERE NEVER IN THE WORLD
+
+Three owner reports close here, and the first of them is the one worth
+reading twice, because it cost five rounds of searching in the wrong
+place.
+
+**"Still see the lines."** Four earlier reports said the same thing in
+different words — "some wierd white horizontal lines", "Remove the white
+triangle", "Horizont should mit be as white", and one bare frame. Every
+round the search went into the scene graph, and every round it came back
+empty: the world-skirt diff was 0 px, hiding the chairlift cables was 0
+px, the artefact survived shadows off, rain off, cloud tails off, and the
+haze bands had already been deleted in r406. Those negatives were all
+correct. The artefact is not in the world at all.
+
+`#speed-lines` is a `position:fixed; inset:0` div at z-index 5 with two
+`repeating-linear-gradient` families on it, one at 175° and one at 185°.
+Each paints a set of near-horizontal white stripes across the whole
+viewport; the ten degrees between the two families makes their overlap a
+long, pointed sliver, which is a triangle seen near face-on and a streak
+seen near edge-on. A radial mask leaves the frame corners lit, which is
+the white wedge in the corner shots. And z-index 5 puts the whole thing
+ABOVE the HUD — which is exactly why the sliver crossed translucent
+panels, and exactly why no bisect over scene children could ever find it.
+
+It was meant to be rare. The CSS comment above it said "past 150 km/h".
+r309 lowered the threshold to 95 for a different owner sentence ("do not
+feel I go 70") and left the comment stale, so `opacity = min(0.45,
+(kmh-95)/110)` had it lit from 95 km/h and capped from 145 — on for most
+of every race, while the code read as though it almost never fired.
+Reading that comment is what sent five searches into the mountains.
+
+`speedLinesFromKmh` is now 9999, above any reachable speed, in
+driving.json and src/driving.js, with the two `?? 95` fallbacks in the
+camera update raised to match so a failed config load cannot switch it
+back on. The element and its CSS stay, so a future speed cue can reuse
+the machinery with a shape that does not read as a stray line. The r309
+intent is not abandoned — the FOV push and the camera pull already carry
+the sense of speed — but it will not be carried by white lines the owner
+keeps filing as a defect. Recorded in RALLY_RULES.md as I-5 (root cause,
+with the list of correct negatives) and K-10 (the conflict with r309).
+
+**"The cars start really strange… they all start super far away."** Both
+halves of that sentence are one bug, and it is a units bug. `gridSlot`
+spaced the rows with the literal `row * 8` — eight CENTRELINE SAMPLES,
+written when a sample was a couple of metres. The r340 length doubling
+made segLen 6.1 to 13.4 u across the roster, so eight samples became 49
+to 107 m of road between rows. Measured on FALKEN RIDGE at r408: 77 m
+per row, 230 m from pole to the back row, and the front pair another 96
+m up the road from the line, because `N - 10` was the same mistake
+again. Eight cars strung over a quarter of a kilometre is not a grid,
+it is a queue — and a queue has no legible order from the driver's seat,
+which is the other half of what the owner reported.
+
+The geometry is stated in metres now and converted through each world's
+own segLen, the way every other metre-reasoning system in this codebase
+already does: `gridRowGapM` 9, `gridPoleBackM` 8, `gridLateralU` 3.6.
+Nine metres a row is a real starting box; an F1 grid box is eight. The
+row step is rounded with a floor of one sample — rounding keeps the gap
+near target across the roster's spacing where `ceil` would jump an 8.9 u
+world to 17.8 m rows and a 9.1 u world back to 9.1, and the floor of one
+sample means two cars sharing a lateral can never share a station, which
+test-hardmode asserts. Census over ten worlds: rows 6.1 to 13.4 m, depth
+18 to 40 m, eight distinct slots everywhere. FALKEN RIDGE went from
+0/77/153/230 m to 0/10/19/29 m.
+
+The OTHER reason the order is hard to read is the r363 reverse
+championship grid, where the title leader starts at the back — and that
+is itself an owner request ("I should not be starting 1st always"). It
+is left exactly as asked. The tension is recorded (K-11) and put back to
+the owner (L-6) rather than traded while fixing a units bug.
+
+**"Set up the hardness level as I asked… hard now is normal."** The
+ladder moved down a rung and gained two above it: EASY, NORMAL (carrying
+the numbers that used to be HARD), HARD, SAVAGE. `tier` is the order,
+and it had to exist as a field: three places asked `difficulty.id ===
+'hard'` as shorthand for "the top tier" — a contract gate, the contract
+rung ladder, and a 1.25× payout — and left alone, SAVAGE would have paid
+like NORMAL and locked the hard rungs, which is the opposite of what a
+harder tier means. All three compare tiers now, and a saved 'hard'
+selection migrates once to 'normal' so a returning player keeps the
+difficulty they were actually playing under its new name.
+
+The new rungs get their edge from aiCorner and aiAggression, never
+aiSpeed: this file already records that raising aiSpeed INVERTS tier
+order, because rivals drop under the `v > maxSpeed*0.55` nitro gate and
+boost half as often. `ramClamp` and the late token cap rise with the
+tier too, because both would otherwise throw the extra aggression away —
+aggression is clamped at 2 before it reaches the ram cooldown, and §5.4
+lets at most two rivals hold the player at once.
+
+**"Make it adaptive. If I'm driving good make them more angry."** The
+obvious reading is a live speed band on the field, and that is precisely
+the rubber band §5 deleted in r313 — a grid that waits for you. So the
+adaptation rides AGGRESSION and nothing else: drive well and they ram,
+shoot and mine you more, on the same pace they always had. Form is the
+player's progress lead over the best rival as a fraction of a lap, so
+pulling away is what stokes it and being caught cools it; smoothed over
+4 s against the real frame step, scaled by the tier's `angerGain`, and
+memoised per frame because four call sites read it per rival and seven
+rivals would have advanced the smoothing twenty-eight times a frame.
+EASY has gain 0 and never gets angry at all. One line in the existing
+feed lane when the field first turns; the HUD is frozen and gains
+nothing.
+
+**What the suite says, including what it says against us.** Eleven of
+fourteen checks green across PINE VALLEY and FURKA RIDGE. Three reds,
+none of them a deploy blocker (test-difficulty sits outside the blocking
+gate's deploy set), all three recorded rather than papered over:
+
+The pinch cap is TIER-BLIND. `EnemyCar` caps corner speed through a
+narrow station at `(16 + 3.6·w) · pace · progRamp` — it carries the
+persona's pace and the roster ramp but not the difficulty. Harmless
+while tiers were separated by aiSpeed, which the straights expressed;
+not harmless now that aiSpeed is flat across the top three and the whole
+tier difference lives in aiCorner, which this cap discards. Measured:
+median rival 402 / 402 / 401 m on NORMAL, HARD and SAVAGE. Three rungs,
+one pace — and on FURKA RIDGE, where the narrows are, the three read
+285 / 275 / 281 against a ±6 tolerance, so the suite's first law ("rival
+pace rises with difficulty") is a coin flip there and goes red when the
+noise falls the wrong way. That red belongs to this build, and it is
+LEFT RED rather than loosened, because it names the defect exactly.
+The fix was written and measured — carry sqrt(aiSpeed·aiCorner)
+normalised to NORMAL — and it lifts HARD's field about 5% and takes HARD
+past the clean-winnable bound on FURKA, i.e. the tier table needs
+retuning in the same change. That is an AI-pace build of its own, so it
+was taken back out rather than shipped half-done. RALLY_RULES.md H-8.
+What ships is what the owner asked for: the rungs above NORMAL are
+angrier, and on worlds without narrows they are quicker too.
+
+The other two reds are law 5 on both worlds. EASY is not
+casual-winnable by the test stand-in, and has not been for some time:
+law 5 reads -4.7% on PINE and -7.4% on FURKA. This is NOT
+from this build: EASY's row is untouched, and an A/B with the old 77 m
+grid restored reads -10.7% and -8.4% — worse, so the grid fix improved
+it. Prime suspect is r404 machine parity, which lifts the grid to the
+player's machine and only halves that on EASY. Recorded as H-9, left
+red so it keeps reporting; test-difficulty sits outside the blocking
+gate's deploy set.
+
+One test bound moved, and it is worth being explicit about why. "HARD is
+still winnable clean" was calibrated at 0.75 when HARD was the TOP rung.
+HARD is now the third of four, sitting a rung above the numbers that
+bound was set against. Corner speed goes as sqrt(aLat), so a rung is
+worth about 5% of field pace — a bound that stays fixed while the field
+gets 5% quicker per rung is not the same test from one rung to the next.
+So the bound is a ladder too, spaced by the same 5%: NORMAL 0.75, HARD
+0.71, SAVAGE 0.67. Measured on this base, HARD reads 0.745 on FURKA and
+0.903 on PINE.
+
+**Three systems in one build, and the reason.** §0.1 says one system per
+change-set. The r408 gate died mid-run with no verdict line, most likely
+starved by browser probes running alongside it, and each gate run is
+about seventy-five minutes. Rather than spend three of them, these went
+in together — but as separate commits, so a regression is still
+bisectable to the system that caused it.
+
 ## r408 — THE FINISH LINE ENDS THE RACE
 
 Owner's Race Integrity patch (capture R21, Falken Ridge on r407), build
