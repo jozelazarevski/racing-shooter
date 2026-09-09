@@ -84,6 +84,8 @@
     "rivalCutChance": 0.3,
     "rivalLateralNoiseTrailM": 4,
     "rivalLateralNoiseOpenM": 12,
+    "recoverOffroadProgressM": 8,
+    "recoverOffroadKmh": 25,
     "stuckDetectS": 2.5,
     "upsideDownS": 2.0,
     "playerResetDelayS": 1.5,

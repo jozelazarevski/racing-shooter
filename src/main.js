@@ -11509,18 +11509,42 @@ class Game {
     const back = Math.max(1, Math.round((RT.returnAheadM ?? 6) / sampleLen));
     car._nextGate = gateId;                  // the gate is still owed
     car._gateAlong = undefined;
-    // never wrap backwards past the lap line — for gate 0 the return seats
-    // ON the line instead, or progress reads the teleport as a lap gained
-    // (r311, caught on the rival kill-respawn; same arithmetic here)
+    // R-FINISH-01 (Race Integrity, capture R21): THE GATE-0 GUARD WAS EATING
+    // THE FINISH.
+    //
+    // r311 refused to wrap a return backwards past the lap line, because
+    // seating at (si-back+N)%N left a car whose lap counter had ALREADY
+    // ticked at index N-3, and progress = lap + index/N then read a whole
+    // lap GAINED (the kill promoted its victim). The guard seated the car ON
+    // the line instead. That is the bug in R21: `checkLap` recognises the
+    // finish as a WRAP — prevIndex > 0.85N and trackIndex < 0.15N — so a car
+    // seated AT index 0 has had its crossing consumed by the teleport. It can
+    // never wrap again inside the lap, `finishRace()` is unreachable, and the
+    // timer runs on. Exactly the capture: respawn at the gate at 3:20.7, drive
+    // past at 3:23.7, no results.
+    //
+    // The seat belongs BEFORE the line — the car owes the crossing and earns
+    // it by driving — and r311's arithmetic is answered where it actually
+    // lives: if the wrap takes the seat back past the line, the lap counter
+    // and the wrap count come back with it, so progress reads L + 0.99
+    // (just short of the line) instead of L + 1.99 (a lap gained). Both
+    // properties hold at once; the old code could only ever have one.
     const rawIdx = gt.si - back;
-    car.placeAt(rawIdx < 0 ? gt.si : rawIdx, 0, true);
+    const N9 = this.track.center.length;
+    if (rawIdx < 0) {
+      car.lap = Math.max(1, (car.lap ?? 1) - 1);
+      car._wraps = (car._wraps ?? car.lap) - 1;
+      car.placeAt((rawIdx + N9) % N9, 0, true);
+    } else {
+      car.placeAt(rawIdx, 0, true);
+    }
     // r340: seated ON the line by the gate-0 wrap guard, the route's
     // plane-crossing detector armed at along >= 0 and the owed gate could
     // never clear by driving (patch13 R9 caught it once the 2x segLen made
     // the guard fire with the seat exactly on the plane). Prime the
     // detector as "just behind the plane": the first honest forward step
     // crosses.
-    if (rawIdx < 0) car._gateAlong = -0.01;
+    if (rawIdx < 0) car._gateAlong = -0.01;   // r340: prime "just behind the plane"
     const sp = (RT.returnSpeedKmh ?? 40) / 3.6;
     car.vel.set(Math.sin(car.heading), 0, Math.cos(car.heading)).multiplyScalar(sp);
     car.vy = 0; car.airborne = false;

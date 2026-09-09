@@ -234,6 +234,12 @@ export const DRIVING = {
     rivalCutChance: 0.3,
     rivalLateralNoiseTrailM: 4,
     rivalLateralNoiseOpenM: 12,
+    // R-RECOVER-01 (Race Integrity, R21): off the road the stuck bar is a
+    // DISTANCE over a window, not a metre. 8 m in 3 s is 9.6 km/h of
+    // along-track pace — an off-road crawl that is getting somewhere is never
+    // rescued, a scrabble against a bank is. On the road the 1 m bar stands.
+    recoverOffroadProgressM: 8,
+    recoverOffroadKmh: 25,
     stuckDetectS: 2.5,
     upsideDownS: 2.0,
     playerResetDelayS: 1.5,

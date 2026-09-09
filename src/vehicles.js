@@ -1824,6 +1824,12 @@ export class Car {
     // came back surging. Every restart path (respawn, rescue, returnToGate,
     // resetRace, the rival pit-lift) funnels through this method.
     this.boostTimer = 0;
+    // R-FINISH-01: A TELEPORT IS NOT A CROSSING. `checkLap` reads the finish
+    // as a frame-to-frame index wrap, so any placement that moves the car
+    // across the lap line would either fake a lap or eat the real one. Two
+    // frames of immunity: the placement frame and the one that follows it,
+    // where `prevIndex` is still the pre-teleport value.
+    this._teleportFrames = 2;
     this.trackIndex = index;
     this.lateral = lateral;
     // sync vertical state to the (possibly elevated) road — no spawn-drop
@@ -4764,6 +4770,10 @@ export class Car {
       }
     }
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
+    // R-FINISH-01: the gates above still arm on a placement (standing on a
+    // checkpoint is standing on it), but neither wrap test may fire while the
+    // index jump is a teleport rather than a drive.
+    if (this._teleportFrames > 0) { this._teleportFrames--; return false; }
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
       this._wraps++;                           // distance always counts...
       const ALL = (1 << LAP_GATES.length) - 1;
@@ -6326,7 +6336,33 @@ export class PlayerCar extends Car {
         let dIdx = alongW - this._wedgeIdx;
         if (dIdx > Nw / 2) dIdx -= Nw;
         if (dIdx < -Nw / 2) dIdx += Nw;
-        if (Math.abs(dIdx) * segL >= 1) {
+        // R-RECOVER-01 (Race Integrity, capture R21): THE CRAWL THAT NEVER
+        // QUALIFIED. The bar above is ONE metre of along-track advance, and
+        // the reported episode — 11 s off-road at 3 to 13 km/h — cleared it
+        // every second or so, so the net never armed and the player dug
+        // themselves out by hand. A 3 km/h scrabble still makes 2 m in 2.5 s.
+        //
+        // OFF THE ROAD ONLY, the bar rises to `recoverOffroadProgressM` over
+        // `recoverOffroadS`: 8 m in 3 s is 9.6 km/h of along-track pace, so a
+        // genuine off-road crawl that is GETTING somewhere is never touched,
+        // and a car scrabbling against a bank is. On the road the old 1 m bar
+        // stands untouched — a slow lap is not a rescue.
+        //
+        // Deliberately still gated on HELD THROTTLE and on being off-road,
+        // which is what keeps §3.6c/§3.6d intact: an idle car parked on a
+        // mountainside is never yanked off it, and being off-road is not by
+        // itself a fault. The patch's own acceptance (the 0:48 episode, 3-13
+        // km/h) is met by this without its unconditional distance trigger,
+        // which is held — see the CLAUDE.md conflict note.
+        const RC9 = (typeof window !== 'undefined' && window.__DRIVING?.route) || {};
+        const offRoad9 = g.track._distToTrack
+          ? g.track._distToTrack(this.pos.x, this.pos.z) > g.track.widthAt(this.trackIndex)
+          : false;
+        const slow9 = Math.hypot(this.vel.x, this.vel.z)
+          < (RC9.recoverOffroadKmh ?? 25) / 3.6;
+        const barM = (offRoad9 && slow9) ? (RC9.recoverOffroadProgressM ?? 8) : 1;
+        this._wedgeBar = barM; this._wedgeOff = offRoad9; this._wedgeSlow = slow9;
+        if (Math.abs(dIdx) * segL >= barM) {
           this._wedgeIdx = alongW;
           this._wedgeT = 0;
         } else {

@@ -4171,6 +4171,78 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r408 — THE FINISH LINE ENDS THE RACE
+
+Owner's Race Integrity patch (capture R21, Falken Ridge on r407), build
+order items 1 and 2. Filed as RALLY_RACE_INTEGRITY.md — the name
+RALLY_PATCH_02.md already belongs to the 2026-09-06 document the master
+spec supersedes, and overwriting it would erase what the master spec's own
+change note points at.
+
+**R-FINISH-01.** Crossed the line at 3:21.7, drove past at 3:23.7, timer
+still running, no results. The patch offers two candidate causes; it is
+neither.
+
+THERE IS NO FINISH TRIGGER VOLUME. `checkLap` recognises the finish as an
+INDEX WRAP — `prevIndex > 0.85N && trackIndex < 0.15N` — gated on a
+complete four-gate checkpoint mask, and `finishRace()` is reachable only
+through it. That is also why "airborne / shielded / mid-respawn" was a red
+herring: the test never asks what state the car is in.
+
+What it does ask is where the car was LAST FRAME, and r311 had quietly made
+that unanswerable. That build refused to wrap a gate-0 return backwards past
+the lap line, because seating at `(si-back+N)%N` left a car whose lap counter
+had already ticked at index N-3, and `progress = lap + index/N` read a whole
+lap GAINED — the kill promoting its victim. The guard seated the car ON the
+line instead. A car at index 0 has had its crossing CONSUMED by the teleport:
+it can never wrap again inside that lap, so the race cannot end. Respawn at
+the gate, drive past, nothing happens. Exactly the capture.
+
+Both properties can hold at once, which the old code could not manage. The
+seat belongs BEFORE the line — the car owes the crossing and earns it by
+driving — and r311's arithmetic is answered where it actually lives: when
+the wrap carries the seat back past the line, the lap counter and the wrap
+count come back with it. Progress reads L + 0.99, a car just short of the
+line, instead of L + 1.99.
+
+AND A TELEPORT IS NEVER A CROSSING. Two frames of immunity after any
+placement, because `prevIndex` is captured before `update` and is still the
+pre-teleport value on the frame after. The checkpoint gates still arm during
+those frames — standing on a checkpoint is standing on it — but neither wrap
+test may fire on an index jump the car did not drive.
+
+Measured as five properties rather than a lap: the return seats at 0.999 of
+the lap, progress stays honest across it, a real crossing afterwards counts,
+a teleport does not, and the ordinary lap path is unchanged.
+
+**R-RECOVER-01, three triggers of four.** Eleven seconds off-road at 3 to
+13 km/h. The existing wedge net asks for less than ONE metre of along-track
+advance under held throttle — and a 3 km/h scrabble makes two metres in
+2.5 s, so it cleared the bar every second or so and never armed. The player
+dug themselves out by hand.
+
+OFF THE ROAD the bar is now a distance over a window: 8 m in 3 s, which is
+9.6 km/h of along-track pace. An off-road crawl that is GETTING somewhere is
+never touched; one scrabbling against a bank is. On the road the 1 m bar
+stands, because a slow lap is not a rescue.
+
+It stays gated on held throttle and on being off-road, and that is what
+keeps §3.6c and §3.6d intact: measured, an idle off-road car never arms the
+timer at all, and a car making 30 km/h off-road keeps the 1 m bar.
+
+HELD FOR THE OWNER: the patch's second trigger — off-road AND more than 15 m
+from the spline for 2 s, unconditionally — reverses §3.6c ("don't reset the
+car when I go off route") and §3.6d ("don't reset me when I am off-road")
+outright. Its precedence clause defers to the MASTER SPEC, which does not
+cover those owner overrides, so the clause cannot settle it. The patch's own
+acceptance is the 0:48 episode at 3-13 km/h, which trigger 1 already catches,
+so nothing is lost by asking first. Its 40 km/h rolling start is a second,
+smaller conflict with §3.6b's standing restart and is also held.
+
+STILL OPEN from the patch: W-EDGE-01a/02 and the camera package (items 3 and
+4), and G-AI-01, which asks to bound a rubber band r313 deleted — the
+bunching it describes needs root-causing, not a band to bound.
+
 ## r407 — NOTHING GROWS IN THE ICE
 
 Owner, on a GLACIAL PASS frame of dark conifers standing in and among the
