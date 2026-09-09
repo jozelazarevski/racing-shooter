@@ -231,9 +231,19 @@
      mid-corner (BRAKE red, DRIFT cyan) reads without looking. Pressed
      state brightens the glass toward its own ring colour. */
 
-  /* PATCH_02 §3.9: SPEED LINES — thin streaks at the frame edges past 150
-     km/h, opacity driven per-frame from the camera update. Pure CSS motion,
-     zero canvas cost on phones. */
+  /* PATCH_02 §3.9: SPEED LINES — DISABLED r409, opacity pinned at 0 by the
+     camera update (driving.json speedLinesFromKmh 9999, above any reachable
+     speed). This overlay was the defect behind five owner reports of "weird
+     white horizontal lines" and a "white triangle": the two gradients below
+     are 175deg and 185deg over inset:0, so each paints a near-horizontal
+     white stripe set and their 10deg crossing reads as a long pointed
+     sliver; the radial mask leaves the corners lit, which is the triangle.
+     It sits at z-index 5, ABOVE the HUD, which is why the sliver crossed
+     translucent panels and no scene-graph bisect ever found it. The comment
+     that used to sit here said "past 150 km/h" while the threshold had been
+     95 since r309 — that staleness is what sent the search into the world.
+     Kept, not deleted, so a future speed cue can reuse the machinery with a
+     shape that does not read as a stray line. */
   #speed-lines{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;
     transition:opacity .25s;
     background:

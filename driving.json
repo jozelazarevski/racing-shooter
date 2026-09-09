@@ -55,7 +55,7 @@
     "nitroBonusKmh": 40,
     "camHeightMaxMul": 1.35,
     "camEaseMs": 400,
-    "speedLinesFromKmh": 95
+    "speedLinesFromKmh": 9999
   },
   "patch02b": {
     "propShoveRadiusU": 1.15,

@@ -146,7 +146,26 @@ export const DRIVING = {
     nitroBonusKmh: 40,
     camHeightMaxMul: 1.35,
     camEaseMs: 400,
-    speedLinesFromKmh: 95,   // r309 "do not feel I go 70": speed must LOOK like speed well before 150
+    // SPEED LINES ARE OFF (owner, 2026-09-09, after FIVE reports of "weird
+    // white horizontal lines" / "remove the white triangle" / "still see the
+    // lines" across four worlds and three builds).
+    //
+    // They were never read as speed. #speed-lines paints two families of 2 px
+    // white lines 5 deg either side of horizontal, and where the families
+    // cross their opacity adds — which is the "triangle". At r309's 95 km/h
+    // threshold, opacity = min(0.45, (kmh-95)/110) put them at 0.13 by 110
+    // km/h and capped from 145 up, i.e. on for most of every race. The CSS
+    // comment still said "past 150 km/h", 55 km/h stale, which is why reading
+    // it suggested they were rare.
+    //
+    // CONFLICT, RECORDED IN RALLY_RULES.md §K: r309 lowered this threshold
+    // for "do not feel I go 70", and switching it off reverses that half. The
+    // intent is not abandoned — FOV push and the camera pull already carry it
+    // — but it will not be carried by white lines the owner keeps reporting
+    // as a defect. A threshold above the reachable top speed disables the
+    // overlay without deleting the machinery, so a future implement can use
+    // it deliberately.
+    speedLinesFromKmh: 9999,
   },
 
   // RALLY_PATCH_02 v1.2 §9 — recording B (Glacier Col) constants. Only the

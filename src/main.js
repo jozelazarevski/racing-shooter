@@ -11631,8 +11631,11 @@ class Game {
   _updateCamera(dt) {
     const p = this.player;
     // PATCH_02 §3.9: the zoom EASES over ~400 ms so the eye reads the
-    // change as acceleration, not a cut — and the speed-lines overlay
-    // fades in past 150 km/h.
+    // change as acceleration, not a cut. The speed-lines overlay below is
+    // OFF (r409): it was the "weird white horizontal lines" and the "white
+    // triangle" the owner reported five times — see RALLY_RULES.md I-5 and
+    // the CSS note in index.html. The fallback here is 9999 to match, so a
+    // failed driving.json load cannot switch the artefact back on.
     const speedZoomRaw = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
     this._camSpd = (this._camSpd ?? 0) + (speedZoomRaw - (this._camSpd ?? 0)) * Math.min(1, dt / 0.4);
     const speedZoom = this._camSpd;
@@ -11640,7 +11643,7 @@ class Game {
       const sl = document.getElementById('speed-lines');
       if (sl) {
         const kmh = Math.abs(p.speedAlong) * 3.6;
-        sl.style.opacity = kmh > (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 95) ? Math.min(0.45, (kmh - (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 95)) / 110).toFixed(2) : "0";
+        sl.style.opacity = kmh > (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 9999) ? Math.min(0.45, (kmh - (window.__DRIVING?.patch02?.speedLinesFromKmh ?? 9999)) / 110).toFixed(2) : "0";
       }
     }
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];
