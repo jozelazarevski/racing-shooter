@@ -7696,6 +7696,85 @@ class Game {
    *
    *  Free roam and missions are exempt: there is no grid to lose to, and
    *  punishing exploration for an unbought upgrade would be nonsense. */
+  /** MACHINE PARITY — THE GRID BRINGS A COMPARABLE CAR (owner, 2026-09-09:
+   *  "Opponents should [match] my cars strength. Needs to be a constant
+   *  battle and race. Not me going away from them always").
+   *
+   *  MEASURED FIRST, across all 78 worlds. The player's top-speed ladder runs
+   *  53.0 (stock SLEEK) to 95.2 (CROWN on engine level 5 with a V12 and no
+   *  wing) — a 1.72x career range, because the garage sells 4% a rung on top
+   *  of a block worth up to 1.24x. The grid does not move with it: each rival
+   *  drives ITS OWN catalogue car at a 0.96 handicap, so with the kit gates
+   *  met (`kitHandicap` 1.0, which is what a properly equipped player has)
+   *  the field averages 55.5 and its fastest car reaches 63.8. A maxed player
+   *  is +71% on the field average and +49% on the quickest rival in the game.
+   *
+   *  What was supposed to answer this was a +2%-per-engine-level term capped
+   *  at +10%, and it had two holes: it priced ONE rung of one upgrade (not
+   *  the block, not the car), and it multiplied `maxSpeed` ONLY — never the
+   *  corner budget, where this file's own note records rivals are limited
+   *  95% of the time. On a twisty world it did nothing at all. It is deleted
+   *  and replaced by this.
+   *
+   *  THIS IS NOT THE RUBBER BAND §5 DELETED. That one read the player's LIVE
+   *  gap every tick and converged the field on it. This is one number fixed
+   *  at the start line from the machines alone: the grid never learns where
+   *  the player is, the roster keeps its own pace spread, and a driver who
+   *  drives better still drives away. It is a balance of performance, which
+   *  is what "opponents should match my car's strength" asks for.
+   *
+   *  It only ever RAISES the grid. Slowing it down for an under-equipped
+   *  player would undo the thing the owner asked for in r342 ("I need to be
+   *  forced to buy upgrades"); `kitHandicap` already handles that direction
+   *  by making the grid faster still. `close` leaves the player a real
+   *  reward for the machine rather than a treadmill: at the top of the
+   *  ladder the grid closes to about 90% of the player's top speed. */
+  machineParity() {
+    if (this.freeRoam || this.missionMode) return 1;
+    const p = this.player;
+    if (!p || !this.enemies?.length) return 1;
+    // Memoized on the things it is allowed to depend on, which is the point
+    // as much as the saving: `player.maxSpeed` moves only in applyUpgrades
+    // and a car swap, so parity CANNOT track anything that happens during a
+    // race. Nitro is a separate boost term and never touches maxSpeed.
+    const key = `${p.maxSpeed}|${this.enemies.length}|${this.level?.id}|${this.difficulty?.id}`;
+    if (this._parityKey === key) return this._parityVal;
+    let ref = 0;
+    for (const e of this.enemies) ref += e.baseMaxSpeed ?? 0;
+    ref /= this.enemies.length;
+    // THE REFERENCE IS WHAT THE GRID ACTUALLY RUNS, NOT ITS SHOWROOM CARD.
+    //
+    // A first cut compared the player against `baseMaxSpeed` alone and it
+    // was wrong twice over. The grid's real pace already carries the
+    // difficulty, the kit lean and the roster ramp — on PINE VALLEY that is
+    // 70.4 against a 56.3 showroom — so measuring the excess against the
+    // card overstated it by the whole of those terms, and then MULTIPLYING
+    // the result back in stacked parity on top of the kit lean: an
+    // under-equipped player in a fast car met a grid at 109 against their
+    // own 95, and the measured race went from 88% contested to 30%. The
+    // grid had run away instead, which is the reported defect with the
+    // sign flipped.
+    //
+    // Compare like with like: the pace the field would bring WITHOUT parity.
+    // Then parity can only ever close a gap that survives everything else,
+    // and it cannot double-count with the lean it sits beside.
+    const D9 = this.difficulty ?? {};
+    const gridPace = ref * (D9.aiSpeed ?? 1) * this.kitHandicap()
+      * (1 + (DRIVING.ai?.progRampPct ?? 0.10)
+        * ((D9.id ?? 'normal') === 'easy' ? (DRIVING.ai?.progRampEasyMul ?? 0.5) : 1)
+        * (this.rosterProg?.() ?? 0));
+    const AI = DRIVING.ai ?? {};
+    const easy = (D9.id ?? 'normal') === 'easy';
+    const close = (AI.parityClosePct ?? 0.85)
+      * (easy ? (AI.parityCloseEasyMul ?? 0.5) : 1);
+    const excess = gridPace > 0 ? (p.maxSpeed ?? gridPace) / gridPace - 1 : 0;
+    const val = excess > 0                    // never slow the grid down
+      ? Math.min(AI.parityMax ?? 1.55, 1 + close * excess)
+      : 1;
+    this._parityKey = key; this._parityVal = val;
+    return val;
+  }
+
   kitHandicap() {
     if (this.freeRoam || this.missionMode) return 1;
     // 0.16 was a nudge, and the padlocks read as decoration because of it —

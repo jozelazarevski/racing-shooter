@@ -5201,16 +5201,23 @@ export class EnemyCar extends Car {
       pace *= 1 + THREE.MathUtils.clamp(gap / 0.05, -1, 1) * clamp;
     }
     this._paceFactor = pace;
-    // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
-    // NORMAL into a parade. Rivals bring +2% per player engine level (cap
-    // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
-    // still gets to win with upgrades. NOTE: upgrades went PER-CAR
-    // (`garage.upgrades[carKey]`) and the old flat `garage.engine` key is
-    // deleted by the save migration — reading it always returned 0, so this
-    // whole parity rule was dead. Ask the game for the selected car's levels.
-    const engLvl = g.carUpgrades?.().engine ?? g.garage?.engine ?? 0;
-    const engUp = (g.difficulty?.id ?? 'normal') === 'easy'
-      ? 1 : 1 + Math.min(0.10, 0.02 * engLvl);
+    // MACHINE PARITY (r404, owner: "Opponents should [match] my cars
+    // strength... Not me going away from them always"). The grid answers the
+    // player's MACHINE, not one rung of one upgrade.
+    //
+    // What stood here was +2% per player engine level capped at +10%, and it
+    // was too small by a factor of seven and aimed at the wrong half of the
+    // car. Measured across all 78 worlds: the player's ladder runs 53.0 to
+    // 95.2 top speed (1.72x) while a kit-ready grid averages 55.5 and its
+    // quickest car reaches 63.8 — a maxed player is +71% on the field. And
+    // this term multiplied `maxSpeed` alone, so on a corner-limited world
+    // (which is 95% of the time, per the aLat note below) it bought nothing.
+    //
+    // `machineParity` is one number fixed at the start line from the two
+    // machines. It is NOT the §5 rubber band: it never reads the player's
+    // live gap, so the field cannot converge on them — see the method.
+    const parity = g.machineParity?.() ?? 1;
+    this._parity = parity;
     // TURN UP FOR A WORLD UNDERGEARED AND THE GRID WILL BURY YOU.
     //
     // Asked for plainly: if the world's requirements are not met, the player
@@ -5230,7 +5237,7 @@ export class EnemyCar extends Car {
         ? (DRIVING.ai?.progRampEasyMul ?? 0.5) : 1);
     const ramp = 1 + rampPct * (g.rosterProg?.() ?? 0);
     this._progRamp = ramp;
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * pace * ramp;
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * parity * kit * pace * ramp;
 
     // (The corner band — the half of the rubber band that actually bound,
     // rivals being corner-limited 95% of the time — is deleted with it.
@@ -5629,7 +5636,13 @@ export class EnemyCar extends Car {
       * D.aiSpeed * (D.aiCorner ?? 1)
       // r342: the roster ramp reaches the corners at the same rate as the
       // straights — corner speed goes as sqrt(aLat), hence ramp².
-      * (this._progRamp ?? 1) * (this._progRamp ?? 1);
+      * (this._progRamp ?? 1) * (this._progRamp ?? 1)
+      // r404: and so does machine parity, for the same reason and by the
+      // same square. This is the half the old engine-only term never had,
+      // and the half that decides a race — rivals are corner-limited 95%
+      // of the time, so a straight-line-only answer to a faster player is
+      // no answer at all on any world with corners in it.
+      * (this._parity ?? 1) * (this._parity ?? 1);
     const sqA = Math.sqrt(aLat);
     // 15, down from 26 (r288): the player's brake learned its real-world cap
     // (~1.5g = 14.7 u/s²), and a field that PLANS 2.65g stops would outbrake

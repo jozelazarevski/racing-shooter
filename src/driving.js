@@ -299,6 +299,25 @@ export const DRIVING = {
     // finish the campaign; NORMAL/HARD are forced to the garage.
     progRampPct: 0.10,
     progRampEasyMul: 0.5,
+
+    // r404 MACHINE PARITY (owner: "Opponents should [match] my cars
+    // strength... Not me going away from them always"). The grid answers
+    // the player's machine, once, at the start line — see Game.machineParity
+    // for why this is a balance of performance and not the §5 rubber band.
+    //
+    // parityClosePct is the fraction of the player's excess top speed the
+    // grid takes back. Measured: a maxed CROWN reaches 95.2 against a
+    // kit-ready field average of 55.5 (+71%); at 0.85 the grid comes up to
+    // 86.0, leaving the player about 10% in hand — a real reward for the
+    // machine, and a race instead of a parade. It never runs the other way:
+    // an under-equipped player keeps the full beating kitHandicap gives
+    // them, because the garage has to stay a requirement (r342).
+    //
+    // parityMax is the ceiling on that, so no build can ever conjure a grid
+    // more than half again its own showroom pace.
+    parityClosePct: 0.85,
+    parityCloseEasyMul: 0.5,
+    parityMax: 1.55,
   },
 
   // CP2 (r348, CAREER_PATH.md): the career block. finaleMul multiplies the
