@@ -8286,8 +8286,8 @@ export class Track {
    *
    *  Both halves of that are one bug. The row gap was the literal `row * 8`
    *  — EIGHT CENTRELINE SAMPLES — written when a sample was a couple of
-   *  metres. Since the r340 length doubling `segLen` is 6.6 to 9.6 u, so
-   *  eight samples is 53 to 77 m between rows: FALKEN RIDGE measured 77 m
+   *  metres. Since the r340 length doubling `segLen` is 6.1 to 13.4 u across the
+   *  roster, so eight samples is 49 to 107 m between rows: FALKEN RIDGE measured 77 m
    *  per row and 230 m from pole to the back row, with the front pair a
    *  further 96 m up the road from the line (`N - 10`). That is not a grid,
    *  it is a queue spread over a quarter of a kilometre — which is exactly
@@ -8297,9 +8297,9 @@ export class Track {
    *  So the geometry is stated in metres and converted through this world's
    *  own `segLen`, the way every other metre-reasoning system here already
    *  does. The step is ROUNDED with a floor of one sample: rounding keeps
-   *  the gap near the 9 m target across the roster's 6.6-9.6 u sample
-   *  spacing (ceil would jump a 8.9 u world to 17.8 m rows and a 9.1 u world
-   *  back to 9.1), and the floor of one sample means two cars sharing a
+   *  the gap near the 9 m target across the roster's measured 6.1-13.4 u
+   *  sample spacing (ceil would jump an 8.9 u world to 17.8 m rows and a
+   *  9.1 u world back to 9.1), and the floor of one sample means two cars sharing a
    *  lateral can never share a station — test-hardmode asserts eight
    *  distinct slots.
    */

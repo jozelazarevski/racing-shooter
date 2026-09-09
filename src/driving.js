@@ -260,7 +260,7 @@ export const DRIVING = {
     recoverOffroadProgressM: 8,
     recoverOffroadKmh: 25,
     // THE GRID IS METRES (r409). The row gap used to be `row * 8` SAMPLES
-    // in track.js, which after the r340 length doubling is 53-77 m a row —
+    // in track.js, which after the r340 length doubling is 49-107 m a row —
     // FALKEN RIDGE measured 77 m per row, 230 m pole-to-back, and the front
     // pair another 96 m up the road. Owner: "they all start super far away.
     // Unusual for a race." Nine metres a row is a real starting box (F1's
