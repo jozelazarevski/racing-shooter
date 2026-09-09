@@ -4171,6 +4171,82 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r404 — THE GRID BRINGS A COMPARABLE CAR
+
+Owner: *"Opponents should [match] my cars strength. Needs to be a constant
+battle and race. Not me going away from them always."*
+
+MEASURED FIRST, across all 78 worlds. The player's top-speed ladder runs
+53.0 to 95.2 — a 1.72x career range, because the garage sells 4% a rung on
+top of an engine block worth up to 1.24x, on top of a car choice worth
+another 1.21x. The grid does not move with it: every rival drives ITS OWN
+catalogue car at a 0.96 handicap, so with the kit gates met (`kitHandicap`
+= 1.0, which is what a properly equipped player has) the field averages
+55.5 and its fastest car reaches 63.8.
+
+> **A maxed player is +71% on the field average and +49% on the quickest
+> rival in the game.** That is the owner's sentence, quantified.
+
+WHAT WAS SUPPOSED TO ANSWER THIS, AND WHY IT COULD NOT. A +2%-per-engine-
+level term capped at +10%, and it had two holes. It priced ONE rung of ONE
+upgrade — not the block, not the machine, so the biggest two thirds of the
+ladder were invisible to it. And it multiplied `maxSpeed` ONLY, never the
+corner budget, where `vehicles.js`'s own note records rivals are limited
+95% of the time: on a twisty world it bought nothing at all. Deleted.
+
+`Game.machineParity` replaces it — one number fixed at the start line from
+the two machines, applied to `maxSpeed` and to `aLat` (squared, because
+corner speed goes as sqrt, the same law the r342 roster ramp already
+follows).
+
+**THIS IS NOT THE RUBBER BAND §5 DELETED.** That one read the player's
+LIVE gap every tick and converged the field on it. This never learns where
+the player is: it is memoized on the player's machine, which moves only in
+`applyUpgrades` and a car swap, so it cannot track anything that happens
+during a race (nitro is a separate boost term and never touches
+`maxSpeed`). The roster keeps its own pace spread, the pressure rival
+keeps its own ±3% lease, and a better driver still drives away. It is a
+balance of performance, which is what the owner asked for.
+
+THE REFERENCE IS WHAT THE GRID ACTUALLY RUNS, NOT ITS SHOWROOM CARD. The
+first cut compared the player against `baseMaxSpeed` alone and was wrong
+twice over: it overstated the excess by the whole of difficulty, kit lean
+and roster ramp, and then MULTIPLIED the result back in, stacking parity
+on top of the kit lean. An under-equipped player in a fast car met a grid
+at 109 against their own 95, and the measured race went from 88% contested
+to 30% — the grid had run away instead, the reported defect with the sign
+flipped. It now compares against the pace the field would bring WITHOUT
+parity, so it can only close a gap that survives everything else, and it
+cannot double-count with the lean it sits beside.
+
+IT ONLY EVER RAISES THE GRID. Slowing down for an under-equipped player
+would undo r342 ("I need to be forced to buy upgrades"); `kitHandicap`
+already owns that direction, and owns it harder.
+
+MEASURED AFTER — kit-ready maxed CROWN on PINE VALLEY, 150 s of full
+frames:
+
+| | grid top | player | player ahead |
+|---|---|---|---|
+| before | 53.2 | 95.2 | +79% |
+| after  | 82.9 | 95.2 | **+15%** |
+
+Rival discipline does not pay for it: 0% of rival-frames off course either
+way, and 1 wreck before against 0 after — the raised corner budget makes
+the field quicker, not sloppier, which was the risk worth measuring rather
+than assuming. Across the catalogue a maxed car goes from +47..69% ahead
+of the grid's real pace to +5..9%, and EVERY STOCK CAR IS UNTOUCHED
+(parity is exactly 1 when the player is not ahead), so the early game and
+the upgrade pressure are unchanged.
+
+KNOWN LIMIT, STATED RATHER THAN HIDDEN. The scripted robot is
+corner-limited and never spends its top speed, so it cannot reproduce a
+human running away from the field, and its contested-time number falls
+when the grid speeds up. The machine comparison is the mechanism the owner
+described and that is what is verified here; the felt result is the
+owner's to judge. `parityClosePct` (0.85) and `parityMax` (1.55) in
+`driving.js` are the knobs if the field now reads too strong in the hand.
+
 ## r403 — THE SEA AND THE BRIDGE (and the climbs, built and held)
 
 Three photographs and three sentences, in the order they arrived.
