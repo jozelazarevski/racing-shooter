@@ -1622,8 +1622,27 @@ class Game {
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
     const sc = sun.shadow.camera;
-    // tight frustum around the player (the rig follows them) = crisp shadows
-    sc.left = -72; sc.right = 72; sc.top = 72; sc.bottom = -72;
+    // THE BOX HAS TO COVER WHAT IS ON SCREEN (r405, owner: "Shades needs to
+    // be consistent and constantly there").
+    //
+    // +-72 was "tight frustum around the player = crisp shadows", and crisp
+    // it was — for the 144 u around the car and nowhere else. Measured on a
+    // PRINCIPALITY STREETS frame: the houses to the left and ahead threw
+    // long shadows down the street and the ones to the right threw none at
+    // all, with a hard straight line between them. That is the whole report:
+    // shadows are not "constantly there" because two thirds of the visible
+    // street is outside the only box that has any.
+    //
+    // 168 covers the readable depth (fog opens at 320 and the street reads
+    // to about 300), and the rig is biased down the view below so the box
+    // is spent on what the camera is looking AT rather than on the road
+    // already behind the car. Texel cost is honest and stated: 0.16 u at
+    // 2048, 0.33 u on a 1024 phone map, against 0.07/0.14 before. This art
+    // is chunky and the PCF radius below is wide, so a softer edge over the
+    // whole street beats a crisp one over a tenth of it. Map size is NOT
+    // raised to pay for it — that is phone fill rate, and §6.7's budget is
+    // measured in the gate.
+    sc.left = -168; sc.right = 168; sc.top = 168; sc.bottom = -168;
     sc.near = 10; sc.far = 400;
     sc.updateProjectionMatrix();
     sun.shadow.bias = -0.0004;
@@ -12231,9 +12250,22 @@ class Game {
     // camera mode, the seat included, ends up. Cheap: one write to one shared
     // material for the whole grid.
     fadeCarLights(this.camera);
-    // keep the shadow light rig centered on the player (offset = theme sun dir)
-    this.moon.position.copy(p.pos).add(this._sunOffset);
-    this.moon.target.position.copy(p.pos);
+    // THE SHADOW BOX FOLLOWS THE VIEW, NOT JUST THE CAR (r405). Centred on
+    // the player, half of it covered road already driven past — invisible
+    // to a camera that looks ahead, so half the map was spent on nothing
+    // and the cutoff fell inside the street the player is actually looking
+    // down. Bias the centre forward along the camera's own heading by a
+    // third of the box, which buys that depth back for free: same map, same
+    // caster count, no extra draw.
+    const fwd9 = this._shadowAim ??= new THREE.Vector3();
+    this.camera.getWorldDirection(fwd9);
+    fwd9.y = 0;
+    const l9 = Math.hypot(fwd9.x, fwd9.z);
+    if (l9 > 1e-3) fwd9.multiplyScalar(56 / l9); else fwd9.set(0, 0, 0);
+    const aimX = p.pos.x + fwd9.x, aimZ = p.pos.z + fwd9.z;
+    this.moon.position.set(aimX + this._sunOffset.x, p.pos.y + this._sunOffset.y,
+      aimZ + this._sunOffset.z);
+    this.moon.target.position.set(aimX, p.pos.y, aimZ);
   }
 
   /** THE DRIVER'S VIEW.

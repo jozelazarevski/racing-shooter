@@ -7332,6 +7332,59 @@ export class Track {
     this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
+    this._applyShadowLaw();  // r405: one shadow rule, after every builder
+  }
+
+  /** SHADOWS ARE A LAW, NOT A HABIT (owner, 2026-09-09: "Shades needs to be
+   *  consistent and constantly there", on a PRINCIPALITY STREETS frame).
+   *
+   *  Fifty-odd builders each decided for themselves whether the thing they
+   *  had just made casts or receives, and the census says what that produced
+   *  on one street world: `oldtown-chimneypots` (884) cast while
+   *  `oldtown-chimneys` (442) — the stacks they sit ON — cast nothing;
+   *  `frontage-awnings` (274) cast while `frontage-valances` (274), the
+   *  cloth hanging off the same awning, did not; the two bollard meshes
+   *  disagreed with each other; and of the 656 unnamed meshes in the main
+   *  bucket, 393 cast no shadow at all. A street of tall houses where half
+   *  the geometry is transparent to the sun does not read as lit, it reads
+   *  as flat, which is the report.
+   *
+   *  So the decision moves here, once, after everything is built, and it is
+   *  made by CLASS:
+   *
+   *    nothing   sky, cloud, horizon, haze, water, the world skirt, painted
+   *              contact-shadow blobs, decals and particles — things with no
+   *              body, or whose "shadow" is already painted on.
+   *    receive   ground surfaces: terrain, road, skirt, pavement, kerb, beds.
+   *              They take shadow and do not cast it — a heightfield casting
+   *              on itself is acne and costs a second pass of the whole map.
+   *    both      everything else. If it has a body and stands in the world,
+   *              it casts and it receives.
+   *
+   *  Run ONCE at build time on purpose. `_autoQuality`'s own note records why
+   *  it must never move at runtime: changing the caster count rewrites every
+   *  material's program cache key and recompiles the scene mid-race (measured
+   *  1.2 s of dead screen). At build time that cost is already being paid. */
+  _applyShadowLaw() {
+    const NONE = /^(sky|cloud|horizon|haze|foam|rain|snow|dust|spark|smoke|fog|particle|world-skirt|contact-shadows|.*-veil|.*-lightpool|.*shadow|.*-glow|lamp-?glow|headlight|beam|tracer|decal|paint|edit-|preview|hud|arrow|marker)/i;
+    // water is GROUND, not NONE: a cliff's shadow falling across the bay is
+    // the whole reason the coast worlds have a cliff. Only its FOAM, which is
+    // a painted overlay, sits in the no-shadow class.
+    const GROUND = /^(terrain|road|crossroad|ford-wash|.*-skirt|skirt|.*pavement|.*kerb|ground|.*-bed|.*-beds|splat|sea|water|river|lake)/i;
+    let cast = 0, recv = 0, off = 0;
+    this.group.traverse((o) => {
+      if (!o.isMesh && !o.isInstancedMesh) return;
+      // the name that decides is the first named thing at or above this mesh:
+      // a builder that names its GROUP and not its meshes still gets its class
+      let nm = '';
+      for (let q = o; q && q !== this.group; q = q.parent) {
+        if (q.name) { nm = q.name; break; }
+      }
+      if (NONE.test(nm)) { o.castShadow = false; o.receiveShadow = false; off++; return; }
+      if (GROUND.test(nm)) { o.castShadow = false; o.receiveShadow = true; recv++; return; }
+      o.castShadow = true; o.receiveShadow = true; cast++;
+    });
+    this._shadowLaw = { cast, recv, off };
   }
 
   /** WR-7.6 (r392, owner: "I still see trees buried"): every builder seats
