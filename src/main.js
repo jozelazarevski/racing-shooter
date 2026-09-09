@@ -150,15 +150,53 @@ const DIFFS = {
   // — and a key nothing reads is a config that lies. A tier's whole pace is
   // aiSpeed × aiCorner; its forgiveness is that pace being low, not a pack
   // that waits.
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.58, aiAggression: 1.0 },
+  // ---- THE LADDER MOVED DOWN ONE (owner, 2026-09-09) ---------------------
+  // "Current hard level should be normal. Make 2 more harder levels where
+  // cars are more aggressive." So NORMAL now carries the numbers that used
+  // to be HARD, and two tiers are stacked above it. The old NORMAL row is
+  // gone rather than renamed: EASY already covers the casual end, and a
+  // fourth rung below would have been a tier nobody selected.
+  //
+  // `tier` IS THE ORDER, AND IT HAD TO EXIST. Three places asked
+  // `difficulty.id === 'hard'` as a shorthand for "the top tier" — a
+  // contract gate, the contract-rung ladder and a 1.25x payout multiplier.
+  // Left alone, SAVAGE would have paid like NORMAL and locked the hard
+  // contract rungs, which is the opposite of what a harder tier means.
+  // Those three now compare tiers.
+  //
+  // WHERE THE NEW TIERS GET THEIR EDGE. Not aiSpeed: this file already
+  // records that raising it INVERTS the order, because rivals drop under
+  // the `v > maxSpeed*0.55` nitro gate and boost half as often — the knob
+  // that reads fastest makes the field slower. It stays at 1.06 across the
+  // top three. The edge is aiCorner (where lap time actually lives, as
+  // lap ∝ aLat^0.26) and aiAggression, which is what the owner asked for:
+  // ram wind-up, boost cadence, fire rate and mine drops.
+  //
+  // `parityClose`/`angerGain` are the adaptive half — see machineParity and
+  // fieldAnger. Anger rides AGGRESSION ONLY, never pace: a live speed band
+  // is the rubber band §5 deleted in r313, and re-adding one is exactly the
+  // "field that waits for you" the standing decision exists to prevent.
+  easy:   { id: 'easy',   label: 'EASY',   tier: 0, aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65, angerGain: 0,    ramClamp: 2.0, tokensLate: 2 },
   // hard aiCorner 0.65 (r291): the drag restore lifted absolute speeds and
   // the tier-blind pinch caps bind sooner, compressing normal and hard to a
   // 3-point coin flip on open worlds (1212 vs 1209 measured). Two points of
   // corner budget give HARD back a real edge without re-crossing the
   // clean-winnable bound.
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.65, aiAggression: 1.4 },
+  normal: { id: 'normal', label: 'NORMAL', tier: 1, aiSpeed: 1.06, aiCorner: 0.65, aiAggression: 1.4,  angerGain: 0.35, ramClamp: 2.0, tokensLate: 2 },
+  // The two new rungs. aiCorner climbs in the same neighbourhood a drifting
+  // player actually sustains (HARD's old 0.65 was measured as "within a
+  // clean player's 0.80 reach"), and aggression is the headline.
+  // ramClamp is raised WITH them because `aggression * aiAggression` is
+  // clamped at 2 before it reaches the ram cooldown — at 2.0 the top tier's
+  // extra anger would have been thrown away by the clamp and the tier would
+  // have felt identical to NORMAL in the one place the owner asked about.
+  // tokensLate likewise: §5.4's arbiter lets at most 2 rivals hold the
+  // player at once, so past that cap "angrier" cannot land either.
+  hard:   { id: 'hard',   label: 'HARD',   tier: 2, aiSpeed: 1.06, aiCorner: 0.72, aiAggression: 2.0,  angerGain: 0.60, ramClamp: 2.8, tokensLate: 3 },
+  savage: { id: 'savage', label: 'SAVAGE', tier: 3, aiSpeed: 1.06, aiCorner: 0.80, aiAggression: 2.6,  angerGain: 0.90, ramClamp: 3.4, tokensLate: 3 },
 };
+// "the top tier" as a QUESTION, not a string compare — see the tier note above
+const atLeastHard = (d) => (typeof d === 'string' ? DIFFS[d] : d)?.tier >= DIFFS.hard.tier;
 
 const UPGRADES = [
   { key: 'engine',   name: 'ENGINE WRENCH',     icon: '🔧', desc: '+4% top speed / lvl',       max: 5 },
@@ -742,7 +780,7 @@ const CONTRACT_POOL = [
     check: (g, ct, rank, need) => ct.bigAirs >= need,
     prog: (ct, need) => `${Math.min(ct.bigAirs, need)}/${need}` },
   { id: 'hardpod', label: 'PODIUM ON HARD', desc: (n) => `top ${n} on HARD`,
-    gate: (g) => g.difficulty.id === 'hard', atFinish: true,
+    gate: (g) => atLeastHard(g.difficulty), atFinish: true,
     rungs: [{ need: 3, pay: 150 }, { need: 2, pay: 300 }, { need: 1, pay: 480, hard: true }],
     check: (g, ct, rank, need) => rank <= need },
   { id: 'pacifist', label: 'PACIFIST', desc: (n) => `top ${n} with zero weapon fire`,
@@ -901,7 +939,7 @@ const RUNG_NUMERAL = ['I', 'II', 'III'];
  *  front of it can complete. */
 function contractAtRung(c, level, difficulty) {
   let ix = Math.max(0, Math.min(c.rungs.length - 1, level | 0));
-  while (ix > 0 && c.rungs[ix].hard && difficulty !== 'hard') ix--;
+  while (ix > 0 && c.rungs[ix].hard && !atLeastHard(difficulty)) ix--;
   const r = c.rungs[ix];
   return { ...c, rungIx: ix, need: r.need, pay: r.pay,
     label: `${c.label} ${RUNG_NUMERAL[ix] ?? ix + 1}`, done: false };
@@ -1577,7 +1615,19 @@ class Game {
     }
     this.adminMode = adminParam === '1'
       || (adminParam !== '0' && localStorage.getItem('ir-admin') === '1');
-    const diffId = localStorage.getItem('ir-diff') || 'normal';
+    // THE SAVED SETTING MOVES WITH THE LADDER (r409). The owner's sentence
+    // was "current hard level should be normal", so the numbers a returning
+    // player had under HARD are the ones now labelled NORMAL. Leaving a
+    // stored 'hard' alone would hand that player the NEW third rung and read
+    // as the rebase never happening. One migration, stamped, so a HARD
+    // chosen deliberately after this build stays HARD forever.
+    let diffId = localStorage.getItem('ir-diff') || 'normal';
+    try {
+      if (localStorage.getItem('ir-diff-ladder') !== 'r409') {
+        if (diffId === 'hard') { diffId = 'normal'; localStorage.setItem('ir-diff', diffId); }
+        localStorage.setItem('ir-diff-ladder', 'r409');
+      }
+    } catch { /* private mode: no migration, no crash */ }
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
     // guard: don't start a locked level via URL tampering
     if (!this.isLevelUnlocked(this.level.id)) {
@@ -7394,7 +7444,9 @@ class Game {
     // against, and the 2,200 ceiling test-rungs holds the contract sweep to.
     // A job should be worth about one good race, not three.
     const scale = Math.min(1.9, 1 + rung / 34);
-    const hard = this.difficulty?.id === 'hard' ? 1.25 : this.difficulty?.id === 'easy' ? 0.8 : 1;
+    // payout rises with the tier rather than naming one: SAVAGE pays more
+    // than HARD, which pays more than NORMAL. Was a bare `id === 'hard'`.
+    const hard = [0.8, 1, 1.25, 1.45][this.difficulty?.tier ?? 1] ?? 1;
     return Math.round((k.base * scale * hard) / 10) * 10;
   }
 
@@ -7765,6 +7817,73 @@ class Game {
    *  by making the grid faster still. `close` leaves the player a real
    *  reward for the machine rather than a treadmill: at the top of the
    *  ladder the grid closes to about 90% of the player's top speed. */
+  /** ANGER, NOT PACE (owner, 2026-09-09: "Make it adaptive. If I'm driving
+   *  good make them more angry").
+   *
+   *  The obvious reading of "adaptive" is a live speed band on the field,
+   *  and that is precisely the rubber band §5 deleted in r313 — a grid that
+   *  waits for you, which this file already records as the thing that made
+   *  three difficulty tiers converge to within 11%. So the adaptation rides
+   *  AGGRESSION and nothing else: drive well and they ram, shoot and mine
+   *  you more, on the same pace they always had. `machineParity` already
+   *  answers "are they in the same class of car"; this answers "how cross
+   *  are they about it".
+   *
+   *  FORM IS THE MARGIN, NOT THE PLACE. Position alone is too coarse in a
+   *  field of eight — P1 by a nose and P1 by half a lap are the same number.
+   *  This reads the player's progress lead over the best rival as a fraction
+   *  of a lap, so pulling away is what makes them angry, and being caught
+   *  cools them back to the tier's own baseline.
+   *
+   *  Smoothed over ~4 s so a single corner cannot swing it, clamped by the
+   *  tier's `angerGain` (EASY 0, so EASY never gets angry at all), and
+   *  logged rather than shown — the HUD is frozen. */
+  fieldAnger() {
+    // ONCE PER FRAME, NOT ONCE PER CALLER. Four call sites read this, each
+    // per rival — seven cars would advance the 4 s smoothing twenty-eight
+    // times a frame and make it effectively instant, which is the twitchy
+    // band this design exists to avoid. Memoised on raceTime.
+    if (this._angerT === this.raceTime) return this._anger ?? 1;
+    this._angerT = this.raceTime;
+    const D9 = this.difficulty ?? {};
+    const gain = D9.angerGain ?? 0;
+    if (!gain || this.state !== 'race' || !this.player?.alive) {
+      // the countdown resets the mood AND the line, so race two does not
+      // open with the field already told it has had enough of you
+      this._anger = 1;
+      this._angerSaid = false;
+      this._angerPrevT = this.raceTime;
+      return 1;
+    }
+    let best = -Infinity;
+    for (const e of this.enemies) {
+      if (e.alive && (e.progress ?? -Infinity) > best) best = e.progress ?? -Infinity;
+    }
+    // progress is `lap + index/N`, so a lead of 1.0 is a whole lap
+    const lead = Number.isFinite(best) ? (this.player.progress ?? 0) - best : 0;
+    // a twentieth of a lap clear of the best rival is "driving good"
+    const form = THREE.MathUtils.clamp(lead / 0.05, 0, 1);
+    const target = 1 + gain * form;
+    // THE TIME CONSTANT IS IN SECONDS, SO THE STEP MUST BE TOO. A fixed
+    // 1/60 here would make the 4 s smoothing an 8 s one on a 30 fps phone —
+    // the reference device this is tuned for. Taken from raceTime, which is
+    // the same clock the memo above keys on; clamped so a stall or a tab
+    // resume cannot jump the mood in one frame.
+    const step = THREE.MathUtils.clamp(this.raceTime - (this._angerPrevT ?? this.raceTime), 0, 0.25);
+    this._angerPrevT = this.raceTime;
+    const k = 1 - Math.exp(-step / 4);
+    this._anger = (this._anger ?? 1) + (target - (this._anger ?? 1)) * k;
+    // one line when the field first turns, and only then — the feed is an
+    // existing lane, so this adds no element to a frozen HUD
+    if (this._anger > 1.25 && !this._angerSaid) {
+      this._angerSaid = true;
+      this.hud?.feed?.('THE FIELD HAS HAD ENOUGH OF YOU', 'bad');
+      this.telemetry?.log('anger', { value: +this._anger.toFixed(2), lead: +lead.toFixed(3) });
+    }
+    if (this._anger < 1.1) this._angerSaid = false;
+    return this._anger;
+  }
+
   machineParity() {
     if (this.freeRoam || this.missionMode) return 1;
     const p = this.player;
@@ -11571,9 +11690,14 @@ class Game {
     if (now < (P2.rivalTargetDelayS ?? 4)) return false;
     const mine = this._aggro.find((a) => a.r === rival);
     if (mine) return true;   // v1.1: tokens ROTATE — a lease is 6 s, never renewed on use
+    // r409: the LATE cap is a tier knob. §5.4's two-token ceiling is what
+    // "more aggressive" runs into first — past it, extra anger has nowhere
+    // to land — so the top two tiers get a third simultaneous attacker.
+    // The early cap (GO+20 s) is untouched: a three-car opening is a pile-up,
+    // not a difficulty.
     const cap = now < (P2.playerTargetEarlyUntilS ?? 20)
       ? (AIT.playerTokensEarly ?? P2.playerTargetTokensEarly ?? 1)
-      : (AIT.playerTokensLate ?? P2.playerTargetTokensLate ?? 2);
+      : (this.difficulty?.tokensLate ?? AIT.playerTokensLate ?? P2.playerTargetTokensLate ?? 2);
     if (this._aggro.length < cap) {
       this._aggro.push({ r: rival, until: now + (AIT.tokenRotateS ?? P2.targetTokenRotateS ?? 6) });
       this.telemetry?.log('rivalTarget', { rivalId: rival.name ?? 'rival', acquire: true });

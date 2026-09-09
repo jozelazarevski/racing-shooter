@@ -1346,6 +1346,10 @@
   /* ---------- end ARENA MISSIONS ---------- */
   .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
   .diff-chip.current.hard{background:#ff8a75}
+  /* r409: the ladder gained a rung above HARD. SAVAGE reads darker and
+     hotter than HARD so the top of the ladder is legible at a glance;
+     the chip machinery is unchanged, only the colour class. */
+  .diff-chip.current.savage{background:#c62f1c;color:#fff;border-color:#7a1a0e}
   .diff-chip.current.normal{background:var(--yellow)}
 
   /* ---------- THE GARAGE, AS A WORKSHOP ----------
@@ -2333,7 +2337,7 @@ body.touch #feed{right:184px}
      r309 layout (owner-requested feature; §6.11 freezes what shipped — this
      occupies the empty top-centre lane and touches nothing pinned). -->
 <div id="copilot-note" style="display:none"></div>
-<div id="build-tag">r408</div>
+<div id="build-tag">r409</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2668,10 +2672,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r408"></script>
+<script type="module" src="./src/main.js?v=r409"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r408"></script>
+<script src="./src/offline.js?v=r409"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r408"></script>
+<script type="module" src="./src/traffic.js?v=r409"></script>
 </body>
 </html>

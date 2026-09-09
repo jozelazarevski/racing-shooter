@@ -5542,8 +5542,12 @@ export class EnemyCar extends Car {
           && g.aiCanTarget?.(this)) {
         this.ramTimer = 0.7;
         // angrier drivers (and harder difficulty) wind up again sooner
+        // r409: anger multiplies aggression (never pace), and the clamp
+        // CEILING rises with the tier — at a flat 2 the top tiers' extra
+        // aggression was thrown away here and they felt like NORMAL.
         this.ramCooldown = (4 + Math.random() * 2)
-          / THREE.MathUtils.clamp(this.aggression * D.aiAggression, 0.6, 2);
+          / THREE.MathUtils.clamp(this.aggression * D.aiAggression * (g.fieldAnger?.() ?? 1),
+            0.6, D.ramClamp ?? 2);
       }
     }
 
@@ -5675,6 +5679,16 @@ export class EnemyCar extends Car {
       // gaps — world 78's mean rival speed was identical under the full
       // ramp), so streets equalize by design; the ramp expresses where the
       // road opens.
+      // MEASURED TIER-BLIND, LEFT TIER-BLIND FOR NOW (r409). aiSpeed is flat
+      // at 1.06 across NORMAL, HARD and SAVAGE, so the whole tier difference
+      // lives in aiCorner — which this cap discards. The four-tier suite
+      // measured the median rival at 402 / 402 / 401 m on those three tiers:
+      // three rungs, one pace. Carrying sqrt(aiSpeed*aiCorner) in here does
+      // fix it, and was written and measured, but it lifts HARD's rivals ~5%
+      // and takes HARD past the clean-winnable bound on FURKA RIDGE — i.e.
+      // the tier table needs retuning against the cap in the same change.
+      // That is an AI-pace build of its own, not a rider on the ladder.
+      // RALLY_RULES.md H-8.
       if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, (16 + 3.6 * wj) * pace * (this._progRamp ?? 1));
       // ---- viz-zones: rivals can't see through fog/trees either
       if (t.vizZones && t.vizZones.length) {
@@ -5733,7 +5747,7 @@ export class EnemyCar extends Car {
       for (let k = 0; k < 45; k += 5) curvAhead = Math.max(curvAhead, t.curvature[(this.trackIndex + k) % t.N]);
       if (curvAhead < 0.012) {
         this.boostTimer = 1.2;
-        this.boostCooldown = 9 / Math.max(0.45, this.aggression * D.aiAggression);
+        this.boostCooldown = 9 / Math.max(0.45, this.aggression * D.aiAggression * (g.fieldAnger?.() ?? 1));
       }
     }
 
@@ -5823,7 +5837,7 @@ export class EnemyCar extends Car {
       const angle = Math.abs(Math.atan2(toPlayer.x, toPlayer.z) - this.heading);
       const norm = Math.min(angle, Math.PI * 2 - angle);
       if (norm < 0.32) {
-        this.fireCooldown = Math.max(0.22, 0.75 / (this.aggression * D.aiAggression));
+        this.fireCooldown = Math.max(0.22, 0.75 / (this.aggression * D.aiAggression * (g.fieldAnger?.() ?? 1)));
         g.weapons.fireBullet(this, 4.5, 0.05);
       }
     }
@@ -5838,7 +5852,7 @@ export class EnemyCar extends Car {
     if (this.mineCooldown <= 0 && g.player.alive && !gateBusy) {
       if (alongP < -6 && alongP > -18 && Math.abs(acrossP) < 3.5
           && g.aiCanTarget?.(this)
-          && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
+          && Math.random() < dt * 1.5 * this.aggression * D.aiAggression * (g.fieldAnger?.() ?? 1)) {
         this.mineCooldown = 6 + Math.random() * 4;
         g.weapons.dropMine(this);
       }

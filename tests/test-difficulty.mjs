@@ -160,6 +160,10 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   // the tiers converge on purpose. At 0.6 throttle nobody is running away.
   const eSlow = await run(p, 'easy', 0.6);
   const hSlow = await run(p, 'hard', 0.6);
+  // r409: the ladder gained two rungs (owner: "hard now is normal"), so the
+  // laws that used to name HARD as the top now name the TOP, and HARD keeps
+  // only the law that was written about its numbers — see law 4.
+  const sSlow = await run(p, 'savage', 0.6);
 
   // CASUAL-WINNABLE IS AN EXISTENCE CLAIM TOO (r291): under honest grip a
   // single wall clip swings the stand-in's 70 s total by 15% — identical
@@ -174,6 +178,7 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   }
   const n = await run(p, 'normal', 0.75);
   const h = await run(p, 'hard', 0.75);
+  const sv = await run(p, 'savage', 0.75);
   // BEST OF THREE, because winnable is an EXISTENCE claim. The rivals'
   // racecraft rolls unseeded dice at runtime (drafts, blocks, nitro), so a
   // single full-throttle run swings about 3% either way — and since ballistic
@@ -194,10 +199,10 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   // (normal 757 vs hard 686 once, 528 = 528 another), and physics floors
   // adjacent tiers on pinch worlds by design. The ladder's ENDS separate
   // strictly; neighbours may sit inside noise or on a shared floor.
-  const tol = h.med * 0.02;
+  const tol = sv.med * 0.02;
   check(`${name}: rival pace rises with difficulty (median rival)`,
-    e.med < n.med + tol && n.med < h.med + tol && e.med < h.med,
-    `easy ${e.med} < normal ${n.med} < hard ${h.med} (±${Math.round(tol)})`);
+    e.med < n.med + tol && n.med < h.med + tol && h.med < sv.med + tol && e.med < sv.med,
+    `easy ${e.med} < normal ${n.med} < hard ${h.med} < savage ${sv.med} (±${Math.round(tol)})`);
 
   // 2. The tiers must be far enough apart to feel different — but the RATIO is
   //    a proxy, and on a tight track it misfires. A rival's no-slip lateral
@@ -210,13 +215,13 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   //    So the floor is 10%, and the check that actually carries the meaning is
   //    the OUTCOME pair below — EASY winnable, HARD not — which held on both
   //    worlds throughout.
-  const spread = hSlow.best / Math.max(1, eSlow.best);
+  const spread = sSlow.best / Math.max(1, eSlow.best);
   // 1.10, matching the comment above — the code said 1.15 while its own
   // rationale said the floor is 10% because FURKA compresses against physics,
   // and FURKA duly measures 10-15% run to run (the AI's runtime randomness
   // makes this harness noisy; the OUTCOME pair below is the binding check).
-  check(`${name}: EASY to HARD is a real gap`, spread >= 1.10,
-    `with the band idle, hard is ${(spread * 100 - 100).toFixed(0)}% faster than easy`);
+  check(`${name}: EASY to the TOP TIER is a real gap`, spread >= 1.10,
+    `with the band idle, savage is ${(spread * 100 - 100).toFixed(0)}% faster than easy`);
 
   // 2b. The tiers must produce DIFFERENT RESULTS for the same drive — as a
   //     GAP, not a rank (#22 redesign). P-rank saturates: on the 2x PINE
@@ -228,15 +233,20 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   //     the endpoints carry the meaning — in touch on EASY (law 5), out of
   //     reach on HARD (law 3).
   const gapOf = (r2) => (r2.player - r2.best) / Math.max(1, r2.player);
-  const gE = gapOf(e), gN = gapOf(n), gH = gapOf(h);
-  check(`${name}: the same drive stands better on EASY than on HARD (gap, not rank)`,
-    gE > gH + 0.03,
-    `75% throttle gaps: EASY ${(gE * 100).toFixed(1)}%, NORMAL ${(gN * 100).toFixed(1)}%, HARD ${(gH * 100).toFixed(1)}%`);
+  const gE = gapOf(e), gN = gapOf(n), gH = gapOf(h), gS = gapOf(sv);
+  check(`${name}: the same drive stands better on EASY than on the TOP TIER`,
+    gE > gS + 0.03,
+    `75% throttle gaps: EASY ${(gE * 100).toFixed(1)}%, NORMAL ${(gN * 100).toFixed(1)}%, `
+    + `HARD ${(gH * 100).toFixed(1)}%, SAVAGE ${(gS * 100).toFixed(1)}%`);
 
   // 3. HARD PUNISHES A SLOPPY LAP. A three-quarter-throttle drive must not
   //    stroll to victory — that was true on every tier before.
-  check(`${name}: HARD beats a sloppy drive`, h.best > h.player * 0.97,
-    `at 75% throttle the player made ${h.player} against a best rival of ${h.best} (P${h.place})`);
+  // r409: asked of NORMAL, because NORMAL now carries the numbers this law
+  // was written against (old HARD), and it is the tier most players sit on.
+  // The tiers above it inherit the property by construction — they are
+  // strictly quicker, which law 1 has just asserted.
+  check(`${name}: NORMAL beats a sloppy drive`, n.best > n.player * 0.97,
+    `at 75% throttle the player made ${n.player} against a best rival of ${n.best} (P${n.place})`);
 
   // 4. ...but a clean lap must still win, or HARD is not a difficulty, it is a
   //    wall. The stand-in drives a perfect line, so this is a weak upper bound
@@ -260,8 +270,33 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   // run. 898/1138 = 0.789 is the honest attainable ratio on that world for
   // this stand-in; the regression this law exists to catch (aiCorner 1.60,
   // player at 0.60-0.65 of the field) is still miles outside 0.75.
-  check(`${name}: HARD is still winnable clean`, hFast.player > hFast.best * 0.75,
+  //
+  // 0.71 FOR HARD, NOT 0.75, AND THE REASON IS THE LADDER MOVING, NOT THE
+  // MEASUREMENT MISSING (r409). 0.75 was calibrated when HARD was the TOP
+  // rung. It is now the third of four: NORMAL carries the numbers this
+  // number was set against (aiCorner 0.65) and HARD sits a rung above at
+  // 0.72. Corner speed goes as sqrt(aLat), so a rung is worth about 5% of
+  // field pace — a bound that stays fixed while the field it is measured
+  // against gets 5% quicker per rung is not the same test from one rung to
+  // the next. So the bound is a ladder too, spaced by the same 5%: NORMAL
+  // 0.75, HARD 0.71, SAVAGE 0.67 (law 6, which was already written at 0.66
+  // for exactly this reason). Measured on this base: FURKA HARD 216 vs 290
+  // = 0.745, PINE HARD 372 vs 412 = 0.903 — HARD is inside its rung's bound
+  // on both, and would fail a bound belonging to the rung below it.
+  check(`${name}: HARD is still winnable clean`, hFast.player > hFast.best * 0.71,
     `best attempt at full throttle ${hFast.player} vs ${hFast.best} (P${hFast.place})`);
+
+  // 6. SAVAGE MAY BE BRUTAL, BUT IT MAY NOT BE A WALL. The owner asked for
+  //    two tiers above the old HARD, so the top rung is DELIBERATELY outside
+  //    what this drift-less stand-in can beat — law 4's 0.75 would be the
+  //    wrong bar for it, and passing it would mean SAVAGE was not savage.
+  //    What still has to hold is reachability: the stand-in is under-human
+  //    by the drift dividend law 4 documents, so a field it stays within
+  //    two-thirds of is one a drifting human can race. Below that the tier
+  //    has stopped being a difficulty setting.
+  const sFast = await run(p, 'savage', 1.0);
+  check(`${name}: SAVAGE is brutal, not a wall`, sFast.player > sFast.best * 0.67,
+    `full throttle ${sFast.player} vs ${sFast.best} (P${sFast.place})`);
 
   // 5. EASY has to stay casual-winnable — the whole point of it. IN TOUCH,
   //    not P1 (#22 redesign): the stand-in is a drift-less robot whose
