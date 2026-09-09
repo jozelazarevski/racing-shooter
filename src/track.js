@@ -23019,6 +23019,16 @@ export class Track {
           horizon: { value: new THREE.Color(T.skyHorizon) },
           // < 1 lets the horizon glow reach higher (volcano's deep red haze)
           curve: { value: T.skyCurve !== undefined ? T.skyCurve : 1.0 },
+          // HOW FAR DOWN THE BLUE REACHES (r406, owner: "Make blues skies
+          // and sun no fog"). The gradient ran `smoothstep(0.0, 0.5, vY)`,
+          // so `top` only arrived at 30 deg of elevation and everything a
+          // chase camera actually frames was `skyHorizon` — on DUST CANYON
+          // that is #ffd9a0, a warm cream, which is why the owner's frame
+          // has no blue in it anywhere. A clear day is blue down to a thin
+          // warm hem, so the hem is 8 deg on a day world. DUSK WORLDS KEEP
+          // THE WIDE BAND: on volcano and the sunset stages that spread IS
+          // the art, and flattening it would be a different defect.
+          hem: { value: T.dusk ? 0.5 : 0.14 },
           // the sunGlow knob was authored in ~30 palettes and read by NOTHING
           // since the sun sprite was banned. This is not that sprite: it is a
           // forward-scatter lobe painted ON the BackSide dome at r=3000,
@@ -23031,15 +23041,61 @@ export class Track {
           glow: { value: new THREE.Color(T.sunGlow ?? 0xfff2c8) },
         },
         vertexShader: `varying float vY; varying vec3 vDir; void main(){ vDir = normalize(position); vY = vDir.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-        fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform float curve; uniform vec3 sunDir; uniform vec3 glow; varying float vY; varying vec3 vDir;
+        fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform float curve; uniform vec3 sunDir; uniform vec3 glow; uniform float hem; varying float vY; varying vec3 vDir;
           void main(){
-            float t = pow(smoothstep(0.0, 0.5, max(vY, 0.0)), curve);
+            float t = pow(smoothstep(0.0, hem, max(vY, 0.0)), curve);
             vec3 col = mix(horizon, top, t);
-            col += glow * pow(max(dot(vDir, sunDir), 0.0), 24.0) * (1.0 - t) * 0.55;
+            // NORMALIZE, because vDir arrives INTERPOLATED. The dome is 24
+            // x 12 segments, so a face spans 15 deg and a linear blend of two
+            // unit corners is short in the middle — length cos(7.5 deg) =
+            // 0.9914. The old glow lobe never noticed (0.9914^24 is still
+            // 0.81 of a wide, soft flare) but a sun DISC is a threshold at
+            // 0.9999, which an un-normalized dot can only reach within a
+            // degree of a vertex. Measured: the disc drew nothing at all
+            // until this line existed.
+            vec3 dir = normalize(vDir);
+            float d = dot(dir, sunDir);
+            // forward-scatter lobe, tightened from 24 so it warms the sky
+            // around the sun instead of washing the whole upper half of it
+            col += glow * pow(max(d, 0.0), 40.0) * (1.0 - t * 0.7) * 0.5;
+            // ...AND THE SUN ITSELF. The old note here records that the sun
+            // SPRITE was banned for smearing over the road from the top-down
+            // camera. This is not that sprite: it is painted on the BackSide
+            // dome at r=3000, behind all geometry and correctly occluded, in
+            // the same pass as the glow lobe that has always been drawn here.
+            // ~0.8 deg across, which is a readable disc on a phone.
+            col += glow * smoothstep(0.99985, 0.99993, d) * 1.7;
             gl_FragColor = vec4(col, 1.0);
           }`,
       })
     );
+    // THE SKY IS CENTRED ON THE EYE, NOT ON THE WORLD (r406).
+    //
+    // The dome sat at the world origin with r=3000 against a 3200 far plane,
+    // which is only safe while the camera is near the middle. It is not: the
+    // roam bounds reach 1400 and the rim wall stands past that, so from a car
+    // 946 u off-centre the dome's far wall is 3489 u away — CLIPPED, leaving
+    // a hole with nothing drawn in it. Measured on DUST CANYON looking down
+    // the sun's own azimuth: the pixel came back 25,25,25, the renderer's
+    // clear colour, and hiding every drawable object in the scene one class
+    // at a time changed nothing, because nothing was painting it.
+    //
+    // It read as a black polygon hanging in the sky, and it is the same
+    // artefact that went unexplained on RED CENTRE earlier. It was invisible
+    // until now only because the haze cylinders hung a curtain in front of
+    // it; clearing the air for the owner's blue sky took the curtain away.
+    //
+    // Following the eye makes every direction exactly r away, so the dome
+    // can never clip. renderOrder -1 with depthWrite off keeps it behind
+    // everything else however the sort falls, and frustumCulled off stops a
+    // cull test run against last frame's centre from dropping it.
+    sky.name = 'sky-dome';
+    sky.renderOrder = -1;
+    sky.frustumCulled = false;
+    sky.onBeforeRender = (r9, s9, cam9) => {
+      sky.position.copy(cam9.position);
+      sky.updateMatrixWorld(true);
+    };
     this.group.add(sky);
 
     // night skies (NEO-KYOTO): a field of star points well above the horizon
@@ -23059,6 +23115,15 @@ export class Track {
         color: 0xcfd8ff, size: 2.4, sizeAttenuation: false,
         fog: false, transparent: true, opacity: 0.85, depthWrite: false,
       }));
+      // r406: the stars ride at r=2850 and clip on the same far plane for
+      // the same reason — they follow the eye with the dome they belong to.
+      stars.name = 'sky-stars';
+      stars.renderOrder = -1;
+      stars.frustumCulled = false;
+      stars.onBeforeRender = (r9, s9, cam9) => {
+        stars.position.copy(cam9.position);
+        stars.updateMatrixWorld(true);
+      };
       this.group.add(stars);
     }
 
@@ -23082,39 +23147,22 @@ export class Track {
     // layered horizon haze band: a tinted translucent cylinder ringing the
     // world between the near hill ring and the far peaks, so the skyline
     // stacks (hills → haze → peaks → sky) instead of reading as one gradient
-    const hazeMat = new THREE.MeshBasicMaterial({
-      map: hazeTexture(), color: T.hazeColor !== undefined ? T.hazeColor : T.fogColor,
-      transparent: true, opacity: T.hazeOpacity !== undefined ? T.hazeOpacity : 0.9,
-      side: THREE.BackSide, fog: false, depthWrite: false,
-    });
-    const haze = new THREE.Mesh(
-      new THREE.CylinderGeometry(940, 940, 300, 48, 1, true), hazeMat
-    );
-    haze.position.y = 95;                 // dense band hugs the horizon line
-    // the game lead toggles this off when the camera pitches steeply down:
-    // from the roam TOP FAR camera the cylinder's far wall painted a WHITE
-    // SHEET over half the world (the player's "white stuff" screenshot)
-    haze.name = 'haze-band';
-    this.hazeBand = haze;
-    this.group.add(haze);
-    // a second, farther, fainter ring OUTSIDE the far peak ring: the skyline
-    // now stacks hills -> haze -> peaks -> haze -> sky, which is the banded
-    // aerial perspective the reference has. Hidden with the same camera
-    // toggle as ring one (main.js keys off hazeBand; ring two is its child
-    // in visibility terms via the shared name prefix check below).
-    const haze2 = new THREE.Mesh(
-      new THREE.CylinderGeometry(1450, 1450, 480, 48, 1, true),
-      new THREE.MeshBasicMaterial({
-        map: hazeTexture(),
-        color: new THREE.Color(T.hazeColor !== undefined ? T.hazeColor : T.fogColor)
-          .lerp(new THREE.Color(T.skyHorizon ?? '#dce8f0'), 0.4),
-        transparent: true, opacity: (T.hazeOpacity !== undefined ? T.hazeOpacity : 0.9) * 0.55,
-        side: THREE.BackSide, fog: false, depthWrite: false,
-      }));
-    haze2.position.y = 150;
-    haze2.name = 'haze-band-far';
-    this.hazeBand2 = haze2;
-    this.group.add(haze2);
+    // NO HAZE BANDS (r406, owner: "Make blues skies and sun no fog").
+    //
+    // Two BackSide cylinders at r=940 and r=1450, painted the theme's fog
+    // colour at 0.9 opacity, stood between the player and the skyline and
+    // WERE the white wall in the owner's DUST CANYON frame — ambient fog by
+    // another name, and unaffected by clearing `scene.fog` because both were
+    // built `fog: false`. "No fog" has to mean these too, or the sky clears
+    // and the horizon stays milky.
+    //
+    // Deleted rather than hidden (working rule 2: delete means delete). The
+    // camera-pitch toggle in main.js that used to switch them off from the
+    // top-down roam view — itself a fix for these cylinders painting a white
+    // sheet over half the world — is guarded on `track.hazeBand` existing,
+    // so it simply stops firing. What the skyline stacks now is hills, then
+    // peaks, then sky: aerial depth carried by the terrain's own colour
+    // ramps rather than by a curtain hung in front of it.
 
     // THE CLOUD FIELD. Still one sprite per cloud - and a sprite IS a draw
     // call, so the count is held to 1.5x, not the 2.5x the design wanted.

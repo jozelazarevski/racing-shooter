@@ -217,6 +217,13 @@ const UPGRADES = [
 // Fitment is PER CAR, exactly like upgrade levels — buying a V8 for the
 // BRAWLER does not put one in the SLEEK. `lock` is evaluated against career
 // data the game already keeps, so no new tracking rides along.
+// CLEAR AIR (r406, owner: "Make blues skies and sun no fog"). The resting
+// fog distances, past everything the player can reach — roam bounds 1400,
+// rim wall to ~1880, sky dome 3000, camera far plane 3200. Local weather
+// (`_updateVizZones`) still pulls the near plane in for a fog bank or a
+// squall and relaxes back to these.
+const CLEAR_NEAR = 2600, CLEAR_FAR = 3400;
+
 const PART_SLOTS = [
   {
     key: 'engine', name: 'ENGINE BLOCK', icon: '🔩',
@@ -1606,7 +1613,16 @@ class Game {
     this.renderer.toneMappingExposure = 1.46;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
+    // CLEAR AIR (r406, owner: "Make blues skies and sun no fog"). The fog
+    // was the wash in the owner's DUST CANYON frame: cream at near 200,
+    // which put the start gantry 200 u away half-dissolved and painted the
+    // whole distance white. It is not deleted outright — `_updateVizZones`
+    // pulls scene.fog IN for a fog bank or a squall, which are deliberate,
+    // local, announced weather and not ambient haze — but its resting
+    // values now sit past everything the player can reach: the roam bounds
+    // are 1400 and the rim wall tops out near 1880, so at 2600 nothing in
+    // the world is ever fogged. Clear to the horizon, on every world.
+    this.scene.fog = new THREE.Fog(0xcfe8f5, CLEAR_NEAR, CLEAR_FAR);
     this.camera = new THREE.PerspectiveCamera(56, innerWidth / innerHeight, 0.5, 3200);
 
     // LIGHTING: warm key / cool fill.
@@ -3054,10 +3070,11 @@ class Game {
     this._syncCarLights();
     if (th) {
       if (th.fogColor !== undefined) {
-        // same near-plane pull as the track ctor (aerial layering), local only
-        const fn = th.fogNear ?? 320;
-        this.scene.fog = new THREE.Fog(th.fogColor,
-          Math.max(fn * 0.72, Math.min(fn, 190)), th.fogFar ?? 1500);
+        // r406: the theme still owns the fog COLOUR — a squall on a desert
+        // world is dust and on a coast world is sea mist, and every tint
+        // that reads `fogColor` still gets its answer — but not the
+        // distances. Those are clear air now, per the note in the ctor.
+        this.scene.fog = new THREE.Fog(th.fogColor, CLEAR_NEAR, CLEAR_FAR);
         // PATCH_02 v3 C-E: the same fog-luminance ceiling the track ctor
         // applies (<= 0.85) — this path re-fogs on theme swap and would
         // otherwise hand the blown haze straight back
@@ -12972,8 +12989,8 @@ class Game {
         if (d <= z.len) { zone = z; break; }
       }
     }
-    const baseNear = t.theme?.fogNear ?? 320;
-    const baseFar = t.theme?.fogFar ?? 1500;
+    // r406: a zone relaxes back to CLEAR AIR, not to the theme's old haze.
+    const baseNear = CLEAR_NEAR, baseFar = CLEAR_FAR;
     let wantNear = baseNear, wantFar = baseFar;
     if (zone) {
       const s = zone.strength ?? 1;
