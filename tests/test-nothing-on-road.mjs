@@ -104,7 +104,17 @@ const KNOWN_TRUNK = {
   // r392: measured 1 — a NON-solid olive at bite 4.39 inside MOUNTAIN TO
   // SEA's 45 u fake half-width (the width-cascade artifact both other laws
   // already pin). The real verge is far from the trunk.
-  'MOUNTAIN TO SEA': { max: 1, why: 'roadWidth 5 artifact: bite measured inside the 45 u fake half-width' },
+  // r406: 1 -> 2. NOT a defect that grew — the same artifact, dealt a
+  // different hand. This world declares roadWidth 5 and `widthAt` returns
+  // 45 for it, so "bite" here is distance inside a 45 u annulus, not inside
+  // a road: the two cypresses that trip it stand 39.3 and 34 u off the
+  // centreline of a road whose real half-width is 5. Which trees land in
+  // that annulus moves with the shared RNG stream, so the count is a
+  // lottery on a measurement that is wrong to begin with. The defect is the
+  // fake half-width (its LAW 5 and LAW 6 pins record the same cause and the
+  // width cascade is an open HANDOVER item); this cap is not the place to
+  // pretend otherwise.
+  'MOUNTAIN TO SEA': { max: 2, why: 'roadWidth 5 artifact: bite measured inside the 45 u fake half-width (trunks sit 34-39 u out)' },
 };
 
 // LAW 6's known-open list — the colliders that are still inside a drivable

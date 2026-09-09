@@ -7333,6 +7333,44 @@ export class Track {
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
+    this._clearRoadSolids();  // r406: no collider left biting the carriageway
+  }
+
+  /** NOTHING INVISIBLE IN THE ROAD (HRD-1 / test-nothing-on-road LAW 6).
+   *
+   *  Fifty builders place solids by their own offsets and most of them get it
+   *  right; the ones that do not are LOAD-DEPENDENT, because scatter rolls off
+   *  a shared RNG stream and any change in draw count anywhere re-rolls every
+   *  later world. That is how a 0.31 u stone appeared in THE DUNE SERPENT's
+   *  9 u carriageway at station 386 when r406 deleted the haze bands: not a
+   *  new bug, a latent one dealt a different hand. Whack-a-mole per world
+   *  cannot close a class like that; a sweep at the end of the build can.
+   *
+   *  The collider is SHAVED, not moved. Moving it without its mesh is the
+   *  exact defect the road-edge builder is already open for — an invisible
+   *  wall beside a visible stone — whereas taking 0.4 u off a road-edge
+   *  boulder's radius is imperceptible and leaves mesh and collider agreeing
+   *  about everything that matters. Where the shave would leave nothing to
+   *  collide with, the collider is dropped and the mesh stays: the r167 rule
+   *  the gantry legs and the grandstand have followed since they were
+   *  written. */
+  _clearRoadSolids() {
+    if (!this.solids?.length || !this._distToTrack || !this.widthAt) return;
+    const V = new THREE.Vector3();
+    let shaved = 0, dropped = 0;
+    const keep = [];
+    for (const s of this.solids) {
+      if (!Number.isFinite(s?.x) || !Number.isFinite(s.r) || s.mat === 'traffic') {
+        keep.push(s); continue;                      // traffic belongs on the road
+      }
+      const i = this.nearestIndex(V.set(s.x, 0, s.z));
+      const bite = this.widthAt(i) + s.r - this._distToTrack(s.x, s.z);
+      if (bite <= 0.25) { keep.push(s); continue; }
+      const want = s.r - (bite - 0.2);               // land clear of the 0.3 bar
+      if (want >= 0.3) { s.r = want; shaved++; keep.push(s); } else dropped++;
+    }
+    this.solids = keep;
+    this._solidTrim = { shaved, dropped };
   }
 
   /** SHADOWS ARE A LAW, NOT A HABIT (owner, 2026-09-09: "Shades needs to be
