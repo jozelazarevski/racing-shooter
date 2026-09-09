@@ -4171,6 +4171,72 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r407 — NOTHING GROWS IN THE ICE
+
+Owner, on a GLACIAL PASS frame of dark conifers standing in and among the
+blue ice walls: *"Trees in the ice?? Fix."*
+
+Two systems planted that forest and NEITHER OF THEM ASKED WHAT IT WAS
+STANDING ON. That is the whole defect, and it is why the first fix moved
+almost nothing.
+
+**THE STAND.** `this.trees` is the solid wood: 800 trunks with colliders,
+scattered on the theme's `treeBelt: [13, 70]`. The cliff ribbon's foot is
+at 11.2 u and its outer skirt at 25.3 — so the belt's inner edge is INSIDE
+the wall, and the ribbon is built last and asks nothing about what was
+scattered there first. The scatter, for its part, only ever looked INWARD:
+`_conformTrees` culls a tree whose crown reaches the carriageway, and
+nothing looked outward at all. Beyond the wall the stand climbed the
+canyon flanks — measured median trunk 69 u out and 6.9 u above the road,
+319 of 726 standing HIGHER than the wall rim beside them.
+
+**THE CARPET, WHICH IS THE ACTUAL FOREST.** Culling the stand alone was
+the first attempt and it was nearly invisible: 647 of 788 trunks gone and
+the ice walls still stood in a green wood. `_buildForestCarpet` is two
+orders of magnitude more trees — ~40,000 instanced cones per world across
+four rings, `carpet-foliage`, no colliders, and it has a `snow || glacial`
+branch in its palette, so it paints an ice world in firs by design.
+Raycasting the frame is what found it; eyeballing the trunk census never
+would have.
+
+**ONE LAW, BOTH SYSTEMS** (plus the grass tufts and bushes, which are the
+same sentence in miniature): a plant stands only on ground that could grow
+it. `_treelineLaw` runs last in the build and asks the ribbon for its own
+published geometry, so the test is exact rather than a guess.
+
+  * On EVERY `cliffWalls` world — the rock canyons too — nothing between
+    the ribbon's foot and its outer skirt. CANYON RUN, ROCKFALL RAVINE,
+    CORNICHE and DRY LAGOON lose their in-wall trunks and nothing else.
+  * On the ICE-WALLED worlds — a winter palette AND a ribbon, which is
+    GLACIAL PASS and GLACIER'S GRIND — nothing inside the canyon and
+    nothing up its flanks. `snow` and `avalanche` are snowy FORESTS with
+    no ribbon and never reach this code: FROST PEAK's wood is a real
+    place and is untouched. What survives on the ice worlds is the valley
+    floor: `iceTreelineUpM` 3.5 above the road, `iceTreelinePadM` 14 clear
+    of the skirt, both in `driving.json`.
+
+**CULLED, NOT RE-PLACED — deliberately.** The obvious fix is to reject the
+spot at placement. It is the wrong one: the whole scatter draws off ONE
+shared `Math.random()` stream, so changing how many draws a world spends
+re-rolls every world built after it. That debt has already cost three
+rounds of unrelated gate reds this month. A zero-scaled instance with its
+collider off spends no draws and shifts nothing.
+
+Measured on GLACIAL PASS: 72 trunks in the wall, 563 up the ice, 68,939
+carpet instances, 8,315 stale entries dropped from the camera's foliage
+guard. That last number nearly went unnoticed — `instanceMatrix` is a
+Float32Array, so a position read back from it is the float32 rounding of
+the double the registry kept, and matching the two as strings finds
+nothing at all. `Math.fround` on both sides, and the chase boom stops
+swerving around cones that are no longer drawn.
+
+The frame it was reported on is now a blue-white ice canyon with bare
+walls, which is what a glacial pass is.
+
+STILL OPEN: the treeline is drawn from the ROAD's height, not from a real
+snowline, so it is a canyon rule rather than an altitude one. A world with
+ice at the bottom and forest above would need the altitude form.
+
 ## r406 — BLUE SKY, A SUN IN IT, AND CLEAR AIR
 
 Owner, on a DUST CANYON frame washed cream from the bonnet to the horizon:
