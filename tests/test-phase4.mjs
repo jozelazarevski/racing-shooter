@@ -144,7 +144,7 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
           const w = runwayGrade(i, 0);
           if (w < bg) { bg = w; best = i; }
         }
-        return { idx: best, lat: 0 };
+        return [{ idx: best, lat: 0, brush: 0 }];   // ranked list, one entry
       }
       // TWO KEYS, AND FLATNESS IS THE ONE THAT GATES. Sorting on brush
       // alone put GLACIER COL on its flattest BRUSH-FREE line at 830@-12,
@@ -166,15 +166,20 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
             score: grade + treesOn(i, lat) * 0.03, brush: brushOn(i, lat) });
         }
       }
-      if (!cands.length) return { idx: 220, lat: latAsk };
+      if (!cands.length) return [{ idx: 220, lat: latAsk, brush: 0 }];
       const flat = cands.filter((c) => c.grade < 0.03);
       const pool = flat.length ? flat : cands;
       pool.sort((a, b) => (a.brush - b.brush) || (a.score - b.score));
-      const pick = pool[0];
-      return { idx: pick.idx, lat: pick.lat, brushed: pick.brush };
+      // A RANKED LIST, NOT ONE ANSWER (r406). Geometry says a corridor is
+      // flat and clear; it cannot say the car will actually go down it. On
+      // this load GLACIER COL's best-scoring runway read 4% of road top and
+      // never reached 30 km/h at all — a `null` — because the run was up
+      // against something. That is not a surface measurement, it is a
+      // measurement that failed, and the two must not look alike. `run`
+      // walks this list until one of them MOVES.
+      return pool.slice(0, 6);
     };
-    const run = (latAsk) => {
-      const { idx, lat, brushed } = flattest(latAsk);
+    const runOne = (idx, lat, brushed) => {
       const place = (sp) => {
         c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
         const pt = t.pointAt(idx, lat);
@@ -202,12 +207,26 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
       }
       return { top: +(vTop * 3.6).toFixed(0), t30, brushed: brushed ?? 0, idx, lat };
     };
+    // ...and a runway the car cannot drive is a failed measurement, not a
+    // slow surface: take the best-ranked one that actually moves.
+    const run = (latAsk) => {
+      const ranked = flattest(latAsk);
+      let first = null;
+      for (let k = 0; k < ranked.length; k++) {
+        const r9 = runOne(ranked[k].idx, ranked[k].lat, ranked[k].brush);
+        first ??= r9;
+        if (r9.t30 !== null && r9.top > 0) return { ...r9, tried: k + 1 };
+      }
+      return { ...first, tried: ranked.length, unusable: true };
+    };
     const road = run(0), grass = run(14);
     return { road: road.top, grass: grass.top, t30: grass.t30,
       brushed: grass.brushed, at: `${grass.idx}@${grass.lat}`,
+      tried: grass.tried ?? 1, unusable: !!grass.unusable,
       pct: +(grass.top / road.top * 100).toFixed(0) };
   });
-  const where = `${r.at}${r.brushed ? `, NO brush-free corridor (best ${r.brushed} brushed samples)` : ''}`;
+  const where = `${r.at}${r.brushed ? `, NO brush-free corridor (best ${r.brushed} brushed samples)` : ''}`
+    + `${r.tried > 1 ? `, ${r.tried} runways tried` : ''}${r.unusable ? ', NONE DRIVABLE' : ''}`;
   check(`F7   ${name}: grass tops at 55-75% of road`, r.pct >= 55 && r.pct <= 75,
     `${r.grass} vs ${r.road} km/h = ${r.pct}%  runway ${where}`);
   check(`F7   ${name}: grass 0-30 km/h under 3 s`, r.t30 !== null && r.t30 < 3,

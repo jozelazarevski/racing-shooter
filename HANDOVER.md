@@ -4171,6 +4171,76 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r406 — BLUE SKY, A SUN IN IT, AND CLEAR AIR
+
+Owner, on a DUST CANYON frame washed cream from the bonnet to the horizon:
+*"Make blues skies and sun no fog."* Three asks — and a fourth defect that
+the third one uncovered.
+
+**BLUE.** The dome ran `mix(horizon, top, smoothstep(0.0, 0.5, vY))`, so
+the blue only arrived at 30° of elevation and everything a chase camera
+frames was `skyHorizon` — which on the desert theme is `#ffd9a0`, a warm
+cream. There was no blue in the owner's picture because there is almost
+none in the bottom 30° of that gradient. The hem is **8°** now: blue down
+to a thin warm band, which is what a clear day looks like.
+
+DUSK WORLDS KEEP THE WIDE SPREAD. `T.dusk` holds the old 0.5 hem — on
+volcano and the sunset stages that band IS the art, and flattening it
+would be a different defect. Verified on EMBER PASS: unchanged.
+
+**SUN.** There has never been one. The note in the shader records that the
+sun SPRITE was banned for smearing over the road from the top-down camera,
+leaving only a forward-scatter lobe. This is not that sprite: the disc is
+painted on the BackSide dome at r=3000, behind all geometry and correctly
+occluded, in the same pass as the lobe that has always been drawn there.
+About 1.2° across, at the theme's own `sunAz`/`sunEl`, so it agrees with
+the key light and with the shadows that light casts.
+
+IT DREW NOTHING AT FIRST, and the reason is worth keeping. `vDir` reaches
+the fragment shader INTERPOLATED. The dome is 24 × 12 segments, so a face
+spans 15°, and a linear blend of two unit corners is short in the middle —
+length cos(7.5°) = 0.9914. The old glow lobe never noticed, because
+0.9914²⁴ is still 0.81 of a wide soft flare. A DISC is a threshold at
+0.9999, which an un-normalized dot can only reach within a degree of a
+vertex. One `normalize` and the sun appears.
+
+**NO FOG.** Ambient fog rested at near 200 on a cream colour — that is
+what dissolved a start gantry 200 u away. Its resting distances now sit
+past everything reachable (roam bounds 1400, rim wall to ~1880): clear to
+the horizon on every world.
+
+It is NOT deleted. `_updateVizZones` pulls fog IN for a fog bank or a
+squall — deliberate, local, announced weather rather than ambient haze —
+and those now relax back to clear air instead of back to the wash. The
+theme still owns the fog COLOUR, so a squall is still dust in the desert
+and sea mist on the coast.
+
+The HAZE BANDS go with it. Two BackSide cylinders at r=940 and r=1450,
+painted the fog colour at 0.9 opacity, standing between the player and the
+skyline: they were the white wall in the owner's frame, and they were
+built `fog: false`, so clearing `scene.fog` alone would have left the
+horizon milky. Deleted, not hidden (working rule 2). The skyline now
+stacks hills → peaks → sky, with depth carried by the terrain's own colour
+ramps instead of a curtain hung in front of it.
+
+**AND THE HOLE THEY WERE HIDING.** With the curtain gone, a large BLACK
+POLYGON stood in the sky. Measured: the pixel reads 25,25,25 — the
+renderer's clear colour — and hiding every drawable class in the scene one
+at a time changed it by nothing, because NOTHING WAS PAINTING IT. The dome
+sat at the WORLD ORIGIN with r=3000 against a 3200 far plane, which is
+only safe while the camera is near the middle. It is not: from a car 946 u
+off-centre the dome's far wall is 3489 u away and clips.
+
+The dome and the stars follow the eye now, so every direction is exactly
+r away and neither can ever clip — `renderOrder = -1` with `depthWrite`
+off keeps the dome behind everything however the sort falls, and frustum
+culling is off so a test against last frame's centre cannot drop it.
+
+THIS IS THE SAME UNEXPLAINED BLACK SHAPE seen on RED CENTRE RUN earlier in
+this session and written off then as "a hole where the sky isn't drawn"
+without a cause. The cause was the far plane, and the fog was covering it
+on every world for as long as there has been fog.
+
 ## r405 — SHADOWS ARE A LAW, AND THE BOX COVERS WHAT IS ON SCREEN
 
 Owner, on a PRINCIPALITY STREETS frame: *"Shades needs to be consistent
