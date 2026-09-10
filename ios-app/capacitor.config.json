@@ -1,0 +1,11 @@
+{
+  "appId": "com.jozelazarevski.igniterally",
+  "appName": "Ignite Rally",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#000000"
+  }
+}

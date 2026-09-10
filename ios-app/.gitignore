@@ -1,0 +1,14 @@
+# The web build is assembled from the repo root by scripts/build-www.mjs —
+# regenerate it, never edit it.
+www/
+node_modules/
+
+# Xcode / CocoaPods build products (the project itself IS committed)
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/build/
+ios/App/output/
+ios/DerivedData/
+ios/capacitor-cordova-ios-plugins/
