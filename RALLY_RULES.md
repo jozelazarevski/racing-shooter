@@ -157,6 +157,12 @@ Summarised here for citation; that table remains the operational text.
 | M-5 | ECONOMY-PLAN.md §2.3 | The daily line: one world per day, seeded from the date, fixed car and weather, one target time, NO credits — unpaid on purpose, so it never needs balancing against the campaign and never needs anti-farming rules. | OPEN |
 | M-6 | ECONOMY-PLAN.md §3 | Acknowledgement, not content: name the moment (style events already detected), let one system react, and end the results card on the best thing that happened rather than a table. | OPEN |
 
+## N. Track variants on existing worlds
+
+| ID | Owner sentence | Rule | Status |
+|---|---|---|---|
+| N-1 | "Re use the tracks and redraw new racing scenes on the existing worlds. Make more jumps steep curves etc. Idea is to reuse the worlds for new tracks" (2026-09-10) | MOSTLY ALREADY BUILT — investigated before designing anything. A world is `{id, name, theme, region}` and the racing line is a SEPARATE named point list: `rawPts = CIRCUITS[level.route || level.theme]`, with `routeFlipX` and `routeReverse` modifiers already in place. 60 shapes serve 78 worlds. So a variant track is a new LEVELS entry carrying the SAME theme and region — all the terrain character, scenery and palette investment — with a different `route` naming a new hand-authored shape. No engine work is needed to make it possible; the work is authoring shapes and clearing §7. CAUTION 1: `seedForLevel` keys on `id` AND `route||theme`, so a variant gets its own seed and therefore its own terrain detail — same LOOK, not the same GROUND. Literal shared topography needs the seed keyed off the shared world instead (open question to the owner). CAUTION 2: the road conforms to terrain (§3.8) and HRD-5 builds flanks along the corridor, so a new line carves its own valley. CAUTION 3: "more jumps, steeper curves" is exactly where §7.5 min corner radius per template and §7.3 kicker landing zones bite — the validator is the constraint, not the authoring. | OPEN |
+
 ## J. Delivery
 
 | ID | Rule | Status |
