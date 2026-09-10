@@ -142,6 +142,17 @@ Summarised here for citation; that table remains the operational text.
 | I-6 | §7.9 | Drop edges readable on every palette: the last 2 m before a drop uses the template's rock material. | LIVE |
 | I-7 | P-PERF-01 (Race Integrity) | 60 fps sustained, no hitch above 33 ms. Measured 30-33 fps with 50-67 ms hitches. | OPEN |
 
+## M. Economy, upgrades and career
+
+| ID | Owner sentence | Rule | Status |
+|---|---|---|---|
+| M-1 | "Work on the game economy, upgrades, career building etc." (2026-09-10) | An open brief, not a defect report. Ground it in measurement before changing a price: `tests/test-economy.mjs` reads the constants where they are written and is GREEN on this base (upgrade steps 600/1100/2600/5100/8600, one line 18,000 CR, a strong race ~1,800, 110 races to max a car, 68 to own the roster). ECONOMY-PLAN.md's own standing advice is "not recommended: re-pricing anything" — the curve was measured into place at r148 and is defended by that test. So the work is where the plan says the gap is: REASONS, not money. | OPEN |
+| M-2 | §6.1c (r381) | THE UNPAID DEBT THIS BRIEF INHERITS. Races went from 3 laps to 1 on any track over `lapsShortTrackU`, and the note recorded at the time says "per-race score and credits shrink with the shorter race; recorded, not retuned, pending play." `raceCr = raceScore × CREDIT_RATE × diffMult` scales with race LENGTH, while PODIUM_CR (650/400/220), FIRST_CLEAR_CR (600) and SWEEP_CR (600) are FLAT. So the one-lap change did not just shrink income — it shifted the MIX toward the flat bonuses, which means driving well pays relatively less and placing pays relatively more. Measure the split before touching any constant. | OPEN |
+| M-3 | ECONOMY-PLAN.md §2.1, shipped r161 | Contract rungs escalate per contract, persisted as `career.rungs = {contractId: rungIndex}`; absent means rung I. Bound: a full sweep of three rung-III contracts pays about one strong race, not three (asserted in tests/test-rungs.mjs). | LIVE |
+| M-4 | ECONOMY-PLAN.md §2.2 | Rival signatures (blocker / late braker / opportunist) — behaviour, not stats, keyed to the driver. Bar: a blind test must identify which rival is which from the last third of a race, or the signatures are too subtle to have been worth the code. | OPEN |
+| M-5 | ECONOMY-PLAN.md §2.3 | The daily line: one world per day, seeded from the date, fixed car and weather, one target time, NO credits — unpaid on purpose, so it never needs balancing against the campaign and never needs anti-farming rules. | OPEN |
+| M-6 | ECONOMY-PLAN.md §3 | Acknowledgement, not content: name the moment (style events already detected), let one system react, and end the results card on the best thing that happened rather than a table. | OPEN |
+
 ## J. Delivery
 
 | ID | Rule | Status |
