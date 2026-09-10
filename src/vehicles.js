@@ -3593,18 +3593,17 @@ export class Car {
               -vn / Math.max(3, vApp9), 0, 1);
             this.vel.x -= nx * vn * 1.05;
             this.vel.z -= nz * vn * 1.05;
-            // MASTER FIX-5 (r388): a trunk hit at pace DEFLECTS at −40%
-            // speed rather than stopping dead — the trunk is 0.7 u of wood,
-            // not a wall; the debris/damage path still prices the hit. Below
-            // 60 km/h the old full stop stands (a parking nudge should park).
-            if (!yields && vApp9 >= 16.7) {
-              const kept = Math.hypot(this.vel.x, this.vel.z);
-              const want9 = vApp9 * 0.6;
-              if (kept < want9 && kept > 0.1) {
-                this.vel.x *= want9 / kept;
-                this.vel.z *= want9 / kept;
-              }
-            }
+            // r410: THE 60% DEFLECT IS DELETED. FIX-5 (r388) restored 60% of
+            // approach speed on a trunk hit at pace — "the trunk is 0.7 u of
+            // wood, not a wall" — and that is the physical claim the owner
+            // has now contradicted three times ("Car should not drive between
+            // the trees", "Rule: I can't drive through a tree", "Should not
+            // be able to drive in the trees"). §7.15 as shipped already says
+            // it in our own words: trunks stop a car "like any solid (no
+            // 60%-and-through deflection)". The rule text and the code have
+            // disagreed since r399; the rule wins. The bounce-out and the
+            // damage pricing below are untouched — what goes is the line that
+            // handed the speed back.
             if (!yields && this.wallGrind <= 0) {
               this.wallGrind = square < 0.55 ? 0.55 : 0.18;
               gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz, square);
@@ -3633,15 +3632,10 @@ export class Car {
         this.pos.z = tr.z + nz * rr;
         const vn = this.vel.x * nx + this.vel.z * nz;
         if (vn < 0) {
-          const vApp9 = Math.hypot(this.vel.x, this.vel.z);
+          // r410: and the carpet trunk keeps none of it either — same rule,
+          // same reason, see the note on the deflect above.
           this.vel.x -= nx * vn * 1.05;
           this.vel.z -= nz * vn * 1.05;
-          const kept = Math.hypot(this.vel.x, this.vel.z);
-          const want9 = vApp9 * 0.6;
-          if (vApp9 >= 16.7 && kept < want9 && kept > 0.1) {
-            this.vel.x *= want9 / kept;
-            this.vel.z *= want9 / kept;
-          }
           if (this.wallGrind <= 0) this.wallGrind = 0.3;
         }
         break;

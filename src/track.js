@@ -17899,6 +17899,17 @@ export class Track {
     // form survives only for the horizon ring.
     const ring = (geos, count, spot, margin, scMin, scRange, paintFn = paint, reg = false) => {
       const meshes = geos.map((g2) => new THREE.InstancedMesh(g2, mat(), count));
+      // r410: the registered crown top is read off the GEOMETRY. It used to
+      // be the literal 6.3 — the verge tree's own tip — which was true while
+      // the verge ring was the only one registered and wrong the moment
+      // another ring was (twoConeMid tops out at 5.35). Same for the crown
+      // radius, which the trunk collider divides back out by 1.9.
+      let geoTop = 0, geoR = 0;
+      for (const g2 of geos) {
+        g2.computeBoundingBox();
+        geoTop = Math.max(geoTop, g2.boundingBox.max.y);
+        geoR = Math.max(geoR, g2.boundingBox.max.x, g2.boundingBox.max.z);
+      }
       // r392: the carpet is FOLIAGE — placement-checked paint, canopy
       // non-collidable (FIX-5). Named so the corridor census classes its
       // crown overhang with the tree crowns instead of counting each
@@ -17951,7 +17962,7 @@ export class Track {
         // in this.trees, so the camera's foliage guard could not see them.
         // Registered position + canopy radius + top height, camera-side only.
         if (reg) (this.camTrees ??= []).push({
-          x, z, r: 1.9 * sc, top: y - 0.35 + 6.3 * scl.y,
+          x, z, r: geoR * sc, top: y - 0.35 + geoTop * scl.y,
           // r392: seat + refs so the WR-7.6d conform pass can re-seat these
           // instances after late terrain mutations (buried-tree sweep)
           y: y - 0.35, meshes, idx: n });
@@ -18066,8 +18077,21 @@ export class Track {
       c2.setHSL(0.30 + Math.random() * 0.06, 0.5, 0.17 + Math.random() * 0.1);
     ring([mossG], spec.moss ?? 1400, trackSpot(0.3, 16), 1.2, 0.7, 1.1, paintMoss);
     // mid-field: fills the ground between the wall and the horizon
+    // r410 (owner, third time: "Should not be able to drive in the trees").
+    // THIS RING NOW CARRIES COLLIDERS. Only the verge call passed `reg`, so
+    // `camTrees` held the 9,000 instances of trackSpot(1, 38) and nothing
+    // else — and BOTH the trunk collider and 7.15's underbrush drag read
+    // that registry. Between 38 and 160 u out from the road edge there was
+    // therefore neither a trunk to hit nor brush to bog in: r399 made the
+    // verge a mass and left the forest behind it paint, which is exactly the
+    // wood a car is in once it has left the road.
+    //
+    // It costs no RNG draws — registration reads the placement the loop has
+    // already rolled — so the shared Math.random() stream is untouched and
+    // no later world re-rolls. The camTrees cell hash is 24 u and this band
+    // is far wider than the verge, so occupancy per cell barely moves.
     ring(terrace ? oliveDome() : twoConeMid(),
-      spec.near ?? (terrace ? 7000 : 14000), trackSpot(38, 160), 20, 1.1, 1.6);
+      spec.near ?? (terrace ? 7000 : 14000), trackSpot(38, 160), 20, 1.1, 1.6, paint, true);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
     // margin 25 keeps an 18 u horizon-scale cone off the verge where the
     // radial scatter happens to cross the lap. r376: the radial extent
