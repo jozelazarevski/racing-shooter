@@ -11,6 +11,11 @@
   // against; bail quietly rather than throwing on every load.
   if (location.protocol === 'file:') return;
 
+  // Inside the iOS app shell (ios-app/) the whole game ships in the app
+  // bundle and every fetch is local — there is nothing to arm, and WKWebView
+  // rejects worker registration on its capacitor:// scheme anyway.
+  if (location.protocol === 'capacitor:' || window.Capacitor) return;
+
   const badge = () => document.getElementById('offline-badge');
 
   const paint = (state, text, title) => {
