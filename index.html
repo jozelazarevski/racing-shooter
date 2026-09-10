@@ -537,7 +537,6 @@
   /* ---------- MENU TABS + PANELS ---------- */
   /* the four tabs must fit ONE line at 390px: no wrap, and they share the
      width evenly rather than each sizing to its own label */
-  #menu-status{margin-top:16px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
   #menu-tabs{margin-top:10px;display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;
     justify-content:center;width:min(100%,660px);margin-left:auto;margin-right:auto}
   #menu-tabs .menu-tab{flex:1 1 0;min-width:0}
@@ -565,10 +564,19 @@
   #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
 
   /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
-  #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
+  #profile-chip{pointer-events:auto;cursor:pointer;margin:0 0 0 auto;padding:0 14px;font-size:12px;
+    display:inline-flex;align-items:center;gap:6px;min-height:36px;flex:0 0 auto;
     letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
     border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
     -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  /* the initial stands in for the name when the bar is narrow — one glyph in
+     a circle, so the chip stays a tap target instead of shrinking to nothing */
+  #profile-initial{display:none;width:20px;height:20px;border-radius:50%;
+    align-items:center;justify-content:center;font-size:12px;line-height:1;
+    background:rgba(127,212,255,.18);color:#7fd4ff;letter-spacing:0}
+  /* px, not ch: the chip sets letter-spacing:2px, so a glyph is wider than
+     1ch and a 9ch cap clipped the default "PLAYER 01" to "PLAYER …". */
+  #profile-chip b{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #profile-chip b{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink)}
   #profile-chip:active{transform:scale(.95)}
   #profile-screen{z-index:30}
@@ -895,7 +903,9 @@
   /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
      garage below is spending, so it is the one thing in the bar that must not
      give way when a chapter name gets long. */
-  #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
+  /* r410: the auto margin moved to #profile-chip, which now precedes this.
+     Two auto margins would SPLIT the slack and strand the chip mid-bar. */
+  #topbar-cred{flex:0 0 auto;margin-left:0;font-family:'Baloo 2';font-weight:800;
     font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
     padding:5px 11px;border-radius:999px;
     background:linear-gradient(180deg,var(--shop-hi),#241c14);
@@ -911,6 +921,9 @@
   #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
   @media (max-width:389px){
     #topbar{gap:7px;padding-left:8px;padding-right:8px}
+    #profile-chip{padding:0 8px;gap:0}
+    #profile-initial{display:inline-flex}
+    #profile-chip b{display:none}
     #topbar-back{font-size:12px;padding:7px 10px}
     #topbar-cred{font-size:9px;padding:4px 7px}
     #topbar-cred b{font-size:12px}
@@ -2053,7 +2066,6 @@
   @media (max-width:460px){
     .game-sub{letter-spacing:3px}
     #menu-tabs{margin-top:8px;gap:4px}
-    #menu-status{margin-top:12px}
     /* the phone rule was written for four tabs at 18px of side padding; with
        five that is 180px of padding alone on a 360px screen */
     .menu-tab{padding:11px 4px;font-size:12px;letter-spacing:.4px}
@@ -2400,6 +2412,17 @@ body.touch #feed{right:184px}
     <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
     <div id="topbar-where" class="ch-here"></div>
     <div id="topbar-stars" class="ch-here-stars"></div>
+    <!-- r410 (owner: "Move the name up or just have a first letter"): the
+         driver chip used to sit in its OWN row below the bar, floating over
+         the 3D grid render between the header and the tabs — the frame the
+         owner sent shows it hanging there with nothing to align to. It
+         belongs in the bar beside the balance: same row, same pill, and the
+         row it used to occupy is gone rather than left empty. At 389px and
+         below it shows the INITIAL only — the owner's own second option —
+         and not a pixel sooner: measured at 420px the bar ends at 410 of 420
+         with the full name, so collapsing earlier would hide a name that
+         fits. -->
+    <button id="profile-chip" title="Driver profiles"><span id="profile-initial" aria-hidden="true"></span><b id="profile-name">PLAYER 01</b></button>
     <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
   </div>
   <!-- The tagline stays: it is the one line of character on the front door,
@@ -2415,9 +2438,6 @@ body.touch #feed{right:184px}
        inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
        addresses and two labels for one control, reported as "I miss the back
        button". There is one now and it lives in #topbar. -->
-  <div id="menu-status">
-    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
-  </div>
   <div id="menu-tabs">
     <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
     <button id="tab-btn-mode" class="menu-tab">MODE</button>

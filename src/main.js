@@ -531,6 +531,18 @@ const plankMat = (col) => {
   return m;
 };
 
+/** r410 (owner: "Move the name up or just have a first letter"): the driver
+ *  chip lives in the top bar now and shows the INITIAL instead of the name
+ *  when the bar is narrow, so both halves are written together — two callers
+ *  used to set the name and neither knew about the initial. */
+function setProfileChip(name) {
+  const full = document.getElementById('profile-name');
+  if (full) full.textContent = name;
+  const ini = document.getElementById('profile-initial');
+  // first LETTER, not first character: "01 Josip" should read J, and a name
+  // that is all punctuation still has to put something in the circle
+  if (ini) ini.textContent = (String(name ?? '').match(/\p{L}/u)?.[0] ?? '?').toUpperCase();
+}
 const CREDIT_RATE = 1 / 5;                 // score -> credits
 const PODIUM_CR = [650, 400, 220];         // 1st / 2nd / 3rd
 // r359 (owner: "Iterate the careerpath"): the conquest windfall was the
@@ -6770,7 +6782,7 @@ class Game {
     const chip = document.getElementById('profile-chip');
     const screenEl = document.getElementById('profile-screen');
     if (!chip || !screenEl) return;
-    document.getElementById('profile-name').textContent = this.profile.name;
+    setProfileChip(this.profile.name);
     chip.addEventListener('click', () => {
       this._renderProfiles();
       screenEl.classList.remove('hidden');
@@ -7042,8 +7054,7 @@ class Game {
     saveJSON('ir-profiles', this.profiles);
     if (id === this.profile.id) {
       this.profile.name = name;
-      const chip = document.getElementById('profile-name');
-      if (chip) chip.textContent = name;
+      setProfileChip(name);
     }
     return true;
   }
