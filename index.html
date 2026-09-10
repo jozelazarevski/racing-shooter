@@ -571,9 +571,12 @@
     -webkit-tap-highlight-color:transparent;transition:transform .1s}
   /* the initial stands in for the name when the bar is narrow — one glyph in
      a circle, so the chip stays a tap target instead of shrinking to nothing */
-  #profile-initial{display:none;width:20px;height:20px;border-radius:50%;
+  /* the initial is the AVATAR, shown at every width — it replaced the chip's
+     old emoji, and hiding it on desktop left a bare text pill with nothing to
+     read as a profile button. Narrow drops the NAME and keeps this. */
+  #profile-initial{display:inline-flex;width:20px;height:20px;border-radius:50%;
     align-items:center;justify-content:center;font-size:12px;line-height:1;
-    background:rgba(127,212,255,.18);color:#7fd4ff;letter-spacing:0}
+    background:rgba(127,212,255,.18);color:#7fd4ff;letter-spacing:0;flex:0 0 auto}
   /* px, not ch: the chip sets letter-spacing:2px, so a glyph is wider than
      1ch and a 9ch cap clipped the default "PLAYER 01" to "PLAYER …". */
   #profile-chip b{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -922,7 +925,6 @@
   @media (max-width:389px){
     #topbar{gap:7px;padding-left:8px;padding-right:8px}
     #profile-chip{padding:0 8px;gap:0}
-    #profile-initial{display:inline-flex}
     #profile-chip b{display:none}
     #topbar-back{font-size:12px;padding:7px 10px}
     #topbar-cred{font-size:9px;padding:4px 7px}
