@@ -4171,6 +4171,132 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r410 — THE FOREST IS A MASS, THE LAP RULE FIRES, AND THE NAME MOVES UP
+
+Four things, and the first is the one that had been reported three times.
+
+**"Should not be able to drive in the trees."** Third owner sentence on
+this, after r399's "Car should not drive between the trees" and "Rule: I
+can't drive through a tree". Three sentences means the previous build did
+not close it, so this one started at the builder instead of the symptom.
+
+`_buildForestCarpet` calls its `ring()` helper four times, and only the
+VERGE call passes the trailing `reg = true`. So `camTrees` held the 9,000
+instances of `trackSpot(1, 38)` and nothing else. The mid ring is
+`trackSpot(38, 160)` at 14,000 instances with `reg` omitted, and the
+horizon ring 24,000 more. BOTH the trunk collider and §7.15's underbrush
+drag read that one registry — so between 38 and 160 u out from the road
+edge there was neither a trunk to hit nor brush to bog in. r399 made the
+verge a mass and left the forest behind it paint, which is exactly the
+wood a car is in once it has actually left the road.
+
+The mid ring registers now. It costs no RNG draws, which matters more
+here than anywhere: registration reads a placement the loop has already
+rolled, so the shared `Math.random()` stream is untouched and no later
+world re-rolls. The horizon ring stays paint and is recorded as a known
+gap rather than silently included — it is the backdrop past 170 u, and
+47,000 collider records a world is a real bill for terrain you only meet
+driving far off-piste.
+
+One thing had to be fixed first: the registered crown `top` was the
+literal 6.3, the verge tree's own tip. True while the verge was the only
+registered ring, wrong the moment a second one was (`twoConeMid` tops out
+at 5.35). Both top and crown radius are read off the geometry's bounding
+box now, so a future ring cannot inherit the wrong tree's dimensions.
+
+And the 60% deflect is deleted on both collision paths. FIX-5 (r388)
+handed back 60% of approach speed on a trunk hit at pace — "the trunk is
+0.7 u of wood, not a wall" — and that is the physical claim the owner has
+now contradicted three times. §7.15 as shipped already says it in our own
+words: trunks stop a car "like any solid (no 60%-and-through
+deflection)". The rule text and the code had disagreed since r399. The
+rule wins.
+
+**And then the probe caught what the change had let in.** Several later
+passes — the treeline law, the ice carpet sweep, the conform and shadow
+laws — cull a carpet instance by scaling its matrix to nothing. That
+takes the tree off the screen and leaves its `camTrees` record untouched.
+While the verge was the only registered ring this was mostly invisible;
+with 23,000 records it was 11,497 PER WORLD, measured identically on PINE
+VALLEY and FALKEN RIDGE, every one carrying a live crown radius between
+2.01 and 8.15 u. Eleven thousand invisible obstacles a car can hit is
+exactly the invisible wall standing decision 1 forbids, and it would have
+shipped behind a green gate, because no suite looks for a collider
+without a tree.
+
+Fixed ONCE rather than per cull path — teaching each law to also edit the
+registry is the same trap the wrap-count arithmetic fell into the same
+day, where r311, r408 and a first attempt each patched a different copy
+of one law. The registry is reconciled in a single pass after every
+builder and every law has run. Measured after: 11,503 colliders on PINE
+and 11,368 on FALKEN, zero ghosts, reach p95 151 u and max 162 u, and a
+car driven straight off the road at 20, 70 and 140 u out is STOPPED every
+time, 12 to 25 m into the wood.
+
+**The 1-or-3 lap rule had never fired once.** r381 asked for "decide when
+track is 1 or 3 laps depending the length" and shipped a 3000 u
+threshold. Nobody measured the roster against it: a census of all 78
+worlds reads min 4532, p25 5783, median 6935, p75 8529, max 12038. The
+SHORTEST track in the game is 1.5x the threshold, so every world took the
+1-lap branch and half the owner's rule was dead code for thirty builds.
+Not mistuned — inert.
+
+The threshold is 7000 now, the owner's pick from the measured
+distribution, and 40 of 78 worlds race three laps. What that buys was
+measured on PINE VALLEY with the same bot and lap count as the only
+variable: the share of the payout that comes from DRIVING goes 29% to
+57%, because `raceCr` scales with race length while PODIUM_CR,
+FIRST_CLEAR_CR and SWEEP_CR are flat. §6.1c filed exactly this as
+"recorded, not retuned, pending play"; this is the retune, and it changes
+no price.
+
+**It also inverted something, and that is recorded rather than hidden.**
+Re-measured after the change: driving's share on the worlds that flipped
+went further than predicted — PINE 27% to 86%, EMBER PASS 47% to 79% —
+because a three-lap race also forfeits the CLEAN RUN bonus more often,
+which shrinks the flat half again. But credits per MINUTE fell with it:
+PINE 152 to 50, EMBER 102 to 91, against 128 on one-lap REDWOOD and 180
+on one-lap FALKEN. The flat bonuses are paid once per RACE and a race is
+now three times longer, so the forty worlds where driving finally pays
+are also the forty worst worlds to earn on. A player optimising income
+would avoid exactly the worlds this change was meant to reward. The
+candidate fix — scale the per-race flat bonuses with lap count — is
+recorded as RALLY_RULES M-10 and NOT applied, because that is a
+re-pricing and ECONOMY-PLAN.md's standing advice is against re-pricing
+without a reported problem. It is a reported problem now, but it is the
+owner's call.
+
+**"Move the name up or just have a first letter."** Both, because the row
+was the fault. `#profile-chip` sat alone in `#menu-status`, a centred row
+of its own between the header and the tabs, floating over the 3D grid
+render with nothing to align to. It is a bar chip now beside the balance,
+and the row it occupied is deleted rather than emptied.
+
+The auto margin needed MOVING, not copying: `#topbar-cred` already
+carried `margin-left:auto`, and giving the chip one as well would have
+split the slack and stranded the chip mid-bar. Below 390px the name hides
+and the initial carries the chip alone — and not a pixel sooner, because
+at 420px the bar ends at 410 of 420 with the full name, so collapsing
+earlier would hide a name that fits. The initial shows at every width as
+the avatar; the first cut hid it on desktop and left a bare text pill
+where the emoji used to be. Two call sites set the profile name and
+neither knew about the initial, so both go through one writer that takes
+the first LETTER, not the first character, so "01 Josip" reads J.
+
+**What the economy census found on the way, none of it acted on.** A
+staged 78-round career tallies race score at 84,916 CR of 253,318 — 33.5%
+— and the rest is flat: first clear 18.5%, podium 13.0%, championship
+points 11.9%, season prize 10.3%, finale double 7.4%, sponsor 2.8%, quest
+2.5%. That 33.5% flatters it, because the sim feeds a fixed score of
+4000; the live per-race census reads driving at 21-30% on most worlds and
+2% on a finale, where FALKEN RIDGE pays 2,800 CR for a race that was 2%
+driving. Earning rate is also a property of the WORLD rather than the
+drive: 67 CR/min on LANTERN QUARTER against 200 on COSTA BRAVA, with
+score rate spanning 0.76 to 4.96 points per second. And TERRAZZA ALTA
+scored zero and paid nothing in 171 s, which is either a bot failure or a
+world with no scorable content and is quoted nowhere until that is
+settled. All recorded as RALLY_RULES M-7, M-8, M-9.
+
 ## r409 — A GRID YOU CAN READ, A LADDER WITH FOUR RUNGS, AND THE LINES WERE NEVER IN THE WORLD
 
 Three owner reports close here, and the first of them is the one worth
