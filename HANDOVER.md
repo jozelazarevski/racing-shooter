@@ -4322,11 +4322,22 @@ So the bound is a ladder too, spaced by the same 5%: NORMAL 0.75, HARD
 0.903 on PINE.
 
 **Three systems in one build, and the reason.** §0.1 says one system per
-change-set. The r408 gate died mid-run with no verdict line, most likely
-starved by browser probes running alongside it, and each gate run is
-about seventy-five minutes. Rather than spend three of them, these went
-in together — but as separate commits, so a regression is still
-bisectable to the system that caused it.
+change-set. Each gate run is about seventy-five minutes and the r408 run
+died mid-way with no verdict line, so rather than spend three of them
+these went in together — but as separate commits, so a regression is
+still bisectable to the system that caused it.
+
+**And the reason the gate keeps dying is not what I first wrote.** I
+attributed the r408 death to browser probes starving it. That was wrong,
+and the next run disproved it: the r409 gate was started with zero
+concurrent probes, ran two suites clean, and was gone by morning — no
+verdict line, no processes, and the local HTTP server dead too. A dead
+server is not something a starved test does. THIS CONTAINER IS
+SUSPENDED WHEN THE SESSION GOES IDLE, and a backgrounded `nohup` does
+not survive it. Both deaths fit that and nothing else. The gate has to
+be run inside an active turn, polled from the foreground until it
+reaches its verdict line — backgrounding it and coming back later loses
+the run every time.
 
 ## r408 — THE FINISH LINE ENDS THE RACE
 
