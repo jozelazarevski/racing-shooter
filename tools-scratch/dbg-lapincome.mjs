@@ -27,20 +27,24 @@ const run = async (level, laps) => {
     if (g.composer) g.composer.render = () => {};
     let el = g.clock.elapsedTime;
     g.clock = { getDelta: () => { el += 1 / 60; return 1 / 60; }, get elapsedTime() { return el; } };
-    g.totalLaps = laps;                       // the one variable
     for (let f = 0; f < 400 && g.state !== 'race'; f++) { g.countdown = 0.01; g._frameBody(); }
-    // drive the centreline flat out until the flag, or 12 simulated minutes
+    const score0 = g.score ?? 0;
+    // THE PLAYER IS DRIVEN THROUGH THE GAME'S OWN INPUT, not by calling
+    // step() beside the frame: _frameBody steps the car from input.analog,
+    // so a direct step() double-integrates and the frame overwrites it.
     const N = g.track.center.length;
     let frames = 0;
-    while (g.state === 'race' && frames < 43200) {
+    while (g.state === 'race' && frames < 108000) {
+      g.lapsTotal = laps;                     // re-asserted: the one variable
       const t = g.track, i = pl.trackIndex;
       const aim = t.center[(i + 12) % N];
       const dx = aim.x - pl.pos.x, dz = aim.z - pl.pos.z;
       let d = Math.atan2(dx, dz) - pl.heading;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
-      pl.step(1 / 60, { throttle: 1, brake: 0, steer: Math.max(-1, Math.min(1, d * 1.6)),
-        drift: false, hold: false });
+      g.input.analog.steer = Math.max(-1, Math.min(1, d * 1.6));
+      g.input.analog.throttle = 1;
+      g.input.analog.brake = 0;
       g._frameBody();
       frames++;
     }
@@ -51,7 +55,8 @@ const run = async (level, laps) => {
       if (v) rows[k] = (rows[k] ?? 0) + v;
     }
     return { world: g.level?.name, laps, finished: g.state !== 'race',
-      raceScore: Math.round(g.raceScore ?? 0), raceSecs: +(frames / 60).toFixed(1),
+      lapsTotal: g.lapsTotal, lap: pl.lap,
+      raceScore: Math.round((g.score ?? 0) - score0), raceSecs: +(frames / 60).toFixed(1),
       place: pl.place ?? null, rows };
   }, { laps });
 };
