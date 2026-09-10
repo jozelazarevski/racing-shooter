@@ -1814,6 +1814,10 @@ export class Car {
 
   placeAt(index, lateral, keepCP = false) {
     const t = this.game.track;
+    // A PLACEMENT NEVER GAINS GROUND (r410). Read before anything moves —
+    // the invariant at the bottom of this method needs the progress the car
+    // actually had.
+    const _prog0 = this.progress;
     this.pos.copy(t.pointAt(index, lateral));
     this.heading = t.headingAt(index);
     this.vel.set(0, 0, 0);
@@ -1861,6 +1865,32 @@ export class Car {
     // crossing its lap number implies — start it one wrap short, or its
     // progress would fall by a full lap the moment it crosses.
     if (!keepCP) this._wraps = this.lap - (index > this.game.track.N * 0.85 ? 1 : 0);
+    // ...AND A RESPAWN NEVER GAINS A LAP (r410). THIS IS THE THIRD TIME THIS
+    // BUG HAS BEEN FIXED, WHICH IS WHY IT IS FIXED HERE.
+    //
+    // progress is `_wraps + trackIndex/N`. Seat a car BEHIND the start line
+    // that has already crossed it — a return to a gate near the end of the
+    // lap, or FIX-8b's respawn 150 m behind a player who is himself near the
+    // line — and the index jumps to ~0.97N while the wrap count stays put:
+    // progress reads L + 0.97 instead of L - 0.03, and being destroyed
+    // PROMOTES the victim by very nearly a whole lap. test-killspos P1
+    // measured 1.02 -> 1.973.
+    //
+    // r311 and r408 each answered one caller with an index guard (`never wrap
+    // past zero`, `clamp to gt.si`), and each left the other callers to be
+    // found later; there were three copies of the arithmetic in two files.
+    // The r324 note above already says every restart path funnels through
+    // this method, so the law belongs HERE, once, stated in the units it is
+    // about: a placement may cost a car ground, and may seat it a few metres
+    // forward when its owed gate is just ahead, but only a wrap-count error
+    // can hand it half a lap, and one wrap is the correction.
+    if (keepCP && Number.isFinite(_prog0) && this.progress - _prog0 > 0.5) {
+      this._wraps -= 1;
+      // the DISPLAYED lap comes back with it but never below 1 (lap counters
+      // start at 1); `_wraps` is what progress reads, so that clamp cannot
+      // re-introduce the gain it used to cause.
+      this.lap = Math.max(1, (this.lap ?? 1) - 1);
+    }
     this.syncMesh(0);
   }
 
@@ -4706,8 +4736,10 @@ export class Car {
       this._respawnBehindPlayer = false;
       const N = g.track.center.length;
       const back = Math.ceil(150 / (g.track.segLen ?? 4));
-      const idx = Math.max(0, (g.player.trackIndex ?? 0) - back);
-      this.trackIndex = idx;
+      // r410: wraps rather than clamping at 0 — 150 m behind a player who is
+      // just over the line is the end of the previous lap, not index 0, and
+      // placeAt's law brings the wrap count back with the seat.
+      const idx = (((g.player.trackIndex ?? 0) - back) % N + N) % N;
       const gates = g.route.gates;
       let owe = gates[0]?.id ?? 0;
       for (const gt2 of gates) { if (gt2.si > idx) { owe = gt2.id; break; } }
@@ -4716,7 +4748,11 @@ export class Car {
       this._respawnAtGate = null;
       this._tailPaceT = 10;
       g.telemetry?.log('return', { car: this.name ?? 'rival', reason: 'kill', gateId: owe });
-      this.placeAt(this.trackIndex, 0, true);
+      // r410: placeAt SETS the index — the caller must not. Pre-assigning
+      // `this.trackIndex` and then passing it back in moved the car before
+      // placeAt could read where it had been, so the wrap-count law there
+      // compared the moved car against itself and never fired.
+      this.placeAt(idx, 0, true);
       return;
     }
     this._respawnBehindPlayer = false;
@@ -4724,17 +4760,17 @@ export class Car {
     if (gt) {
       const N = g.track.center.length;
       const back = Math.max(1, Math.round(6 / (g.track.segLen ?? 4)));
-      // NEVER wrap backwards past the lap line: (si-back+N)%N for gate 0
-      // put the car at index N-3 with its lap counter untouched, and
-      // progress = lap + index/N read it as a WHOLE LAP GAINED — the kill
-      // promoted its victim (caught by test-killspos: 1.079 -> 1.999).
-      const rawIdx = gt.si - back;
-      this.trackIndex = rawIdx < 0 ? gt.si : rawIdx;
+      // r410: the seat wraps honestly now — it belongs BEFORE the gate even
+      // when that is past index 0 — and placeAt's own law keeps the wrap
+      // count with it. The old `rawIdx < 0 ? gt.si : rawIdx` clamp seated
+      // the car ON the line to dodge an arithmetic bug that is fixed at
+      // source; seating on the line is what R-FINISH-01 had to undo.
+      const gIdx = ((gt.si - back) % N + N) % N;
       this._nextGate = gt.id;
       this._gateAlong = undefined;
       g.telemetry?.log('return', { car: this.name ?? 'rival', reason: 'kill', gateId: gt.id });
       this._respawnAtGate = null;
-      this.placeAt(this.trackIndex, 0, true);
+      this.placeAt(gIdx, 0, true);   // r410: placeAt sets the index, see above
       return;
     }
     this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
