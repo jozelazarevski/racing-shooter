@@ -11648,22 +11648,42 @@ class Game {
     // and the wrap count come back with it, so progress reads L + 0.99
     // (just short of the line) instead of L + 1.99 (a lap gained). Both
     // properties hold at once; the old code could only ever have one.
-    const rawIdx = gt.si - back;
+    //
+    // r410: THAT INVARIANT WAS ONLY HALF-ENFORCED, AND test-killspos P1
+    // caught the other half. The r408 cut guarded `rawIdx < 0` — the return
+    // that wraps backwards past index 0 — and left the case where the SEAT
+    // does not wrap but the CAR already has: a rival just over the line at
+    // progress 1.02 whose last gate sits near the end of the lap gets seated
+    // at index ~875 with its wrap count untouched, and progress reads 1.973.
+    // Being destroyed promoted it by very nearly a whole lap. Measured
+    // identically with the r409 grid and with the old spacing restored, so
+    // this is neither r408's nor r409's: it is as old as the else-branch.
+    //
+    // So the invariant is stated in the units it is about — PROGRESS — and
+    // checked once, instead of being inferred from a second index geometry:
+    // a return may cost a car ground and may leave it a few metres forward
+    // when its owed gate is just ahead, but it may NEVER hand it half a lap.
+    // Only a wrap-count error can produce that, and one wrap is the fix.
     const N9 = this.track.center.length;
-    if (rawIdx < 0) {
+    const idx = ((gt.si - back) % N9 + N9) % N9;
+    const wrapped = idx > (car.trackIndex ?? idx);   // seat is behind the line the car has crossed
+    let wraps9 = car._wraps ?? car.lap ?? 1;
+    if ((wraps9 + idx / N9) - (car.progress ?? 0) > 0.5) {
+      wraps9 -= 1;
+      // the DISPLAYED lap comes back with it, but never below 1 (D-1: the
+      // lap counter starts at 1). `_wraps` is what progress reads, so the
+      // clamp cannot re-introduce the gain it used to cause here.
       car.lap = Math.max(1, (car.lap ?? 1) - 1);
-      car._wraps = (car._wraps ?? car.lap) - 1;
-      car.placeAt((rawIdx + N9) % N9, 0, true);
-    } else {
-      car.placeAt(rawIdx, 0, true);
     }
+    car._wraps = wraps9;
+    car.placeAt(idx, 0, true);
     // r340: seated ON the line by the gate-0 wrap guard, the route's
     // plane-crossing detector armed at along >= 0 and the owed gate could
     // never clear by driving (patch13 R9 caught it once the 2x segLen made
     // the guard fire with the seat exactly on the plane). Prime the
     // detector as "just behind the plane": the first honest forward step
     // crosses.
-    if (rawIdx < 0) car._gateAlong = -0.01;   // r340: prime "just behind the plane"
+    if (wrapped) car._gateAlong = -0.01;   // r340: prime "just behind the plane"
     const sp = (RT.returnSpeedKmh ?? 40) / 3.6;
     car.vel.set(Math.sin(car.heading), 0, Math.cos(car.heading)).multiplyScalar(sp);
     car.vy = 0; car.airborne = false;
