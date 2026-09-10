@@ -84,7 +84,23 @@ export const DRIVING = {
   driftScrubCap: 2.1,        // × budget kinetic ceiling WITH the handbrake (unloaded tyres); 4.4 otherwise
   driftReward: 0.15,         // r379: slice of scrubbed slide returned as forward speed while held (0.35 free); 0.5 made drifts FASTER than entry
   driftForwardScrub: 0.5,    // r379: forward speed lost per second at full slip with the handbrake held — a drift costs real speed
-  lapsShortTrackU: 3000,     // r381 (owner): a lap under this races 3 laps; longer races 1 (level.laps still wins)
+  // r410: 7000, NOT 3000 — THE RULE HAD NEVER FIRED ONCE.
+  //
+  // r381 asked for "1 or 3 laps depending the length" and shipped a 3000 u
+  // threshold. The roster was never measured against it: a census of all 78
+  // worlds reads min 4532, p25 5783, median 6935, p75 8529, max 12038 — the
+  // SHORTEST track in the game is 1.5x the threshold, so every world took the
+  // 1-lap branch and the 3-lap half of the owner's rule was dead code for
+  // thirty builds. Not mistuned; inert.
+  //
+  // 7000 is the owner's pick from the measured distribution (median 6935), and
+  // it puts 40 of 78 worlds on 3 laps. What that buys, measured on PINE VALLEY
+  // with the same bot and lap count as the only variable: the share of the
+  // payout that comes from DRIVING goes 29% -> 57%, because `raceCr` scales
+  // with race length while PODIUM_CR / FIRST_CLEAR_CR / SWEEP_CR are flat.
+  // §6.1c filed that consequence as "recorded, not retuned, pending play";
+  // this is the retune, and it changes no price. RALLY_RULES.md M-2.
+  lapsShortTrackU: 7000,     // a lap under this races 3 laps; longer races 1 (level.laps still wins)
   driftYawAssist: 0.85,      // rad/s of rotation help toward the steer, 15°-65° slip, handbrake held
   // r341 (owner, on r340: "Drift is spinning the car way too much"): a held
   // drift HOLDS its angle. Measured (tools-scratch/driftspin.mjs): while the
