@@ -7335,6 +7335,7 @@ export class Track {
     this._treelineLaw();     // r407: nothing grows inside a wall, nothing on the ice
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
     this._clearRoadSolids();  // r406: no collider left biting the carriageway
+    this._pruneGhostTrees();  // r410: no collider left standing where no tree is
   }
 
   /** NOTHING GROWS IN THE ICE (owner, 2026-09-09: "Trees in the ice??", on a
@@ -17822,6 +17823,37 @@ export class Track {
       this._elevRangeMemo = Math.max(0, hi - lo);
     }
     return this._elevRangeMemo;
+  }
+
+  /** NO COLLIDER STANDS WHERE NO TREE IS (r410).
+   *
+   *  Registering the mid ring turned a latent desync into a measurable one.
+   *  Several later passes — the treeline law, the ice carpet sweep, the
+   *  conform and shadow laws — CULL a carpet instance by scaling its matrix
+   *  to nothing, which removes the tree from the screen and leaves its
+   *  `camTrees` record untouched. While the verge ring was the only
+   *  registered one that was mostly invisible; with 23,000 records it is
+   *  11,497 per world, measured on PINE VALLEY and FALKEN RIDGE alike, every
+   *  one of them carrying a live crown radius between 2.01 and 8.15 u.
+   *  That is eleven thousand invisible obstacles a car can hit, which is
+   *  precisely the invisible wall standing decision 1 forbids.
+   *
+   *  Rather than teach every cull path to also edit the registry — the same
+   *  "fix it in three places" trap the placeAt wrap-count law fell into — the
+   *  registry is reconciled ONCE, here, after every builder and every law has
+   *  run: an instance scaled away is not a tree, so its record goes. Reading
+   *  element 0 of each 16-float block is the instance's x scale.
+   */
+  _pruneGhostTrees() {
+    if (!this.camTrees?.length) return;
+    const before = this.camTrees.length;
+    this.camTrees = this.camTrees.filter((t) => {
+      const m = t.meshes && t.meshes[0];
+      if (!m || t.idx == null || !m.instanceMatrix) return true;
+      return m.instanceMatrix.array[t.idx * 16] >= 0.01;
+    });
+    this._camTreeGrid = null;          // the cell hash was built from the old list
+    this._ghostTreesPruned = before - this.camTrees.length;
   }
 
   /** PATCH_02 v3 C-C: verge-carpet trees near a point, for the camera's
