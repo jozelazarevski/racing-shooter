@@ -18111,42 +18111,8 @@ export class Track {
     // large, starting just off the road edge, the whole way round the lap.
     // r377 (owner's forest mockup): scaled up to TOWER — the reference's
     // lane runs under the canopy, not past shoulder-height cones
-    // r413 (owner: "I'd like the field clean without trees. And add more
-    // field", CIDER LANE frame) — THE CARPET NOW OBEYS THE THEME'S TREELINE.
-    //
-    // CIDER LANE's theme declares `treeBelt: [40, 140]`: a 31 u open field
-    // past the 9 u road edge. Its `trees:*` systems respect that — measured
-    // nearest birch 15.9 u, oak 16.0, larch 16.9, pine 21.9. This ring did
-    // not: `trackSpot(1, 38)` hard-codes its own band one metre off the
-    // tarmac and never reads treeBelt, so 5,448 carpet instances stood
-    // within 60 u of the road and 946 of them INSIDE 20 u, nearest at the
-    // very edge. That wall, and the lone cone standing out in the open
-    // grass, are what the owner photographed. Widening the belt would have
-    // changed nothing, because the belt was never what put them there.
-    //
-    // So the near pad comes from the theme. A field theme that asks for a
-    // clear band gets one — open grass to its treeline, which is both
-    // "clean without trees" and "more field" from a single number. A FOREST
-    // theme is untouched: belt [12, 85] still yields the old ~1 u pad, so
-    // r368's "The roads are all deserted" fix keeps working exactly where it
-    // was aimed, and a wood still runs to the verge because that is what a
-    // wood is.
-    //
-    // NOT zero-draw: the band moves, so the rejection sampler accepts at a
-    // different rate and the scatter downstream of it re-rolls. That is
-    // deliberate here (this IS a scenery change, not a refactor) and the
-    // gate is what proves the fallout is clean.
-    const beltNear = Array.isArray(T.treeBelt) ? T.treeBelt[0] : null;
-    const roadPad = this.widthAt(0) + 2.5;
-    const vergePad = beltNear != null ? Math.max(1, beltNear - roadPad) : 1;
     ring(terrace ? oliveDome() : twoCone(),
-      spec.verge ?? (terrace ? 4200 : 9000),
-      // The band KEEPS ITS WIDTH — it slides out, it does not compress. The
-      // first cut wrote max(vergePad + 12, 38), which for a 40 u belt gave a
-      // 9.5 u band instead of the original 37: the rejection sampler then
-      // threw away most of its draws and the world build slowed enough to
-      // time the probe out. A narrow far band is not the same scene, either.
-      trackSpot(vergePad, vergePad + 37), 3, 1.4, 1.9, paint, true);
+      spec.verge ?? (terrace ? 4200 : 9000), trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
     // r377 UNDERSTOREY, from the owner's mockup: the ground between the
     // trunks is not bare — a fern layer fills the first metres off the
     // lane, and moss pads green the verge. Non-solid, same as every
