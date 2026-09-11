@@ -4171,6 +4171,70 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r413 — THE BORE FLOOR WAS A STAIRCASE
+
+Owner, on r412: "Still shaking under a tunel." UNDER, not after — and that is
+what narrowed it, because the exit hand-off had already been worked twice.
+
+The tunnel branch of the chase camera clamped like this:
+
+    const ci = tk.nearestIndex(cp, tun.i);
+    const fy = tk.center[ci].y;
+    cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
+
+`ci` is an INTEGER station. `tk.center[ci].y` therefore steps: as the camera
+runs the bore, the index ticks to the next sample and the floor jumps a whole
+station's rise in a single frame — and the ceiling with it, since both bounds
+are derived from the same `fy`. Anywhere the bore is not dead level, the view
+twitches once per station crossing.
+
+THE SAME TRAP IS ALREADY WRITTEN DOWN IN THIS REPO, on the physics side:
+"`groundHeightAt` is a staircase between samples; at racing speed the car
+crosses a step every three frames, and the jump detector below — which
+differentiates this value twice — was reading those steps as crests." That was
+cured by moving to `groundHeightAtPos`, the continuous fractional read. The
+camera was never given the same treatment.
+
+Which is exactly why this kept coming back. r398 fixed the ENTRY pair and
+capped the exit rise from +33 u to about +7; its own note called that "a cap,
+not a cure". Neither change touched the staircase, so the shake survived both
+and the third report arrived pointing at the middle of the bore rather than
+its ends.
+
+FIXED: `fracIndexAt` gives the continuous station and `groundHeightAtFrac`
+interpolates between the two neighbouring samples. Lateral 0 is the bore's own
+centreline — the bank term is zero there and a bore carries no ramp — so this
+is the same height the old line intended, sampled between stations instead of
+at one.
+
+ALSO IN THIS BUILD, and honestly marked as unverified: E-12, the owner's
+"I'd like the field clean without trees. And add more field" (CIDER LANE).
+The cause is proven — the theme already declares `treeBelt: [40, 140]`, its
+`trees:*` systems obey it (nearest birch 15.9 u, oak 16.0, larch 16.9, pine
+21.9), and the verge carpet does not: `trackSpot(1, 38)` is a band hard-coded
+one metre off the tarmac that never reads treeBelt, putting 5,448 instances
+within 60 u and 946 inside 20 u. That is the wall, the lone cone in the open
+grass, and the missing field, all from one call.
+
+Two fixes were tried and reverted before this one. Dragging the band out to
+the treeline is right in result and unaffordable in cost: every sample costs a
+lap search, a slope test and five ground seats, the ring rejects slopes past
+50 deg, and the road corridor is FLATTENED — so a verge band is accepted
+cheaply while a band at 28-65 u sits in unflattened hills where most draws are
+rejected. Measured, the build went from 28 s to not finishing in 170 s.
+
+What ships instead REMOVES work: a theme whose belt starts at 38 u or beyond
+builds no verge wall at all. The mid ring already scatters at
+`trackSpot(38, 160)`, so on a 40 u belt it simply IS the treeline — open field
+in front, wood closing in behind. Forest themes are untouched by construction:
+belt [12, 85] sits inside the verge band, so they keep their wall and r368's
+"The roads are all deserted" fix keeps working where it was aimed.
+
+The after-measurement did not complete — the probe browser died twice on a
+container with 15 GB free and no orphan processes, so the failure is the
+harness, not the game. The gate is therefore the first real verification this
+change gets.
+
 ## r412 — THE OPEN TEMPLATE IS A SHAPE, NOT A STRAIGHT (E-10 pilot)
 
 Owner: "Add wide fields scenarios. Those where there and got deleted."
