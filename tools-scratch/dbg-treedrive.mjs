@@ -40,12 +40,15 @@ for (const lv of USE) {
         if (!best || n > best.n) best = { n, i, side, x: q.x, z: q.z };
       }
     }
-    // stand the car on the road at that station, pointed at the stand
-    const road = t.pointAt(best.i, 0);
-    pl.pos.set(road.x, t.terrainHeight(road.x, road.z) + 0.6, road.z);
+    // Seat the car with placeAt, never by writing pos: the wrap-count work
+    // put the placement law INSIDE placeAt and callers pass a seat. Writing
+    // pos directly leaves trackIndex stale and groundHeightAt then reads an
+    // undefined centre sample — which is exactly how this probe first failed.
+    pl.placeAt(best.i, 0);
     pl.vel.set(0, 0, 0);
-    pl.heading = Math.atan2(best.x - road.x, best.z - road.z);
     pl.boostTimer = 0;
+    const road = { x: pl.pos.x, z: pl.pos.z };
+    pl.heading = Math.atan2(best.x - road.x, best.z - road.z);
     const x0 = pl.pos.x, z0 = pl.pos.z;
     let maxDepth = 0, entered = 0;
     for (let f = 0; f < 360; f++) {          // 6 s at 60 Hz
