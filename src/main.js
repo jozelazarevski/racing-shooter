@@ -12026,7 +12026,31 @@ class Game {
         cp.x -= n.x * over;
         cp.z -= n.z * over;
       }
-      const fy = tk.center[ci].y;
+      // r413 (owner: "Still shaking under a tunel") — THE BORE FLOOR IS READ
+      // CONTINUOUSLY, NOT PER STATION.
+      //
+      // This clamped to `tk.center[ci].y`, the centre height at an INTEGER
+      // station. That is a staircase: as the camera runs the bore, `ci` steps
+      // to the next sample and the floor — and with it the ceiling, which is
+      // derived from the same number — jumps by a whole station's rise in one
+      // frame. Both ends of the clamp move, so the view twitches wherever the
+      // bore is not dead level.
+      //
+      // The same trap is already documented on the physics side ("groundHeightAt
+      // is a staircase between samples; at racing speed the car crosses a step
+      // every three frames"), and was fixed there by moving to the fractional
+      // read. The camera never got that treatment, which is why r398's
+      // entry-pair fix and its exit cap did not cure this: neither touched the
+      // staircase, and a cap is not a cure.
+      //
+      // `fracIndexAt` gives the continuous station and `groundHeightAtFrac`
+      // interpolates between the two neighbouring samples. Lateral 0 is the
+      // bore's own centreline — no bank term at zero, and a bore carries no
+      // ramp — so this is the same height the old line wanted, sampled without
+      // the step.
+      const fy = tk.groundHeightAtFrac
+        ? tk.groundHeightAtFrac(tk.fracIndexAt(cp, tun.i), 0)
+        : tk.center[ci].y;
       cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
     } else if (tk?.deckOverhead
       && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex))) {
