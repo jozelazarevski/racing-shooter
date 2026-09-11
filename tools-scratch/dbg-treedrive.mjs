@@ -44,6 +44,11 @@ for (const lv of USE) {
     // put the placement law INSIDE placeAt and callers pass a seat. Writing
     // pos directly leaves trackIndex stale and groundHeightAt then reads an
     // undefined centre sample — which is exactly how this probe first failed.
+    // Let the countdown expire FIRST. The grid is locked until GO, so a probe
+    // that starts driving immediately spends its first ~180 frames commanding
+    // a frozen car, and the countdown-to-race transition re-seats it anyway —
+    // the run measures the grid, not the wood.
+    for (let w = 0; w < 400 && g.state === 'countdown'; w++) g._frameBody(1 / 60);
     pl.placeAt(best.i, 0);
     pl.vel.set(0, 0, 0);
     pl.boostTimer = 0;
