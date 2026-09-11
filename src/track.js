@@ -18111,8 +18111,37 @@ export class Track {
     // large, starting just off the road edge, the whole way round the lap.
     // r377 (owner's forest mockup): scaled up to TOWER — the reference's
     // lane runs under the canopy, not past shoulder-height cones
-    ring(terrace ? oliveDome() : twoCone(),
-      spec.verge ?? (terrace ? 4200 : 9000), trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
+    // r413 (owner: "I'd like the field clean without trees. And add more
+    // field", CIDER LANE frame) — A WORLD THAT DECLARES A CLEAR FIELD GETS NO
+    // VERGE WALL.
+    //
+    // CIDER LANE's theme already asks for `treeBelt: [40, 140]` — a 31 u open
+    // field past the 9 u road edge — and its `trees:*` systems obey it
+    // (nearest birch 15.9 u, oak 16.0, larch 16.9, pine 21.9). This ring did
+    // not: `trackSpot(1, 38)` is a band hard-coded one metre off the tarmac
+    // that never reads treeBelt, and it put 5,448 instances within 60 u with
+    // 946 INSIDE 20 u, nearest at the very edge. That wall, the lone cone
+    // standing in the open grass, and the missing field are all this call.
+    //
+    // The fix is to SKIP it, not to drag it outward. Dragging was tried and
+    // reverted: every sample here costs a lap search, a slope test and five
+    // ground seats, and the ring rejects slopes past 50 deg. The road
+    // corridor is flattened, so a verge band is accepted cheaply while a band
+    // at 28-65 u sits in unflattened hills where most draws are rejected —
+    // measured, the build went from 28 s to not finishing inside 170 s.
+    // Skipping costs nothing because the MID ring already scatters at
+    // trackSpot(38, 160): on a 40 u belt it IS the treeline, so the wood
+    // still closes in behind an open field instead of standing on the verge.
+    //
+    // Forest themes are untouched: belt [12, 85] is inside the verge band, so
+    // they keep their wall and r368's "The roads are all deserted" fix keeps
+    // working exactly where it was aimed.
+    const beltNear = Array.isArray(T.treeBelt) ? T.treeBelt[0] : null;
+    const clearField = beltNear != null && beltNear >= 38;
+    if (!clearField) {
+      ring(terrace ? oliveDome() : twoCone(),
+        spec.verge ?? (terrace ? 4200 : 9000), trackSpot(1, 38), 3, 1.4, 1.9, paint, true);
+    }
     // r377 UNDERSTOREY, from the owner's mockup: the ground between the
     // trunks is not bare — a fern layer fills the first metres off the
     // lane, and moss pads green the verge. Non-solid, same as every
