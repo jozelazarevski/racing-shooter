@@ -18136,7 +18136,7 @@ export class Track {
     // Forest themes are untouched: belt [12, 85] is inside the verge band, so
     // they keep their wall and r368's "The roads are all deserted" fix keeps
     // working exactly where it was aimed.
-    const beltNear = Array.isArray(T.treeBelt) ? T.treeBelt[0] : null;
+    const beltNear = Array.isArray(this.T.treeBelt) ? this.T.treeBelt[0] : null;
     const clearField = beltNear != null && beltNear >= 38;
     if (!clearField) {
       ring(terrace ? oliveDome() : twoCone(),

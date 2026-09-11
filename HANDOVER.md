@@ -4230,10 +4230,29 @@ in front, wood closing in behind. Forest themes are untouched by construction:
 belt [12, 85] sits inside the verge band, so they keep their wall and r368's
 "The roads are all deserted" fix keeps working where it was aimed.
 
-The after-measurement did not complete — the probe browser died twice on a
-container with 15 GB free and no orphan processes, so the failure is the
-harness, not the game. The gate is therefore the first real verification this
-change gets.
+CORRECTION, WRITTEN AFTER THE ABOVE. The paragraph that stood here blamed the
+probe browser for the failed measurements and called the game innocent. That
+was wrong, and the bug was mine: the patch read `T.treeBelt` inside
+`_buildForestCarpet`, where the theme is `this.T`. The world never built — it
+threw `ReferenceError: T is not defined` on load.
+
+Everything I concluded from the timings is void with it. There was no
+slope-rejection cost and no band-compression cost, and "28 s on base against
+not finishing inside 170 s" was the difference between a build and a crash,
+not between fast and slow. Four hypotheses went into explaining why a world
+built slowly; one `page.on('pageerror')` listener said in twenty seconds that
+it had not built at all. The same lesson as the wrap-count bug and the drive
+probe: ask whether the thing ran before explaining how it ran.
+
+With `this.T` in place and the world building clean, MEASURED:
+
+    CIDER LANE    carpet near road  5,448 -> 1,008
+                  nearest carpet      9.0 u -> 25.7 u
+                  inside 20 u          946 -> 0
+    PINE VALLEY   (forest control)  5,129 / 9.2 u / 986 — unchanged
+
+Zero trees in the open band, treeline at 25.7 u, and a forest world keeps its
+verge wall exactly as before.
 
 ## r412 — THE OPEN TEMPLATE IS A SHAPE, NOT A STRAIGHT (E-10 pilot)
 
