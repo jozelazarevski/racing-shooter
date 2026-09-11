@@ -44,24 +44,29 @@ for (const lv of USE) {
     // put the placement law INSIDE placeAt and callers pass a seat. Writing
     // pos directly leaves trackIndex stale and groundHeightAt then reads an
     // undefined centre sample — which is exactly how this probe first failed.
-    // Let the countdown expire FIRST. The grid is locked until GO, so a probe
-    // that starts driving immediately spends its first ~180 frames commanding
-    // a frozen car, and the countdown-to-race transition re-seats it anyway —
-    // the run measures the grid, not the wood.
-    for (let w = 0; w < 400 && g.state === 'countdown'; w++) g._frameBody(1 / 60);
+    // Use the harness pattern dbg-lapincome proved out, not an invention:
+    //   - force the countdown to expire rather than stepping through it,
+    //   - drive with analog.steer/throttle/brake (NOT {x,y} — that shape is
+    //     ignored, which is why an earlier cut of this probe sat at 0 km/h
+    //     for its whole run and looked like a physics bug),
+    //   - call _frameBody() with no dt; it takes its own.
+    for (let f = 0; f < 400 && g.state !== 'race'; f++) { g.countdown = 0.01; g._frameBody(); }
     pl.placeAt(best.i, 0);
     pl.vel.set(0, 0, 0);
     pl.boostTimer = 0;
     const road = { x: pl.pos.x, z: pl.pos.z };
     pl.heading = Math.atan2(best.x - road.x, best.z - road.z);
     const x0 = pl.pos.x, z0 = pl.pos.z;
-    let maxDepth = 0, entered = 0;
-    for (let f = 0; f < 360; f++) {          // 6 s at 60 Hz
-      g.input.analog = { x: 0, y: 1 };       // full throttle, straight
-      g._frameBody(1 / 60);
+    let maxDepth = 0, entered = 0, peakKmh = 0;
+    for (let f = 0; f < 360 && g.state === 'race'; f++) {
+      g.input.analog.steer = 0;
+      g.input.analog.throttle = 1;
+      g.input.analog.brake = 0;
+      g._frameBody();
+      if (!Number.isFinite(pl.pos.x)) break;
       const d = Math.hypot(pl.pos.x - x0, pl.pos.z - z0);
       if (d > maxDepth) maxDepth = d;
-      // how far INTO the wood: nearest registered tree behind us counts
+      peakKmh = Math.max(peakKmh, Math.hypot(pl.vel.x, pl.vel.z) * 3.6);
       let inWood = 0;
       for (const tr of t.camTreesNear(pl.pos.x, pl.pos.z)) {
         if (!(tr.r > 0)) continue;
@@ -72,7 +77,7 @@ for (const lv of USE) {
     const kmh = Math.hypot(pl.vel.x, pl.vel.z) * 3.6;
     return { world: t.level?.name, standDensity: best.n,
       travelledU: +maxDepth.toFixed(1),
-      framesInsideWood: entered,
+      framesInsideWood: entered, peakKmh: +peakKmh.toFixed(1),
       finalKmh: +kmh.toFixed(1),
       offRoadU: +t._distToTrack(pl.pos.x, pl.pos.z).toFixed(1) };
   }, undefined)));
