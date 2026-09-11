@@ -4171,6 +4171,61 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r411 — THE WOOD WAS NEVER SOLID: A GATE, NOT A DEFLECT
+
+The owner, on r410: "I can still drive in trees." That is the THIRD time. r399
+fixed it. r410 fixed it again. Both fixes were real and both were correct, and
+neither ever ran.
+
+The carpet-trunk collision in `vehicles.js` opens with a height test:
+
+    if (this.pos.y > tr.top + 1 || this.pos.y < tr.top - 11) continue;
+
+The lower bound hangs off the tree's CROWN. A car standing on the ground beside
+anything taller than about 11.5 u fails it and the trunk is skipped before a
+single line of the collision response executes. r399 deleted the 60%-and-through
+deflect on the `trees` path. r410 deleted it on the carpet path. Each was
+verified against the response it changed. Neither reached this line, because
+the line decides whether the response happens at all.
+
+What that cost, measured on registered trees within 40 u of the road:
+
+    PINE VALLEY       2523 of 3469 skipped   72.7%
+    DEEPWOOD TRAIL    2416 of 3376 skipped   71.6%
+    REDWOOD RAMPAGE   2402 of 3538 skipped   67.9%
+    GLACIER COL       2079 of 3768 skipped   55.2%
+
+The median tree is 12-14 u against an 11 u cut-off. Most of the forest was
+scenery with a collider you could only reach by being airborne at canopy height.
+
+THE FIX is one line: measure the band from the tree's BASE. A trunk spans base
+to crown, so a grounded car is always inside it. `tr.y` carries the base and is
+present on every registry entry (11,361-11,508 per world, none missing). After:
+PINE VALLEY, DEEPWOOD TRAIL and REDWOOD RAMPAGE skip zero; GLACIER COL skips 25
+(0.7%), and those 25 are malformed entries whose crown reads below their own
+base, which the top test should reject and does.
+
+Both deliberate skips survive, checked rather than assumed. On PINE VALLEY, a
+car on the ground collides with all 3469 trees; a car above the canopy with
+none; a car below a ledge tree with none. Solid wood, not a ceiling or a floor.
+
+TWO THINGS RAISED AND THEN REFUTED BY MEASUREMENT, recorded because the reasoning
+was public. First, admitting three times as many trees might reach a malformed
+entry and write a bad position into the car: PINE VALLEY has zero non-finite
+entries, so no. Second, a NaN that appeared in the drive probe looked like the
+fix's doing: A/B said it threw at frame 101 with the fix and frame 102 on the
+untouched base, in both cases with the car stationary at 0 km/h — and a
+stationary car cannot touch a tree. The probe was setting `input.analog` to
+`{x, y}` when the harness reads `.steer/.throttle/.brake`, so the throttle never
+applied. Three hypotheses, three refutations; the geometry evidence never
+depended on any of them.
+
+STILL OPEN, not papered over: the trunk loop resolves ONE tree per frame
+(`break`), and with roughly three times as many trees now live a car may still
+squeeze between two. 7.15's underbrush drag is the backstop. It is unmeasured
+and is deliberately NOT changed on a hunch — the roster-wide driving suites in
+the gate are the instrument for it.
+
 ## r410 — THE FOREST IS A MASS, THE LAP RULE FIRES, AND THE NAME MOVES UP
 
 Four things, and the first is the one that had been reported three times.
