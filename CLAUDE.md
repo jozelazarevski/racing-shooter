@@ -237,6 +237,18 @@ operational form.
 
 ### 8. Stage templates (generator inputs; §7 is checked on the output regardless)
 
+**UNITS WARNING (r412, measured).** THIS TABLE IS IN METRES AND THE GAME IS IN `u`.
+`ROAD_HALF` is 9, already wider than the "open" row's halfWidth 8, so pasting a
+figure from this table into code NARROWS the road it was meant to open. The table
+is a SHAPE — relative proportions and character — not a set of constants to copy.
+Measure the roster in `u` and build toward the shape.
+
+**AND THE TABLE HAS NEVER BEEN IMPLEMENTED.** There is no template system in the
+code: worlds are hand-authored per theme, no world carries a `template:` field,
+and nothing reads these rows. They describe intent, and §7 is what is actually
+enforced. When a row and the code disagree, that is not a bug in the code — it is
+this table describing a generator that was never built.
+
 | Parameter | street | canyon | forest / alpine | circuit | open | mountain (switchbacks) | snow / ice |
 |---|---|---|---|---|---|---|---|
 | designSpeedKmh | 140 | 170 | 160 | 190 | 200 | 130 | 150 |
