@@ -18141,7 +18141,12 @@ export class Track {
     const vergePad = beltNear != null ? Math.max(1, beltNear - roadPad) : 1;
     ring(terrace ? oliveDome() : twoCone(),
       spec.verge ?? (terrace ? 4200 : 9000),
-      trackSpot(vergePad, Math.max(vergePad + 12, 38)), 3, 1.4, 1.9, paint, true);
+      // The band KEEPS ITS WIDTH — it slides out, it does not compress. The
+      // first cut wrote max(vergePad + 12, 38), which for a 40 u belt gave a
+      // 9.5 u band instead of the original 37: the rejection sampler then
+      // threw away most of its draws and the world build slowed enough to
+      // time the probe out. A narrow far band is not the same scene, either.
+      trackSpot(vergePad, vergePad + 37), 3, 1.4, 1.9, paint, true);
     // r377 UNDERSTOREY, from the owner's mockup: the ground between the
     // trunks is not bare — a fern layer fills the first metres off the
     // lane, and moss pads green the verge. Non-solid, same as every
