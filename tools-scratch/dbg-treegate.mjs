@@ -31,7 +31,7 @@ for (const lv of USE) {
   console.log(JSON.stringify(await p.evaluate(() => {
     const t = window.__game.track;
     const CARY = 0.55;                    // chassis origin above ground, near enough
-    let near = 0, skipped = 0, admitted = 0;
+    let near = 0, skipped = 0, admitted = 0, skippedNew = 0, admittedNew = 0;
     const hs = [];
     for (const tr of t.camTrees ?? []) {
       if (!(tr.r > 0)) continue;
@@ -42,13 +42,17 @@ for (const lv of USE) {
       const y = ground + CARY;            // car standing at the tree's base
       const h = tr.top - ground;          // how tall the tree reads to the gate
       hs.push(h);
+      // OLD gate (floor hung off the crown) vs NEW gate (floor at the base)
       if (y > tr.top + 1 || y < tr.top - 11) skipped++; else admitted++;
+      const base = typeof tr.y === 'number' ? tr.y : tr.top - 11;
+      if (y > tr.top + 1 || y < base - 2) skippedNew++; else admittedNew++;
     }
     hs.sort((a, c) => a - c);
     const pct = (q) => hs.length ? +hs[Math.floor(q * (hs.length - 1))].toFixed(2) : null;
     return { world: t.level?.name, nearRoad: near,
-      SKIPPED_BY_HEIGHT_GATE: skipped, admitted,
-      skippedPct: near ? +(100 * skipped / near).toFixed(1) : 0,
+      oldGateSkipped: skipped, oldGatePct: near ? +(100 * skipped / near).toFixed(1) : 0,
+      NEW_GATE_SKIPPED: skippedNew, newGatePct: near ? +(100 * skippedNew / near).toFixed(1) : 0,
+      nowSolid: admittedNew,
       treeHeight: { min: pct(0), p50: pct(0.5), p90: pct(0.9), max: pct(1) } };
   }, undefined)));
 }

@@ -28,7 +28,8 @@ for (const lv of USE) {
     const g = window.__game, t = g.track, pl = g.player;
     // find the densest patch of registered wood within reach of the road
     let best = null;
-    for (let i = 0; i < t.center.length; i += 7) {
+    const STEP = Math.max(1, Math.round(t.center.length / 60));
+    for (let i = 0; i < t.center.length; i += STEP) {
       for (const side of [1, -1]) {
         const q = t.pointAt(i, (t.widthAt(i) + 16) * side);
         let n = 0;

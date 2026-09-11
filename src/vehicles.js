@@ -3625,7 +3625,33 @@ export class Car {
         const rr = trunkR + 1.35;
         const dx = this.pos.x - tr.x, dz = this.pos.z - tr.z;
         if (dx * dx + dz * dz >= rr * rr) continue;
-        if (this.pos.y > tr.top + 1 || this.pos.y < tr.top - 11) continue;
+        // r411: MEASURE THE BAND FROM THE BASE, NOT THE TOP — this line is
+        // why "I can't drive through a tree" came back a THIRD time.
+        //
+        // It read `pos.y < tr.top - 11`, a floor hung off the tree's CROWN.
+        // A car standing on the ground beside anything taller than ~11.5 u
+        // failed it, so the trunk was skipped before a single line of the
+        // collision response below ever ran. Measured on the registered wood
+        // within 40 u of the road: PINE VALLEY 2523 of 3469 trees skipped
+        // (72.7%), REDWOOD RAMPAGE 67.9%, DEEPWOOD TRAIL 71.6%, GLACIER COL
+        // 55.2% — median tree 12-14 u against an 11 u cut-off. Most of the
+        // forest was never solid.
+        //
+        // r399 and r410 each deleted the 60%-and-through deflect, one code
+        // path apiece, and each was verified on the response they changed.
+        // Neither reached this line. Two fixes that both looked right and
+        // both failed meant the tested code was never entered — the same
+        // shape as the wrap-count bug, where byte-identical output was the
+        // tell of a fix that never ran.
+        //
+        // The trunk spans base to crown, so a grounded car is always inside
+        // it. `tr.y` is the base and is present on every registry entry
+        // (verified: 11,361-11,508 per world, none missing). Both intended
+        // skips survive: driving over a canopy from a cliff above (y above
+        // the top) and passing under a tree rooted on a ledge overhead (y
+        // below the base). The top test also still rejects the broken
+        // entries on GLACIER COL whose crown reads below their own base.
+        if (this.pos.y > tr.top + 1 || this.pos.y < (tr.y ?? tr.top - 11) - 2) continue;
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
         this.pos.x = tr.x + nx * rr;
