@@ -5314,6 +5314,24 @@ export const ROUTE_SCALE = 4;
 /** Title-screen minimaps: the raw circuit control polygon for a theme. */
 export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
 
+/** THE LAP AS THE TRACK BUILDER SEES IT — raw shape, then the world's own
+ *  transforms. r415.
+ *
+ *  This existed twice: the builder applied `routeFlipX` and `routeReverse`
+ *  before laying its centreline, and the level-select map did not. The card
+ *  therefore drew the MIRROR IMAGE of eleven worlds and the wrong direction
+ *  of five, which is most of "the maps don't match the current now". One
+ *  function now answers "what shape is this lap", and both callers ask it.
+ *
+ *  Returns a fresh array — callers scale and curve it themselves, and the
+ *  builder's grade-stretch must not write through to CIRCUITS. */
+export function routePlanPoints(level) {
+  let pts = CIRCUITS[(level && (level.route || level.theme))] || CIRCUITS.forest;
+  if (level && level.routeFlipX) pts = pts.map(([x, z]) => [-x, z]);
+  if (level && level.routeReverse) pts = [...pts].reverse();
+  return pts === CIRCUITS[(level && (level.route || level.theme))] ? [...pts] : pts;
+}
+
 export const ROAD_HALF = 9; // drivable half-width
 // bore section, shared by the tunnel mesh and by anything that has to know
 // whether a point is INSIDE a tunnel (the chase camera, above all)
@@ -6869,7 +6887,10 @@ export class Track {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    let rawPts = CIRCUITS[(level && (level.route || level.theme))] || CIRCUITS.forest;
+    // r415: through `routePlanPoints` so the level-select map and the world
+    // are built from ONE answer to "what shape is this lap" (see that
+    // function). The flip/reverse lines below moved into it unchanged.
+    let rawPts = routePlanPoints(level);
     // r327 DUPLICATE SHAPES DIFFER. Eleven route keys served 26 worlds, so
     // fifteen of them drove another world's exact centreline — "same corners
     // in the same order is the same track wearing a different hat" (the
@@ -6880,8 +6901,6 @@ export class Track {
     // fourth distinct lap. Everything downstream — elevation, ramps,
     // tunnels, props, gates — generates from the transformed centreline, so
     // no placement can survive from the sibling world.
-    if (level && level.routeFlipX) rawPts = rawPts.map(([x, z]) => [-x, z]);
-    if (level && level.routeReverse) rawPts = [...rawPts].reverse();
     // r340: the 2x lap — one multiplication, at the single point every
     // world's shape passes through
     // r385 (PATCH_02 v3 FIX-6/PART III): THE MANDATE BUYS LENGTH, NOT WALLS.

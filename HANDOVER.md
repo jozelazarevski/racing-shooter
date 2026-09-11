@@ -4171,6 +4171,70 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r415 — THE CARD WAS DRAWING THE MIRROR IMAGE
+
+Owner, in one sentence: "Remove the new tag and update the maps of each
+track. They don't match the current now."
+
+**The NEW tag.** `fresh: true` on a level put a rotated yellow NEW banner on
+its card, and worlds kept the flag long after they stopped being new. Gone
+properly, per working rule 2: the render call, the `.wc-new` CSS rule, and a
+grep confirming nothing else names it. The flag itself STAYS, deliberately and
+not by oversight — a second reader, `freshRegions`, sorts regions containing
+new worlds to the front of the board, which exists because of an earlier
+report ("I don't see the new tracks"). The owner asked for the tag, not the
+ordering.
+
+**The maps.** They did not match, and it was not impressionistic — it was
+three separate faults stacked on one call.
+
+`_drawCircuitMap` drew `circuitPoints(lv.route || lv.theme)`, the RAW control
+points. And `circuitPoints` turned out to have EXACTLY ONE CALLER: the map.
+The world is built at track.js:6872 from those same points and then applies
+three things the card never did:
+
+1. `routeFlipX` mirrors the plan — **11 worlds**, whose cards therefore showed
+   the mirror image of the track, every left-hander drawn as a right.
+2. `routeReverse` runs the lap the other way — **5 worlds**, drawn with the
+   start dot at the wrong end.
+3. The centreline is a closed **centripetal CatmullRom** that passes THROUGH
+   the control points, while the card drew a quadratic-midpoint path that only
+   approaches them — so every corner on every card was rounded off.
+
+The fix is a single source of truth. `routePlanPoints(level)` now owns "what
+shape is this lap" — raw points plus the two transforms — and the builder and
+the card both ask it; the card then builds the same curve class. The
+flip/reverse lines moved out of the builder unchanged rather than being
+copied, so the two cannot drift apart again, which is exactly how this bug
+existed in the first place.
+
+**Measured, with a negative control** (mean nearest-point distance from the
+drawn shape to the built track's own `center`, both normalised into a unit box
+so only shape is compared; the control re-implements the OLD path):
+
+| world | old | new |
+|---|---|---|
+| RAZORBACK MOUNTAIN (flipX) | 0.0919 | **0.0008** |
+| CITADEL BAY (flipX) | 0.0566 | **0.0035** |
+| HARVEST RUN | 0.0128 | **0.0010** |
+| TORRI CORSA | 0.0125 | **0.0016** |
+| PINE VALLEY | 0.0111 | **0.0009** |
+| GRANITE NARROWS | 0.0119 | 0.0126 |
+
+A flipped world's card was **9% of its own bounding box** away from the lap it
+represents. It is now 0.08%. Eleven of the twelve worlds measured improved, by
+2x to 115x.
+
+**The twelfth is reported, not buried.** GRANITE NARROWS comes out a wash, and
+the reason is real: three things can still move a centreline after the curve —
+the editor warp, the opt-in T-01 weave (7 worlds), and a kink-relaxation pass
+that pulls any station turning more than 20 degrees toward its neighbours'
+midpoint. That pass only fires on worlds with authored cusps, and GRANITE
+NARROWS is one. For those worlds the card draws the AUTHORED shape and the
+game drives a cusp-relaxed version of it — about 1.3% apart, which on a 72 px
+canvas is a pixel. Running 600 relaxation passes per card for 78 cards on
+menu open is not worth a pixel, so it is written down instead of chased.
+
 ## r414 — 78 WORLDS, 43 LOOKS: THE THEME IS THE SAMENESS
 
 The owner sent a frame of GRANITE NARROWS with one sentence: "Most tracks

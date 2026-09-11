@@ -6,7 +6,7 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
+import { Track, LEVELS, routePlanPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
@@ -4672,7 +4672,7 @@ class Game {
       const state = !unlocked ? 'LOCKED' : got >= 3 ? 'CLEARED' : best ? 'STARS LEFT' : 'OPEN';
       const badge = isNext
         ? `<div class="tl-next">${nextUp.why === 'locked' ? 'NEXT UNLOCK' : 'NEXT UP'}</div>` : '';
-      card.innerHTML = `${lv.fresh ? '<div class="wc-new">NEW</div>' : ''}${badge}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
+      card.innerHTML = `${badge}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="tl-rung">${i + 1}</div>
@@ -4685,7 +4685,7 @@ class Game {
         <div class="tl-state ${state.toLowerCase().replace(' ', '-')}">${state}</div>
         ${unlocked ? this._featChips(lv.id) : ''}
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
-      this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, lv.id === curId);
+      this._drawCircuitMap(card.querySelector(".wc-map"), lv, !unlocked, lv.id === curId);
       card.dataset.lvid = lv.id;
       card.addEventListener('click', () => {
         // "Already on it" is only true if what is standing is the SHIPPED
@@ -5833,8 +5833,31 @@ class Game {
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
-  _drawCircuitMap(cnv, themeKey, locked, current) {
-    const pts = circuitPoints(themeKey);
+  /** THE CARD'S MAP IS THE LAP, r415.
+   *
+   *  Owner: "update the maps of each track. They don't match the current
+   *  now." They did not, and in three separate ways — this drew the RAW
+   *  control points of `CIRCUITS[key]` through a quadratic-midpoint path,
+   *  while the world is built (track.js) from the same points AFTER
+   *  `routeFlipX` and `routeReverse`, as a closed centripetal CatmullRom:
+   *
+   *    - 11 worlds declare `routeFlipX`, so their card showed the track's
+   *      MIRROR IMAGE — every left-hander drawn as a right;
+   *    - 5 declare `routeReverse`, so the card ran the lap backwards and put
+   *      the start dot at the wrong end;
+   *    - a quadratic-midpoint path only APPROACHES its control points while
+   *      a CatmullRom passes THROUGH them, so every corner on every card was
+   *      rounded off into a softer shape than the one being driven.
+   *
+   *  Both callers now take `routePlanPoints` (the transforms) and the same
+   *  curve class, so the card cannot drift from the world again. Sampling is
+   *  uniform in the curve parameter rather than arc length: that traces the
+   *  identical curve, and the card wants the shape, not station spacing. */
+  _drawCircuitMap(cnv, level, locked, current) {
+    const plan = routePlanPoints(level);
+    const curve = new THREE.CatmullRomCurve3(
+      plan.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'centripetal');
+    const pts = curve.getPoints(Math.max(160, plan.length * 12)).map((v) => [v.x, v.z]);
     const ctx = cnv.getContext('2d');
     const W = cnv.width, H = cnv.height, pad = Math.max(5, W * 0.08);
     ctx.clearRect(0, 0, W, H);   // redrawn in place when the highlight moves
@@ -5844,7 +5867,8 @@ class Game {
       nx = Math.min(nx, x); xx = Math.max(xx, x);
       nz = Math.min(nz, z); xz = Math.max(xz, z);
     }
-    const s = Math.min((W - pad * 2) / (xx - nx), (H - pad * 2) / (xz - nz));
+    const s = Math.min((W - pad * 2) / Math.max(1e-6, xx - nx),
+      (H - pad * 2) / Math.max(1e-6, xz - nz));
     const ox = (W - (xx - nx) * s) / 2 - nx * s;
     const oz = (H - (xz - nz) * s) / 2 - nz * s;
     const P = pts.map(([x, z]) => [x * s + ox, z * s + oz]);
@@ -5852,18 +5876,15 @@ class Game {
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const path = () => {
       ctx.beginPath();
-      ctx.moveTo((P[0][0] + P[n - 1][0]) / 2, (P[0][1] + P[n - 1][1]) / 2);
-      for (let i = 0; i < n; i++) {
-        const a = P[i], b = P[(i + 1) % n];
-        ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
-      }
+      ctx.moveTo(P[0][0], P[0][1]);
+      for (let i = 1; i < n; i++) ctx.lineTo(P[i][0], P[i][1]);
       ctx.closePath();
     };
     path(); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 7 * lw; ctx.stroke();
     path();
     ctx.strokeStyle = locked ? 'rgba(255,233,168,.35)' : current ? '#ffd400' : '#f4e2b8';
     ctx.lineWidth = 3 * lw; ctx.stroke();
-    if (!locked) { // start-line dot
+    if (!locked) { // start-line dot — station 0 of the lap as driven
       ctx.fillStyle = '#fff';
       ctx.beginPath(); ctx.arc(P[0][0], P[0][1], 3 * lw, 0, 7); ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5 * lw; ctx.stroke();
