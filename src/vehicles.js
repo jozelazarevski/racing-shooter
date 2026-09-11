@@ -5208,7 +5208,12 @@ export class EnemyCar extends Car {
         this._cutBias = Math.random() < this.cutChance ? 1.6 : 0;
         if (this._mistakeCd <= 0 && this._errT <= 0 && this._errRec <= 0
             && this.ramTimer <= 0 && this._revT <= 0
-            && Math.random() < 1 - this.consistency) {
+            // r416: the tier scales the error rate. A top rung whose rivals
+            // still hand you a corner every lap is not a top rung — SAVAGE
+            // runs at a tenth of the roster's natural mistake rate, which is
+            // how it gets hard WITHOUT a field exempt from the player's own
+            // physics (see the aiCorner note in main.js).
+            && Math.random() < (1 - this.consistency) * (g.difficulty?.mistakeMul ?? 1)) {
           this._errKind = Math.random() < 0.5 ? 'wide' : 'late';
           this._errMag = 1 + Math.random() * 2;           // wide: 1-3 m
           this._errT = this._errKind === 'late' ? 0.45 + Math.random() * 0.2 : 0.01;
@@ -5745,7 +5750,16 @@ export class EnemyCar extends Car {
       // the tier table needs retuning against the cap in the same change.
       // That is an AI-pace build of its own, not a rider on the ladder.
       // RALLY_RULES.md H-8.
-      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, (16 + 3.6 * wj) * pace * (this._progRamp ?? 1));
+      // r416: AND IT CARRIES THE TIER NOW. The note above is the diagnosis;
+      // this line is the fix the owner's "SAVAGE is easy" finally bought.
+      // `cornerCap` is derived in main.js as sqrt(aiSpeed*aiCorner) NORMALISED
+      // TO NORMAL, so NORMAL is left exactly where its five laws put it
+      // (factor 1.000) while HARD gains 5% and SAVAGE 25% at the pinches that
+      // used to flatten all three to one pace.
+      if (wj < ROAD_HALF - 0.2) {
+        vMax = Math.min(vMax, (16 + 3.6 * wj) * pace * (this._progRamp ?? 1)
+          * (D.cornerCap ?? 1));
+      }
       // ---- viz-zones: rivals can't see through fog/trees either
       if (t.vizZones && t.vizZones.length) {
         for (const z of t.vizZones) {
@@ -5798,7 +5812,18 @@ export class EnemyCar extends Car {
     // ---- nitro-ish bursts: behind the player, on a straight, off cooldown
     this.boostCooldown -= dt;
     const slowed = g.enemySlowUntil && g.raceTime < g.enemySlowUntil;
-    if (!slowed && this.boostCooldown <= 0 && this.boostTimer <= 0 && gap > 0.004 && v > this.maxSpeed * 0.55) {
+    // r416: `gap > 0.004` means BEHIND THE PLAYER — so nitro was a pure
+    // catch-up mechanic and THE LEADER NEVER BOOSTED AT ALL. That is why
+    // raising the tier's corner budget lifted the MIDFIELD and left the
+    // front alone: measured on PINE VALLEY, the median rival went 381 -> 405
+    // while the best rival sat at 415 both times. The player races the
+    // leader, so a top tier whose leader cannot boost is a top tier that
+    // feels easy however fast its midfield is — which is exactly the report.
+    // On SAVAGE the front of the field uses the same nitro the player has,
+    // ahead or behind. No physics the player lacks; it simply stops waiting
+    // to be overtaken before it drives hard.
+    const boostGate = (g.difficulty?.freeBoost ?? false) || gap > 0.004;
+    if (!slowed && this.boostCooldown <= 0 && this.boostTimer <= 0 && boostGate && v > this.maxSpeed * 0.55) {
       let curvAhead = 0;
       for (let k = 0; k < 45; k += 5) curvAhead = Math.max(curvAhead, t.curvature[(this.trackIndex + k) % t.N]);
       if (curvAhead < 0.012) {

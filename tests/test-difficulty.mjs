@@ -297,6 +297,16 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [21, 'FURKA RIDGE']]) {
   const sFast = await run(p, 'savage', 1.0);
   check(`${name}: SAVAGE is brutal, not a wall`, sFast.player > sFast.best * 0.67,
     `full throttle ${sFast.player} vs ${sFast.best} (P${sFast.place})`);
+  // 4c. ...AND IT HAS TO ACTUALLY BEAT A CLEAN DRIVE (r416, owner: "Savage
+  //     mode needs to be impossible to beat. Now it is easy"). The floor
+  //     above is a REACHABILITY bound and says nothing about whether SAVAGE
+  //     wins — a tier the clean stand-in strolls past satisfies it happily,
+  //     which is exactly the state the owner reported. The ceiling is the
+  //     half that was missing: on the top rung the perfect-line robot must
+  //     LOSE. Law 4 keeps the same bot winnable on HARD, so the two bounds
+  //     together are the ladder's top step, stated rather than assumed.
+  check(`${name}: SAVAGE beats a clean drive`, sFast.player < sFast.best,
+    `full throttle ${sFast.player} vs ${sFast.best} (P${sFast.place})`);
 
   // 5. EASY has to stay casual-winnable — the whole point of it. IN TOUCH,
   //    not P1 (#22 redesign): the stand-in is a drift-less robot whose

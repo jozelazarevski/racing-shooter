@@ -192,9 +192,64 @@ const DIFFS = {
   // have felt identical to NORMAL in the one place the owner asked about.
   // tokensLate likewise: §5.4's arbiter lets at most 2 rivals hold the
   // player at once, so past that cap "angrier" cannot land either.
-  hard:   { id: 'hard',   label: 'HARD',   tier: 2, aiSpeed: 1.06, aiCorner: 0.72, aiAggression: 2.0,  angerGain: 0.60, ramClamp: 2.8, tokensLate: 3 },
-  savage: { id: 'savage', label: 'SAVAGE', tier: 3, aiSpeed: 1.06, aiCorner: 0.80, aiAggression: 2.6,  angerGain: 0.90, ramClamp: 3.4, tokensLate: 3 },
+  hard:   { id: 'hard',   label: 'HARD',   tier: 2, aiSpeed: 1.06, aiCorner: 0.72, aiAggression: 2.0,  angerGain: 0.60, ramClamp: 2.8, tokensLate: 3, mistakeMul: 0.80 },
+  // ---- SAVAGE IS THE TOP RUNG AND HAD TO EARN IT (owner, r416) ----------
+  // "Savage mode needs to be impossible to beat. Now it is easy." It was
+  // easy for a reason this file already recorded and deferred (H-8): the
+  // width-pinch cap in vehicles.js was TIER-BLIND, so on every narrow or
+  // pinched station the three top tiers converged — the four-tier suite
+  // measured the median rival at 402 / 402 / 401 m across NORMAL, HARD and
+  // SAVAGE, and on FURKA three configurations spanning aLat 0.60-0.95 all
+  // lapped 1138-1157. Three rungs, one pace. That cap now carries the tier
+  // (`cornerCap` below), which is what lets these numbers reach the road.
+  //
+  // aiCorner 0.92 AND NOT MORE, and the ceiling is the r284 note above,
+  // still binding: the player's tyres obey a_lat <= 4*grip, and a field
+  // planning far past 1.0 is "openly exempt from physics the player can
+  // feel" — the old 1.60 was cut for exactly that. SAVAGE is brutal because
+  // the field is PERFECT, not because it cheats.
+  // 0.92 AND NOT 1.02, which was tried first and MEASURED WORSE: at 1.02 the
+  // narrow world went backwards (FURKA median rival 275 against HARD's 282)
+  // because a bigger corner budget on a road with no room is overdriving,
+  // not pace. The same trap the aiSpeed note above records, at a third knob.
+  // `mistakeMul` is the second lever and the honest one: SAVAGE rivals
+  // hardly ever err (§5.3's per-corner P = 1 - consistency, at a tenth), so
+  // there is no gift to wait for.
+  // `freeBoost` is the THIRD, and it is the one that actually answered the
+  // owner. Rival nitro was gated on `gap > 0.004` — behind the player — so
+  // THE LEADER NEVER BOOSTED, and the player races the leader. Corner budget
+  // alone lifted the midfield and left the front exactly where it was (PINE
+  // median 381 -> 405 while the best rival sat at 415 both times). With the
+  // front of the field using the same nitro the player has, the leader went
+  // 415 -> 475.
+  savage: { id: 'savage', label: 'SAVAGE', tier: 3, aiSpeed: 1.06, aiCorner: 0.92, aiAggression: 2.6,  angerGain: 0.90, ramClamp: 3.4, tokensLate: 3, mistakeMul: 0.10, freeBoost: true },
 };
+// THE PINCH CAP'S TIER FACTOR, DERIVED AND NOT TYPED (r416). vehicles.js
+// caps corner speed at a pinch with `16 + 3.6w`, a constant calibrated
+// against the tier NORMAL now carries — so the factor is normalised to
+// NORMAL, which keeps NORMAL exactly where its five laws put it and lets
+// every rung above it actually arrive. Corner speed goes as sqrt(aLat) and
+// aLat carries aiSpeed*aiCorner, hence the square root. Derived from the
+// rows themselves so it cannot drift when a row is retuned.
+// CLAMPED [1.00, 1.12], and BOTH ENDS ARE MEASUREMENTS, not taste.
+//   floor 1.00: below it a tier would thread pinches SLOWER than the bare
+//     constant does today, which would quietly re-tune EASY — a tier this
+//     change has no business touching. At the floor EASY keeps exactly its
+//     old pinch behaviour and its forgiveness stays where it belongs, in
+//     its own aLat.
+//   ceiling 1.12: unclamped, SAVAGE came out at 1.253 and went BACKWARDS on
+//     the narrow world — measured on FURKA RIDGE, median rival 275 against
+//     HARD's 282, because a pinch is a physical width and a field carrying
+//     25% more speed into one overshoots it and pays the exit. This is the
+//     same trap the aiSpeed note above records ("the knob that reads
+//     fastest makes the field slower"), met at a different knob. A better
+//     driver threads a pinch a little quicker; nobody threads it a quarter
+//     quicker. SAVAGE's real gain lives in aLat, on the open corners where
+//     there is room to use it.
+for (const d of Object.values(DIFFS)) {
+  d.cornerCap = Math.min(1.12, Math.max(1, Math.sqrt(
+    (d.aiSpeed * (d.aiCorner ?? 1)) / (DIFFS.normal.aiSpeed * (DIFFS.normal.aiCorner ?? 1)))));
+}
 // "the top tier" as a QUESTION, not a string compare — see the tier note above
 const atLeastHard = (d) => (typeof d === 'string' ? DIFFS[d] : d)?.tier >= DIFFS.hard.tier;
 

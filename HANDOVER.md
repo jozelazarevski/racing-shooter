@@ -4171,6 +4171,82 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r416 — THE LEADER NEVER BOOSTED
+
+Owner: "Savage mode needs to be impossible to beat. Now it is easy."
+
+It was easy, and this file had already written down why and then deferred it
+(H-8). `aiSpeed` is flat at 1.06 across NORMAL, HARD **and** SAVAGE, so the
+whole tier difference lives in `aiCorner` — and the width-pinch cap in
+vehicles.js was TIER-BLIND, so at every narrow station the three top tiers
+converged. The difficulty suite's own note measures it: on FURKA three
+configurations spanning aLat **0.60–0.95** all lapped **1138–1157**.
+
+The baseline run of that suite, taken before touching anything, says it
+plainer still. On PINE VALLEY the median rival went **easy 322 < normal 401 <
+hard 397 < savage 381** — THE TOP RUNG WAS SLOWER THAN NORMAL. The ladder was
+inverted at the top, and its own test failed on it.
+
+Three levers, in the order they were tried, because the first two taught the
+third:
+
+**1. The pinch cap carries the tier.** `cornerCap` is derived in main.js as
+`sqrt(aiSpeed·aiCorner)` NORMALISED TO NORMAL, so NORMAL stays exactly where
+its five laws put it and the rungs above it arrive. Clamped `[1.00, 1.12]`,
+and both ends are measurements: the floor stops the change from quietly
+re-tuning EASY, and the ceiling exists because unclamped SAVAGE reached 1.253
+and **went backwards on the narrow world** (FURKA median 275 against HARD's
+282). A pinch is a physical width — a better driver threads it a little
+quicker, nobody threads it a quarter quicker.
+
+**2. aiCorner 0.80 → 0.92, not 1.02.** 1.02 was tried first and measured
+worse for the same reason. The r284 ceiling still binds: the player's tyres
+obey `a_lat <= 4·grip`, and a field planning far past 1.0 is openly exempt
+from physics the player can feel. SAVAGE is brutal because the field is
+perfect, not because it cheats — `mistakeMul: 0.10` drops its per-corner
+error rate to a tenth, so there is no gift to wait for.
+
+**3. And then the measurement said the first two had missed the point.** With
+both landed, PINE's median rival went 381 → 405 — while **the best rival sat
+at 415 both times**. The player races the LEADER. Lifting the midfield and
+leaving the front alone is precisely a tier that looks faster on paper and
+feels easy in the seat.
+
+The cause was one condition: rival nitro is gated on `gap > 0.004`, and `gap`
+is *player progress minus mine* — so a rival only boosts when it is BEHIND
+the player, and **the leader never boosted at all.** Nitro was a pure
+catch-up mechanic. On SAVAGE the front of the field now uses the same nitro
+the player has, ahead or behind.
+
+**Measured, all against the same baseline run:**
+
+| | baseline | r416 |
+|---|---|---|
+| PINE median rival (savage) | 381 | **446** |
+| PINE **best** rival vs clean stand-in | 372 vs 415 | 372 vs **475** |
+| PINE ladder | 401 → 397 → **381** (inverted) | 395 → 401 → **446** |
+| FURKA median rival (savage) | 277 | **290** |
+| PINE gap at 75% throttle | −29.2% | **−46.5%** |
+
+A clean full-throttle drive now loses to SAVAGE's leader by 22%. The suite
+gained a law for it — law 4c, "SAVAGE beats a clean drive" — because the
+existing SAVAGE law was only a FLOOR ("brutal, not a wall") and a tier the
+stand-in strolls past satisfies a floor happily. That is the state the owner
+reported, and a bound that cannot fail on it is not a test.
+
+**Two failures remain in that suite and they are NOT this build's.** EASY
+casual-winnable fails on both worlds, and the baseline run fails it on both
+worlds too — PINE −5.3% then, −5.0% now; FURKA −7.4% then, −6.9% now. Both
+are slightly better than they were and both are still red. Baseline: 3
+failed. Now: 2 failed, both pre-existing. Written down rather than folded
+into the headline.
+
+**Not claimed: "impossible".** Literally unwinnable would make SAVAGE's stars
+unobtainable, which is a design trap rather than a difficulty. The target
+taken was brutal — and the honest caveat is that the stand-in is a drift-less
+robot and therefore under-human, so a drifting owner will still be closer to
+this field than 22%.
+
 ## r415 — THE CARD WAS DRAWING THE MIRROR IMAGE
 
 Owner, in one sentence: "Remove the new tag and update the maps of each
