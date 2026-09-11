@@ -51,8 +51,15 @@ for (const lv of USE) {
       lapU: Math.round(len), stations: N,
       halfWidth: { min: q(w, 0), p50: q(w, 0.5), max: q(w, 1) },
       cornerR: { p05: q(r, 0.05), p25: q(r, 0.25), p50: q(r, 0.5) },
-      tightPct: +(100 * r.filter((x) => x < 45).length / N).toFixed(1),
-      straightPct: +(100 * r.filter((x) => x > 200).length / N).toFixed(1) };
+      // BANDS, because one "straight" threshold lies: a gentle 220 u sweep is
+      // a long sweeping curve, not a straight, and lumping the two together
+      // made a flowing loop read as 95% straight.
+      bands: {
+        hairpin_u45: +(100 * r.filter((x) => x < 45).length / N).toFixed(1),
+        committed_45_120: +(100 * r.filter((x) => x >= 45 && x < 120).length / N).toFixed(1),
+        fastSweep_120_300: +(100 * r.filter((x) => x >= 120 && x < 300).length / N).toFixed(1),
+        gentle_300_800: +(100 * r.filter((x) => x >= 300 && x < 800).length / N).toFixed(1),
+        dead_over800: +(100 * r.filter((x) => x >= 800).length / N).toFixed(1) } };
   }, undefined)));
 }
 await b.close();

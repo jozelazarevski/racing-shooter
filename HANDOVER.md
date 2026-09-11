@@ -4171,6 +4171,68 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r412 — THE OPEN TEMPLATE IS A SHAPE, NOT A STRAIGHT (E-10 pilot)
+
+Owner: "Add wide fields scenarios. Those where there and got deleted."
+
+NOTHING WAS DELETED, and that is worth saying plainly before the build: the
+roster is 78 worlds and was 78 before; HRD-5's mountain flank already exempts
+field roads exactly as the owner scoped it (it returns early unless the world
+carries the MOUNTAIN tag, and field themes carry FARMLAND / PLAINS / DESERT);
+and the crop, hedge and stubble builders are all still present. Asked which of
+four readings was meant, the owner chose FAST OPEN-FIELD TRACKS.
+
+TWO THINGS THE SPEC NUMBERS HID.
+
+First, units. CLAUDE.md §8 writes the open template in METRES — halfWidth 8 —
+and the game is in `u` with ROAD_HALF already 9. Pasting the spec figure would
+have NARROWED every road it touched. The template is a shape to build toward,
+not a set of constants to copy.
+
+Second, and this is the build: the field worlds are already wide and already
+fast. What they have no is CURVATURE. SAFARI PLAINS measured, by curvature
+band across 900 stations:
+
+    hairpin  <45      0.3%
+    committed 45-120  1.0%
+    fast sweep 120-300 11.2%
+    gentle   300-800  36.4%
+    DEAD     >800     51.0%
+
+Half the lap was nothing to drive, and the tightest corner on the entire world
+was R197 — there was never a bend worth committing to.
+
+(An earlier read of this called the world "95% straight" on a single R>200
+threshold. That lumped genuine long sweeps in with dead ground and overstated
+it; the band table above is the honest form and is what the rewrite was
+designed against.)
+
+THE PILOT is SAFARI PLAINS, chosen because `safari` is read by exactly ONE
+world — `vineyard` by contrast feeds three, including BRIDGE RUN — because it
+is the most extreme case, and because it is the only PLAINS world on the
+roster. Same ±235 footprint, so the terrain, the waterhole bay and the scenery
+bands still fit; comparable lap length, so the world stays on the one-lap side
+of lapsShortTrackU. The 16-point C becomes 27 points of continuous sweep: a
+double-apex right off the start straight, an esse pair, a long horseshoe
+around the bay, a kink, one sweeping left onto the line. More points because a
+sweep needs samples to hold its radius — sixteen can only give long nothing
+joined by gentle nothing.
+
+    band               before -> after
+    hairpin <45         0.3  -> 0
+    committed 45-120    1.0  -> 3.4
+    fast sweep 120-300 11.2  -> 19.0
+    gentle 300-800     36.4  -> 59.6
+    dead >800          51.0  -> 18.0
+    tightest corner    R197  -> R147      lap 7082 -> 7215 u
+
+Zero hairpins is deliberate: the open template's floor is a 60 m radius, so an
+open-field world should never need one.
+
+THIS IS A PILOT, NOT A SWEEP. The other field worlds measure 63-83% above the
+same thresholds and are queued behind it, but each route shape moves every
+world that reads it, so they go one at a time and measured — not in a batch.
+
 ## r411 — THE WOOD WAS NEVER SOLID: A GATE, NOT A DEFLECT
 
 The owner, on r410: "I can still drive in trees." That is the THIRD time. r399

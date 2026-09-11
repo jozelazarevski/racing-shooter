@@ -1790,11 +1790,30 @@ const CIRCUITS = {
   // wide corners. Nothing else on the roster has three-fold symmetry, and
   // running the edges out to the rim makes this the LONGEST flat lap: the
   // opposite extreme from OUNINPOHJA's narrow oval, from the same envelope.
-  safari: [ // the C: a plains sweep wrapped around one deep waterhole bay
-    [60.0, -225.0], [180.0, -175.0], [230.0, -60.0], [225.0, 70.0], [160.0, 175.0],
-    [30.0, 225.0], [-110.0, 215.0], [-205.0, 140.0], [-230.0, 20.0], [-190.0, -95.0],
-    [-90.0, -105.0], [-20.0, -45.0], [60.0, -20.0], [120.0, -60.0], [95.0, -140.0],
-    [16.2, -180.8],
+  // r412 (owner: "Add wide fields scenarios") — E-10. THE OPEN TEMPLATE IS A
+  // SHAPE, NOT A STRAIGHT. Measured before the rewrite, the old 16-point C
+  // ran: hairpin 0.3%, committed 1.0%, fast sweep 11.2%, gentle 36.4% and
+  // FIFTY-ONE PER CENT dead (radius over 800 u). Half the lap was nothing to
+  // drive, and the tightest corner on the whole world was R197 — there was
+  // never a bend worth committing to. Width was never the problem: the road
+  // is already 9 u half-width, wider than the template's own figure once the
+  // metre/unit mismatch is accounted for.
+  //
+  // So this is the same footprint (the ±235 envelope the terrain, waterhole
+  // and scenery bands are all built around, and a comparable lap length so
+  // the world stays on the one-lap side of lapsShortTrackU) re-authored as
+  // CONTINUOUS FAST SWEEPS: a double-apex right off the start straight, an
+  // esse pair, a long horseshoe around the waterhole bay, a kink, and one
+  // sweeping left onto the line. More points, because a sweep needs samples
+  // to hold its radius — a 16-point loop can only give long nothing joined
+  // by gentle nothing.
+  safari: [ // the plains sweep: continuous open bends around the waterhole bay
+    [60.0, -228.0], [140.0, -215.0], [200.0, -178.0], [228.0, -118.0], [232.0, -52.0],
+    [205.0, 6.0], [150.0, 35.0], [100.0, 70.0], [118.0, 132.0], [168.0, 168.0],
+    [150.0, 212.0], [82.0, 228.0], [10.0, 205.0], [-52.0, 222.0], [-120.0, 215.0],
+    [-186.0, 168.0], [-224.0, 100.0], [-232.0, 26.0], [-208.0, -44.0], [-150.0, -86.0],
+    [-84.0, -96.0], [-30.0, -62.0], [22.0, -30.0], [78.0, -44.0], [112.0, -92.0],
+    [92.0, -150.0], [40.0, -196.0],
   ],
 
   // CORNICHE — Corsica, the "rally of ten thousand corners". A cliff road that
