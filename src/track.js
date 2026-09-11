@@ -901,6 +901,114 @@ export const LEVELS = [
     } }
 ];
 
+
+/** LOOK VARIANTS — r414, E-11 ("Most tracks look the same like this").
+ *
+ *  THE CAUSE, MEASURED: a THEME carries the whole palette and many worlds
+ *  share one theme, so worlds on the same theme are identical BY
+ *  CONSTRUCTION. The honest census (tools-scratch/dbg-lookcensus2.mjs, which
+ *  resolves the generated harbour family and the six `THEMES.x = {...}`
+ *  assignments and applies each world's own `tune`, all of which the first
+ *  instrument missed) found 78 worlds on 45 themes reduced to 43 DISTINCT
+ *  LOOKS, with 56 worlds sharing a look with at least one other. The owner's
+ *  frame, GRANITE NARROWS, was pixel-kin to TORRI CORSA.
+ *
+ *  THE FIX IS PER-WORLD PALETTE, not a restyle of any one world: each world
+ *  in a shared cluster is given its own HOUR AND AIR — a time of day and a
+ *  quality of light that belongs to that place. One world per cluster keeps
+ *  its established look as the anchor and is absent from this table.
+ *
+ *  BOUND BY THE STANDING LAWS: every variant is DAYLIGHT with a blue sky and
+ *  a sun (r406) — none sets `dusk`; no horizon is pushed toward white (#126,
+ *  and HIGHCROWN PEAK's is deliberately warmed here to close it); no foliage
+ *  colour is touched, so the conifer green law (7.14 / r393) is untouched;
+ *  and no geometry moves — this is colour only.
+ *
+ *  Layered UNDER each world's own `tune`, so a hand-authored world palette
+ *  (BIRCHLAND CRESTS, AERODROME CIRCUIT, RAZORBACK MOUNTAIN, ORCHARD PARK)
+ *  always wins and none of them appears here.
+ *
+ *  Verified: with this table applied the census reports 78 DISTINCT LOOKS of
+ *  78 worlds, zero shared. Re-run it after any theme edit.
+ */
+const LOOK_VARIANTS = {
+  // FOREST FIRE ESCAPE — smoke-lit, but redder and closer than EMBER PASS
+  14: { skyTop: '#8f4a3a', skyHorizon: '#ffb070', fogColor: 0x7a3a20, hemiGround: 0xa8785a },
+  // AVALANCHE ALLEY — colder blue, less white glare than GLACIAL PASS
+  16: { skyTop: '#3f7fc8', skyHorizon: '#cfe0f0', fogColor: 0xc8dcee, hemiGround: 0x7a90b8 },
+  // COL DE VERNAY — tarmac col, warm stone light off the galleries
+  22: { skyTop: '#2f74b8', skyHorizon: '#e8e0cc', fogColor: 0xdcdac4, hemiGround: 0x6a7e4a },
+  // SERPENT PASS — morning off the sea, sun low in the north-west
+  23: { skyTop: '#1f6fc4', skyHorizon: '#e8dcc4', fogColor: 0xe0d6c2, hemiGround: 0x8c8668, sunEl: 0.35, sunAz: 2.2 },
+  // PENEDO LEAP — granite and dust, warmer than the redwood coast
+  24: { skyTop: '#3f7fc0', skyHorizon: '#f0e0c0', fogColor: 0xe4d4b8, hemiGround: 0x7a6844 },
+  // HIGHCROWN PEAK — thin air, deep cobalt, and a WARM horizon (the white horizon report, #126)
+  25: { skyTop: '#1a56b8', skyHorizon: '#e8d8b8', fogColor: 0xdcd0b8, hemiGround: 0x6e7c52 },
+  // SAFARI PLAINS — green-gold plains under a taller sun
+  26: { skyTop: '#4f9cd8', skyHorizon: '#f6e8b8', fogColor: 0xead8a0, hemiGround: 0xb8a45c },
+  // CORNICHE — canyon by the sea: cooler than the inland ones
+  27: { skyTop: '#4f8fd0', skyHorizon: '#f2dcc0', fogColor: 0xd8cdb4, hemiGround: 0xa8754c },
+  // ALPENRING — meadow morning, greener and softer
+  33: { skyTop: '#4f8ad8', skyHorizon: '#d8ecd0', fogColor: 0xd2e4cc, hemiGround: 0x6f9c4a },
+  // ARDENNES SWEEP — damp northern light, the greens deeper
+  36: { skyTop: '#4f86b8', skyHorizon: '#dce6cc', fogColor: 0xc8d6d0, hemiGround: 0x3c6a3c },
+  // CROSSOVER RING — cool coastal morning, the air washed clean
+  37: { skyTop: '#5fa0e0', skyHorizon: '#d4e8e4', fogColor: 0xcadedc, hemiGround: 0x4a6a58 },
+  // WALDSCHLEIFE — hot afternoon, the forest floor dry
+  38: { skyTop: '#2f7fd8', skyHorizon: '#f0e8c4', fogColor: 0xe0e4c8, hemiGround: 0x5f8a30 },
+  // AUTODROMO VELOCE — race noon: the hardest light on the terraces
+  39: { skyTop: '#1a6ad2', skyHorizon: '#dfeaec', fogColor: 0xdae8e6, hemiGround: 0xb9a77c },
+  // NEON MARINA — harbour neon: teal and sodium, not the violet grid
+  40: { skyTop: '#0e1c2e', skyHorizon: '#1f6a86', fogColor: 0x081420, hemiGround: 0x1f4a56 },
+  // RALLYCROSS ARENA — hard-packed and dusty, not the river valley
+  42: { skyTop: '#3f86c8', skyHorizon: '#f0e4c0', fogColor: 0xdcd8bc, hemiGround: 0x6a7040 },
+  // DRY LAGOON — a bleached salt basin under a washed sky
+  44: { skyTop: '#7fb0d8', skyHorizon: '#f6e8c8', fogColor: 0xeeddb8, hemiGround: 0xd0a670 },
+  // TOUR DES CAPS — cape wind, high clear air off the headland
+  45: { skyTop: '#3f9ae8', skyHorizon: '#b9d2e2', fogColor: 0xbcd6d8, hemiGround: 0x9c9068 },
+  // COSTA BRAVA — bright white-stone coast, sand in the light
+  52: { skyTop: '#2a8ce0', skyHorizon: '#eee4cc', fogColor: 0xe4dcc8, hemiGround: 0xb4aa94 },
+  // COTE D AZUR — deep azure, a clean pale horizon
+  54: { skyTop: '#1f6cd0', skyHorizon: '#d6e8f4', fogColor: 0xcfe0ee, hemiGround: 0xa89070 },
+  // BRIDGE RUN — river valley, greener and cooler than the vineyard
+  55: { skyTop: '#3f92d8', skyHorizon: '#dce8d8', fogColor: 0xd2e2d4, hemiGround: 0x7f9e5c },
+  // MOUNTAIN TO SEA — high summer, the glare of the bay
+  57: { skyTop: '#1a86e2', skyHorizon: '#cfe6ee', fogColor: 0xc8e0e8, hemiGround: 0xa8a884 },
+  // CLIFF KNOT — the clarity that follows weather: deep sky, cold stone
+  59: { skyTop: '#1560b8', skyHorizon: '#d8e2e0', fogColor: 0xcfdcd8, hemiGround: 0x7e8a80 },
+  // SEA CLIFF RUN — late gold along the cliff face
+  60: { skyTop: '#3a7fc0', skyHorizon: '#f4d9ac', fogColor: 0xeccfa4, hemiGround: 0xb0906a },
+  // OLIVE PASS — inland and drier than OLIVE CROSSING
+  61: { skyTop: '#4f96d8', skyHorizon: '#f2e2c0', fogColor: 0xe6d8b8, hemiGround: 0xb49a68 },
+  // CAPE OLIVETO — late afternoon gold down the olive rows
+  62: { skyTop: '#2a76c0', skyHorizon: '#f0d8b0', fogColor: 0xe6d2ac, hemiGround: 0xb08c5a },
+  // TERRAZZA ALTA — thin high air, the bay far below and cool
+  63: { skyTop: '#1a5fc0', skyHorizon: '#d2e6f2', fogColor: 0xcfdeee, hemiGround: 0x8fa07c },
+  // SALINE SPRINT — salt-pan glare, everything bleached warm
+  64: { skyTop: '#4fa6dc', skyHorizon: '#f2ecd8', fogColor: 0xeae2cc, hemiGround: 0xc8c096 },
+  // GRANITE NARROWS — THE OWNER'S FRAME. Deep cobalt over warm granite, the ground grey-gold rather than green, so it cannot be mistaken for TORRI CORSA or for a pine world
+  65: { skyTop: '#1550b0', skyHorizon: '#ecdcbc', fogColor: 0xdfd4b4, hemiGround: 0x8c8270, sunEl: 0.5, sunAz: 1.5 },
+  // GLACIER COL — ice blue under a low sun
+  66: { skyTop: '#1f66bc', skyHorizon: '#d8e8f4', fogColor: 0xd0e0f0, hemiGround: 0x90a0b0 },
+  // TIMBER GORGE — gorge light: deeper, bluer, the sky a slot overhead
+  67: { skyTop: '#38668c', skyHorizon: '#b8c8c0', fogColor: 0xa8c2b4, hemiGround: 0x42564a },
+  // MAPLE MILE — a cooler sky so the maples burn against it
+  69: { skyTop: '#3f6fa8', skyHorizon: '#e8cfa8', fogColor: 0xdcc0a0, hemiGround: 0x5a4028 },
+  // CIDER LANE — bright open harvest afternoon over the clean field
+  71: { skyTop: '#3f92cc', skyHorizon: '#f8ecd0', fogColor: 0xf0e2c4, hemiGround: 0x9a8a50 },
+  // IL VICOLO — the lanes are in shade; only the sky is bright
+  74: { skyTop: '#2456a0', skyHorizon: '#c2cfd8', fogColor: 0xc0cad6, hemiGround: 0x9a8e80 },
+  // PORTO MOLO — a working port at midday
+  75: { skyTop: '#2f86d4', skyHorizon: '#e6e8e0', fogColor: 0xe2e6dc, hemiGround: 0xc0b69c },
+  // CAPO VELA — sail light, warm horizon over the water
+  76: { skyTop: '#3f92c8', skyHorizon: '#f2e0c0', fogColor: 0xecd6b6, hemiGround: 0xbfa680 },
+};
+for (const [id, over] of Object.entries(LOOK_VARIANTS)) {
+  const lvl = LEVELS.find((l) => l.id === +id);
+  if (lvl) lvl.tune = { ...over, ...(lvl.tune || {}) };
+}
+
+
 /* ==========================================================================
  * CHAPTERS — the roster as a story with parts, not one 67-rung ladder.
  *

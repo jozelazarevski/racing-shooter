@@ -4171,6 +4171,82 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r414 — 78 WORLDS, 43 LOOKS: THE THEME IS THE SAMENESS
+
+The owner sent a frame of GRANITE NARROWS with one sentence: "Most tracks
+look the same like this." Pale gravel between mid-green conifers, a grey-green
+mountain behind, plain blue sky — nothing in the picture says which of the 78
+worlds it is.
+
+That is a complaint about VARIETY, not about that world being wrong, so the
+fix was never to restyle GRANITE NARROWS. The question is how many looks the
+game actually has, and the answer has a cause: A THEME CARRIES THE WHOLE
+PALETTE AND MANY WORLDS SHARE ONE THEME, so worlds on the same theme are
+identical by construction. Six worlds ride `medterrace`. Five ride the
+harbour/mountainsea palette. Four ride `riviera`.
+
+**THE INSTRUMENT WAS WRONG THREE TIMES BEFORE THE NUMBER WAS WORTH ANYTHING**,
+and that is the part worth keeping:
+
+1. The first census regex-matched `PROP_SPECS` instead of `FLORA_MIX` and
+   reported crates and cones as the dominant tree species.
+2. The second parsed only object literals, so it missed the twelve generated
+   harbour worlds (`THEMES[key] = {...harbor, ...over}`) and reported them as
+   a 7-world cluster that does not exist — and it ignored each world's own
+   `tune`, which is layered OVER the theme, so BIRCHLAND CRESTS was counted
+   inside the pine cluster while carrying a full dawn palette. It OVERSTATED
+   sameness in one direction and invented a cluster in the other.
+3. The third missed six more themes that are not in the literal at all
+   (`THEMES.riviera = {...}`, `THEMES.savanna = {...}`, four more), which came
+   back as twelve worlds with an all-dash key.
+
+And a fourth trap sits in the tree for whoever looks next: `src/world/themes.js`
+and `src/world/levels.js` EXIST, are tracked, are full of plausible palettes —
+and NOTHING IMPORTS THEM. They are an abandoned split, last touched at r334.
+`src/track.js` is the live table. A previous session already burned itself on
+`src/world/levels.js` (see dustline/tools/verify-coverage.mjs) and wrote it
+down; this session nearly measured the dead file instead of the live one.
+
+v2 of the census stopped pattern-matching the data and started EVALUATING it:
+THEMES, the generated-harbour loop, the six post-hoc assignments, FLORA_MIX
+and LEVELS are sliced out of the source and run in a sandbox whose scope Proxy
+answers 0 for anything they reach outside themselves. Exact where a regex was
+approximate, and still no browser.
+
+**THE HONEST NUMBER: 78 worlds, 45 themes, 43 DISTINCT LOOKS, and 56 worlds
+sharing a look with at least one other.** GRANITE NARROWS and TORRI CORSA were
+pixel-kin. The owner is right and it is not impressionistic.
+
+**THE FIX IS PER-WORLD PALETTE.** `LOOK_VARIANTS` gives each world in a shared
+cluster its own HOUR AND AIR — a time of day and a quality of light that
+belongs to that place: TERRAZZA ALTA thin and high over its bay, SALINE SPRINT
+bleached in salt-pan glare, IL VICOLO in lane shade under a bright sky,
+TIMBER GORGE with the sky a slot overhead. One world per cluster keeps its
+established look as the anchor and is absent from the table. GRANITE NARROWS,
+the frame the owner actually sent, gets deep cobalt over warm granite with the
+ground grey-gold instead of green, so it can no longer be mistaken for TORRI
+CORSA or for a pine world.
+
+Bound by the standing laws, deliberately: every variant is DAYLIGHT with a
+blue sky and a sun (r406) — not one sets `dusk`; no foliage colour is touched,
+so the conifer green law stands untested; no geometry moves; and the table is
+layered UNDER each world's own `tune`, so the four worlds that already
+hand-author a palette (BIRCHLAND CRESTS, AERODROME CIRCUIT, RAZORBACK
+MOUNTAIN, ORCHARD PARK) win over it and none of them appears in it.
+
+It also closes a queued report on the way past: HIGHCROWN PEAK's horizon was
+`#dceef8`, all but white, which is the owner's "horizon should not be white".
+Its variant warms it to `#e8d8b8` under a deeper cobalt.
+
+**Measured after: 78 DISTINCT LOOKS of 78 worlds, zero shared.** And the first
+run after the table landed still said 43 — because the census slices the
+LEVELS literal and could not see the block that follows it. That is the
+instrument failing to see the change, which is not the same thing as the
+change failing, and it took reading the tool rather than re-guessing the fix.
+Verified in the running game, not only in the parser: five worlds loaded with
+a `pageerror` listener attached, all built, zero errors, palettes read back
+off the live `track.T`.
+
 ## r413 — THE BORE FLOOR WAS A STAIRCASE
 
 Owner, on r412: "Still shaking under a tunel." UNDER, not after — and that is
