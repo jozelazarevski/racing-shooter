@@ -4171,6 +4171,57 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r420 — TWENTY-SEVEN OF TWENTY-EIGHT WERE ALREADY FINE
+
+Owner: "You can also twist the tracks make them drive the other world and
+change the scenery. Woala."
+
+He is right, and the useful part of this build was finding out how right:
+**the trick is already applied nearly everywhere.** Of the 28 worlds sharing
+12 route shapes, 27 already carry a distinct twist (`routeFlipX`,
+`routeReverse`, or both — the r327 "fourth distinct lap") or run under a
+different theme. I had been about to hand-draw laps for all of them.
+
+**Exactly one world drove a lap another world drives the same way:** LARCH
+GOLD, untwisted on `deepwood`, identical to DEEPWOOD TRAIL — confirmed
+independently by curvature, both measuring 8453 u, median radius 547, 23.4%
+straight, 8.9% sweepers. Its scenery was already another world's
+(autumnwood against deepwood); what was missing was the twist. It now carries
+mirror **and** reverse.
+
+**Verified the way a twist has to be verified.** A mirror-and-reverse
+preserves every radius, so the curvature histogram is identical BY
+CONSTRUCTION — reporting it unchanged would say nothing. What a twist changes
+is sequence, handedness and outline:
+
+| | LARCH GOLD vs DEEPWOOD TRAIL |
+|---|---|
+| corner handedness agreeing station-for-station | **41.8%** (50% = unrelated) |
+| plan outline distance, normalised | **0.0346** (same-shape scores ~0.001) |
+
+Below 50% is anti-correlated, which is exactly what a mirror does.
+
+**AND I GOT IT WRONG FIRST, IN A WAY THIS REPO HAS SEEN BEFORE.** The first
+measurement also named GLACIER COL as an untwisted copy of PINE VALLEY, and
+its own entry seemed to agree — it declares `route: 'glaciercol'` and the
+census said no such key existed. Both were wrong about the world:
+GLACIER COL measures lap 5239 / median radius 185 / 43.6% sweepers against
+PINE VALLEY's 6800 / 421 / 17.7. Nothing like it.
+
+The census had missed `CIRCUITS.glaciercol = composeRoute(...)`, assigned
+AFTER the object literal — **exactly the trap the look census hit with
+`THEMES.savanna = {...}` in r414.** Second table, same mistake, one build
+apart. What caught it was not re-reading the parser: it was that the
+curvature numbers refused to match the story.
+
+The standing lesson, now in the rules: in this file a table is not finished
+at its closing brace. Grep for `X.key =` before trusting any literal-only
+parse. Both censuses fold in post-hoc assignments now.
+
+Two clusters still share a theme (TOUR DES CAPS + TERRAZZA ALTA, AUTODROMO
+VELOCE + SALINE SPRINT) and are left alone on purpose: both pairs already
+differ by twist and by their r414 palettes.
+
 ## r419 — THE CACHE NAME SAID r406 AND THE CODE IN IT WAS r405
 
 A standing report: the owner was playing r405 while r406 was live. Every

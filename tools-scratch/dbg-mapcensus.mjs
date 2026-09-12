@@ -18,7 +18,17 @@ const scope = new Proxy({ Math, JSON, Object, Array, Number, String }, { has: ()
 // question here is only WHICH KEYS EXIST, so take the top-level keys of the
 // literal rather than its geometry.
 const circuitSrc = cut('const CIRCUITS = {', '\n};');
-const keys = new Set([...circuitSrc.matchAll(/\n  ([A-Za-z][A-Za-z0-9_]*):/g)].map((m) => m[1]));
+// ...AND THE KEYS ASSIGNED AFTER THE LITERAL. `CIRCUITS.glaciercol =
+// composeRoute(...)` is not inside the object, and a literal-only parse
+// therefore reported GLACIER COL as falling back to PINE VALLEY's loop --
+// which it does not: it measures lap 5239 / p50 185 / 43.6 pct sweepers
+// against PINE's 6800 / 421 / 17.7. This is EXACTLY the trap the look
+// census hit with `THEMES.savanna = {...}` in r414. Second table, same
+// mistake: check for post-hoc assignment before trusting a literal.
+const keys = new Set([
+  ...[...circuitSrc.matchAll(/\n  ([A-Za-z][A-Za-z0-9_]*):/g)].map((m) => m[1]),
+  ...[...src.matchAll(/^CIRCUITS\.([A-Za-z][A-Za-z0-9_]*)\s*=/gm)].map((m) => m[1]),
+]);
 const { LEVELS } = new Function('__s', `with(__s){ ${cut('export const LEVELS = [', '\n];').replace('export const', 'const')}\nreturn { LEVELS }; }`)(scope);
 const byKey = new Map();
 const missing = [];

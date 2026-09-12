@@ -554,7 +554,17 @@ export const LEVELS = [
    * -------------------------------------------------------------------- */
 
   { id: 68, name: 'LARCH GOLD', theme: 'autumnwood', region: 'AUTUMN',
-    cost: 41, fresh: true, route: 'deepwood',
+    // r420, the owner's own trick: "You can also twist the tracks make them
+    // drive the other world and change the scenery." LARCH GOLD borrowed
+    // `deepwood` UNTWISTED, so it and DEEPWOOD TRAIL were the same lap in the
+    // same direction — measured identical at 8453 u, median radius 547,
+    // 23.4 pct straight, 8.9 pct sweepers. The scenery was already another
+    // world's (autumnwood against deepwood); what was missing was the twist.
+    // Mirrored AND reversed is the r327 "fourth distinct lap": every left
+    // becomes a right and the corners arrive in the opposite order, so the
+    // card draws a different outline (r415 made it draw the true transform)
+    // and the drive is a different sequence. No new shape needed.
+    cost: 41, fresh: true, route: 'deepwood', routeFlipX: true, routeReverse: true,
     // THE ONE THAT INTRODUCES THE SEASON, so it is the friendliest shape in
     // the chapter: `deepwood`'s flowing woodland esses, which never leave the
     // trees. That matters here more than on the world it was written for —
