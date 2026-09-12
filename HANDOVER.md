@@ -4171,6 +4171,60 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r417 — TWO FARMLAND TRACKS, AND THERE WAS NOT EVEN ONE
+
+Owner: "Create farmland themed tracks." The fourth consecutive sentence
+asking for open field — E-10's wide fields, the r412 open-field pilot, E-12's
+"add more field", now this. It is a settled direction, not a note.
+
+**One conflict, raised rather than traded.** "Create" reads as ADD, and
+CLAUDE.md §9 rule 5 says world count, chapters and star ratings are
+unchanged — adding worlds silently re-prices the whole career, because
+chapter gates are fractions of a chapter's stars and `starCost` prices from
+the career rung. The C-4 amendment permits redesigning track geometry freely,
+so the reading that satisfies both is to build the farmland tracks out of the
+field-country worlds that already exist. **The roster stayed at 78.** If the
+owner wants it to grow, that is his call and a different build (K-16).
+
+**What was there, measured before touching it:** the `farmland` route was a
+hedgerow POLYGON — fourteen control points at field boundaries, described in
+its own comment as "a chain of short headland straights meeting at bends the
+hedge hides". As a thing to drive that is dead ground joined by corners, and
+it measured exactly so.
+
+Worse: HARVEST RUN carried `route: 'farmland'`, so **both farmland worlds
+were the same lap** — the same corners in the same order, which the note
+above LEVELS already calls "the same track wearing a different hat". The
+owner asked for farmland *tracks*. There was not even one.
+
+**The shape is the SAFARI PLAINS treatment (r412) applied to field country:**
+a closed loop whose radius varies as a few low harmonics, so curvature is
+CONTINUOUS — no straight to end, no corner to arrive at, a road always
+turning and never tight. HARVEST RUN gets its own `harvestvale` route with a
+different harmonic mix, so the two read as two places rather than one lap
+flipped.
+
+**The parameters were searched, not guessed**, against the profile of the one
+open-field lap already known to read right. The first hand-picked attempt
+made it WORSE — 69.6% dead — because I had confused the loop's radius with
+its radius of *curvature*: a smooth 950 u circle is dead ground, and the
+metric was right to say so. 150,000 candidate shapes were then scored offline
+against SAFARI PLAINS' measured bands, which costs seconds and no browser.
+
+| | HEDGEROW DASH | HARVEST RUN | (SAFARI PLAINS, the pilot) |
+|---|---|---|---|
+| dead ground, R > 800 | 45.2% → **23.7%** | 45.2% → **22.0%** | 18.0% |
+| open sweepers, R 200–800 | 37.9% → **72.1%** | 37.9% → **73.3%** | 70.4% |
+| tight, R < 60 | 2.2% → **0%** | 2.2% → **0%** | 0.4% |
+| median radius | 714 → **544** | 714 → **575** | 539 |
+| lap | 6493 → 6288 u | 6493 → 6350 u | 7215 u |
+
+Dead ground roughly halved on both, every tight corner gone, and the two are
+now different laps. The offline model predicted 24.6% and 24.2% against the
+game's 23.7% and 22.0% — close enough that the search can be trusted for the
+remaining field worlds (the `vineyard` pair, VINEYARD VELOCE and CIDER LANE,
+are still one lap between them).
+
 ## r416 — THE LEADER NEVER BOOSTED
 
 Owner: "Savage mode needs to be impossible to beat. Now it is easy."

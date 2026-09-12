@@ -597,7 +597,7 @@ export const LEVELS = [
     } },
 
   { id: 70, name: 'HARVEST RUN', theme: 'harvestvale', region: 'AUTUMN',
-    cost: 43, fresh: true, route: 'farmland',
+    cost: 43, fresh: true, route: 'harvestvale',   // r417: its own lap, not HEDGEROW DASH's
     // STUBBLE COUNTRY WITH THE CROP IN. `farmland` is the hedgerow-banked lane
     // route, which is the right shape for a world whose identity is that you
     // cannot see over the sides — and in autumn the banks are cut and the
@@ -2014,17 +2014,53 @@ const CIRCUITS = {
     [-224, -186], [-198, -208],
   ],
 
-  // HEDGEROW DASH — farmland lanes. The road does not choose its own line here:
-  // it runs where the field boundaries put it, so the lap is a chain of short
-  // headland straights meeting at bends the hedge hides until you are in them.
-  // Nothing on the roster is shaped this way — the alpine worlds stack legs up
-  // a face, the rally routes flow. This one turns because the field turns.
-  // Measured (900 samples): 1851 u lap, tightest radius 17 u, 3.9 % of the lap
-  // under 25 u, self-approach 50.9 u — well clear of the 22 u ribbon width.
-  farmland: [ // hedgerow polygon: straight field boundaries, odd angles
-    [-215.0, 175.0], [30.0, 190.0], [95.0, 120.0], [225.0, 95.0], [215.0, -30.0],
-    [120.0, -55.0], [130.0, -140.0], [10.0, -195.0], [-140.0, -180.0], [-120.0, -80.0],
-    [-185.0, -40.0], [-230.0, 40.0], [-125.8, 69.5], [-165.0, 120.0],
+  // HEDGEROW DASH — OPEN FIELD, r417 (owner: "Create farmland themed tracks").
+  //
+  // It used to be a hedgerow POLYGON: fourteen control points at field
+  // boundaries, "a chain of short headland straights meeting at bends the
+  // hedge hides". Read as a thing to DRIVE, that is dead ground joined by
+  // corners, and it measured exactly so: 45.2 pct of the lap over an 800 u
+  // radius, median 714, only 14.7 pct in the 60-200 u sweeper band. Two
+  // worlds rode it identically (HARVEST RUN borrowed it outright), so the
+  // game had ONE farmland lap and it was mostly straight.
+  //
+  // This is the SAFARI PLAINS treatment (r412) applied to field country: a
+  // closed loop whose radius varies as a few low harmonics, so curvature is
+  // CONTINUOUS — no straight to end, no corner to arrive at, a road always
+  // turning and never tight. That is what the open template's "min corner
+  // radius 60" was always a floor FOR.
+  //
+  // Targets are E-10's, measured on the pilot: dead ground well under 20
+  // pct, the bulk in the open 200-800 band, effectively nothing under 60.
+  // Re-measure with tools-scratch/_routecurve.mjs after any edit here — the
+  // shape is generated, and nudging one point by hand is how the continuity
+  // gets broken.
+  farmland: [
+    [163.8, 0.0], [188.5, 29.9], [203.5, 66.1], [205.9, 104.9], [196.6, 142.8],
+    [177.7, 177.7], [151.4, 208.3], [118.7, 232.9], [80.7, 248.2], [39.7, 250.4],
+    [0.0, 237.0], [-33.2, 209.6], [-56.6, 174.2], [-71.2, 139.7], [-82.7, 113.8],
+    [-99.5, 99.5], [-128.5, 93.4], [-170.7, 87.0], [-219.2, 71.2], [-261.8, 41.5],
+    [-285.6, 0.0], [-282.9, -44.8], [-254.7, -82.8], [-210.5, -107.3], [-163.5, -118.8],
+    [-124.6, -124.6], [-97.9, -134.7], [-79.5, -156.1], [-61.2, -188.4], [-35.4, -223.5],
+    [-0.0, -249.1], [40.3, -254.4], [76.6, -235.6], [100.5, -197.3], [109.1, -150.1],
+    [106.0, -106.0], [100.1, -72.7], [100.5, -51.2], [112.7, -36.6], [135.8, -21.5],
+  ],
+
+  // HARVEST RUN — its own lap at last, r417. It carried `route: 'farmland'`,
+  // so the two farmland worlds were the same corners in the same order —
+  // which the note above LEVELS already calls "the same track wearing a
+  // different hat". The owner asked for farmland trackS. Same open-field
+  // grammar, a different harmonic mix: two broad lobes against HEDGEROW
+  // DASH's single one, so they read as two places and not one lap flipped.
+  harvestvale: [
+    [173.5, 0.0], [141.7, 22.4], [117.1, 38.1], [105.6, 53.8], [105.7, 76.8],
+    [110.3, 110.3], [110.7, 152.4], [100.1, 196.5], [76.4, 235.1], [41.6, 262.5],
+    [0.0, 276.6], [-44.0, 278.0], [-87.2, 268.5], [-127.0, 249.3], [-160.4, 220.8],
+    [-183.9, 183.9], [-194.2, 141.1], [-190.6, 97.1], [-176.5, 57.3], [-159.3, 25.2],
+    [-148.0, 0.0], [-148.7, -23.6], [-161.7, -52.5], [-180.3, -91.9], [-193.5, -140.6],
+    [-191.0, -191.0], [-167.8, -231.0], [-127.3, -249.9], [-79.0, -243.2], [-34.1, -215.5],
+    [-0.0, -178.7], [23.2, -146.6], [41.8, -128.8], [64.5, -126.6], [96.7, -133.0],
+    [136.9, -136.9], [176.9, -128.6], [205.6, -104.7], [214.2, -69.6], [201.4, -31.9],
   ],
 
   // RED CENTRE RUN — the fastest lap on the roster, and the shape is dictated
