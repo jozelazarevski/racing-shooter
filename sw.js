@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r418';
+const CACHE = 'ignite-rally-r419';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -83,7 +83,25 @@ self.addEventListener('install', (e) => {
     // Add individually: one 404 in addAll() rejects the whole install and
     // leaves the player with no offline copy at all. A missing file must not
     // cost us the game.
-    const results = await Promise.allSettled(CORE.map((u) => cache.add(u)));
+    // FROM THE NETWORK, NOT THE HTTP CACHE (r419). `cache.add(u)` is a normal
+    // fetch, so it is satisfied by the browser's HTTP cache — and GitHub
+    // Pages serves these files with a max-age. A player who opened the game
+    // shortly before a deploy therefore PRECACHED THE PREVIOUS BUILD'S BYTES
+    // UNDER THE NEW CACHE NAME, and because the fetch handler below is
+    // cache-first, that stale copy is then served forever. The cache name
+    // said r406 and the code in it was r405, which is exactly the report.
+    //
+    // Reproduced before fixing (tools-scratch/_swupgrade.mjs installs build A,
+    // swaps the server to build B and reloads): with a plain `cache.add` the
+    // cache key flipped to the new release while the DOM and the module kept
+    // reporting the OLD build, on every one of six reloads. With
+    // `cache: 'reload'` the same harness reaches build B on RELOAD 1.
+    //
+    // CORE only. EXTRA is 58 world previews that never change and cost
+    // 1.15 MB; forcing those past the HTTP cache would re-download the lot on
+    // every release to fix a staleness that art does not have.
+    const results = await Promise.allSettled(
+      CORE.map((u) => cache.add(new Request(u, { cache: 'reload' }))));
     const failed = results
       .map((r, i) => (r.status === 'rejected' ? CORE[i] : null))
       .filter(Boolean);

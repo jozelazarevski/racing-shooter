@@ -4171,6 +4171,52 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r419 — THE CACHE NAME SAID r406 AND THE CODE IN IT WAS r405
+
+A standing report: the owner was playing r405 while r406 was live. Every
+build in this session is worth exactly as much as it reaches his phone, so
+this one came before more content.
+
+**The update machinery was already right, and I nearly blamed it.** A first
+harness registered a bare worker, reproduced six reloads of staleness, and
+pointed at the registration — but `src/offline.js` already does all of it,
+added at r289: `updateViaCache: 'none'`, an explicit `update()`, another on
+`visibilitychange`, and an auto-reload on `controllerchange`. My harness was
+testing a straw man. Rebuilt to mirror the product, its timing dominated the
+result and it stopped being a reliable instrument for that half.
+
+**But one observation held regardless of timing, and it is the bug:** the
+cache key flipped to the new release while the served bytes stayed on the
+old one.
+
+`cache.add(u)` in the install handler is an ordinary fetch, so it is
+satisfied by the BROWSER'S HTTP CACHE — and GitHub Pages serves these files
+with a max-age. A player who opened the game shortly before a deploy
+therefore **precaches the previous build's bytes under the new cache name**,
+and since the fetch handler is cache-first, that stale copy is then served
+forever. Not for one reload. Forever, until the cache name changes again and
+the race is re-run.
+
+That is the report exactly: a cache called `ignite-rally-r406` full of r405.
+
+**Reproduced, then fixed, then re-measured** (`tools-scratch/_swupgrade.mjs`
+installs build A, swaps the server under it, and reloads while reporting what
+the DOM, the module and the cache each say):
+
+| | result |
+|---|---|
+| plain `cache.add` | cache key `rBBB`, DOM and module still `rAAA`, all six reloads |
+| `cache.add(new Request(u, { cache: 'reload' }))` | **build B on reload 1** |
+
+CORE only. EXTRA is 58 world previews that never change and weigh 1.15 MB;
+forcing those past the HTTP cache would re-download the lot every release to
+fix a staleness that art does not have.
+
+One harness bug found and fixed on the way, because a tool that lies is worse
+than no tool: its success check still tested a field the diagnostics rewrite
+had removed, so it printed STILL STALE over data that plainly showed the
+upgrade working.
+
 ## r418 — THE METRIC WAS COUNTING CORNERS AS STRAIGHTS
 
 Continuing the field-country work. The `vineyard` route served two worlds,
