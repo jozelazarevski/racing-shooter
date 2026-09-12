@@ -609,7 +609,7 @@ export const LEVELS = [
     } },
 
   { id: 71, name: 'CIDER LANE', theme: 'harvestvale', region: 'AUTUMN',
-    cost: 44, fresh: true, route: 'vineyard',
+    cost: 44, fresh: true, route: 'orchardrows',   // r418: its own lap; the vineyard loop is the owner's drawing
     // ORCHARD ROWS. `vineyard` carpets its slopes with planted rows and that
     // machinery does not care what is planted in them — so the route that was
     // written for vines lays out an orchard, in a season when an orchard is
@@ -2061,6 +2061,37 @@ const CIRCUITS = {
     [-191.0, -191.0], [-167.8, -231.0], [-127.3, -249.9], [-79.0, -243.2], [-34.1, -215.5],
     [-0.0, -178.7], [23.2, -146.6], [41.8, -128.8], [64.5, -126.6], [96.7, -133.0],
     [136.9, -136.9], [176.9, -128.6], [205.6, -104.7], [214.2, -69.6], [201.4, -31.9],
+  ],
+
+  // CIDER LANE — ORCHARD LANES, r418. It carried `route: 'vineyard'`, which
+  // is THE OWNER'S OWN HAND-DRAWN LOOP ("the player's third hand-drawn loop:
+  // spiral head, three paw lobes"), so two worlds drove one drawing. The
+  // drawing stays exactly where it is — it is his and, measured, it is the
+  // best lap of the four field worlds: 6.7 pct GENUINE STRAIGHT, 33.6 pct in
+  // the 60-200 sweeper band, median radius 269. CIDER LANE gets its own.
+  //
+  // AND IT IS AIMED AT THAT FAMILY, NOT AT ITS TWO SIBLINGS. HEDGEROW DASH
+  // and HARVEST RUN are open-field laps (p50 544 and 575, 4-5 pct sweepers);
+  // a third copy of that profile would have been three worlds with one
+  // character. This one flows: searched to 7.0 pct straight, 25.7 pct
+  // sweepers, zero tight corners, p50 349 — between the owner's loop and the
+  // open pair, which is what an orchard lane should feel like.
+  //
+  // 56 control points, not 40: the shape carries 7th-harmonic content and a
+  // coarser polygon would let the spline eat it.
+  orchardrows: [
+    [191.4, 0.0], [221.9, 25.0], [242.5, 55.4], [240.4, 84.1], [215.0, 103.6],
+    [179.0, 112.5], [149.0, 118.8], [135.4, 135.4], [135.8, 170.3], [137.9, 219.5],
+    [128.7, 267.2], [103.3, 295.2], [67.2, 294.5], [30.7, 272.1], [0.0, 247.4],
+    [-27.0, 239.8], [-58.4, 255.8], [-99.7, 284.9], [-147.4, 306.0], [-189.2, 301.1],
+    [-212.4, 266.4], [-214.0, 214.0], [-204.7, 163.3], [-203.9, 128.1], [-226.8, 109.2],
+    [-273.5, 95.7], [-326.9, 74.6], [-362.3, 40.8], [-361.0, 0.0], [-322.1, -36.3],
+    [-261.8, -59.8], [-204.2, -71.4], [-166.8, -80.3], [-152.8, -96.0], [-152.1, -121.3],
+    [-150.0, -150.0], [-137.1, -171.9], [-113.3, -180.3], [-85.3, -177.2], [-59.8, -171.0],
+    [-38.9, -170.4], [-20.0, -177.8], [-0.0, -188.1], [21.7, -192.9], [42.9, -187.8],
+    [61.4, -175.4], [78.4, -162.8], [98.2, -156.3], [123.8, -155.3], [153.3, -153.3],
+    [178.7, -142.5], [191.0, -120.0], [186.8, -90.0], [172.8, -60.5], [162.6, -37.1],
+    [168.1, -18.9],
   ],
 
   // RED CENTRE RUN — the fastest lap on the roster, and the shape is dictated

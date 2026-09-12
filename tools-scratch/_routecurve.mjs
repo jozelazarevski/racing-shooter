@@ -25,11 +25,32 @@ for (const lv of process.argv.slice(2)) {
       R.push(ar < 1e-6 ? 1e6 : (d1 * d2 * d3) / (4 * ar));
       len += Math.hypot(c[(i + 1) % N].x - m.x, c[(i + 1) % N].z - m.z);
     }
+    // STRAIGHT vs INFLECTION, r418. `dead_over800` alone is NOT "how much of
+    // this lap is straight": a road that changes hand passes through infinite
+    // radius at every inflection, so a flowing S counts as dead ground at the
+    // very moment it is doing the most interesting thing. Measured on the
+    // CIDER LANE candidate, 79 pct of its dead samples sat within 2 stations
+    // of a curvature sign change. So the sign is taken too, and the honest
+    // number — `straight` — is dead ground that is NOT an inflection.
+    const sgn = [];
+    for (let i = 0; i < N; i++) {
+      const a = c[(i - 3 + N) % N], m = c[i], z = c[(i + 3) % N];
+      sgn.push(((m.x - a.x) * (z.z - m.z) - (m.z - a.z) * (z.x - m.x)) >= 0 ? 1 : -1);
+    }
+    const infl = new Set();
+    for (let i = 0; i < N; i++) {
+      if (sgn[i] !== sgn[(i + 1) % N]) for (let d = -2; d <= 2; d++) infl.add((i + d + N) % N);
+    }
     const pct = (f) => +(100 * R.filter(f).length / N).toFixed(1);
     const srt = [...R].sort((x, y) => x - y);
+    const deadIdx = R.map((r, i) => (r > 800 ? i : -1)).filter((i) => i >= 0);
+    const straight = deadIdx.filter((i) => !infl.has(i)).length;
     return { name: g.level?.name, lapU: Math.round(len), N,
       p05: Math.round(srt[(N * 0.05) | 0]), p50: Math.round(srt[(N * 0.5) | 0]),
-      dead_over800: pct((r) => r > 800), sweep60_200: pct((r) => r >= 60 && r <= 200),
+      dead_over800: pct((r) => r > 800),
+      straight: +(100 * straight / N).toFixed(1),
+      inflection: +(100 * (deadIdx.length - straight) / N).toFixed(1),
+      sweep60_200: pct((r) => r >= 60 && r <= 200),
       open200_800: pct((r) => r > 200 && r <= 800), tight_under60: pct((r) => r < 60) };
   })));
 }

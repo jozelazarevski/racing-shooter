@@ -4171,6 +4171,72 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r418 — THE METRIC WAS COUNTING CORNERS AS STRAIGHTS
+
+Continuing the field-country work. The `vineyard` route served two worlds,
+so VINEYARD VELOCE and CIDER LANE were one lap between them — the last
+duplicate in field country after r417.
+
+**The route is the OWNER'S OWN DRAWING** ("the player's third hand-drawn
+loop: spiral head, three paw lobes"), and VINEYARD VELOCE owns it while CIDER
+LANE borrowed it. So the drawing does not move. CIDER LANE gets its own.
+
+**But first the instrument was wrong, and it nearly cost r417 its claim.**
+
+`dead_over800` — the headline r417 was reported in — counts every station
+whose radius exceeds 800 u. A road that changes hand passes through INFINITE
+radius at every inflection, so a flowing S is scored as dead ground at the
+exact moment it is doing the most interesting thing. Measured on a candidate
+shape: **79% of its "dead ground" sat within two stations of a curvature sign
+change.** It was not straight. It was turning, in both directions.
+
+So `_routecurve` now takes the curvature SIGN as well, and reports `straight`
+(dead ground that is NOT an inflection) separately from `inflection`.
+
+Then the old farmland lap was measured again with it — checked out of git and
+run in the game rather than reasoned about — because a published number had
+to be right:
+
+| | dead > 800 | genuine straight | inflection |
+|---|---|---|---|
+| HEDGEROW DASH, before r417 | 45.2% | **40.0%** | 5.2% |
+| HEDGEROW DASH, after r417 | 23.7% | **17.0%** | 6.7% |
+
+**r417's claim survives and gets sharper: genuine straight fell 40.0% → 17.0%,
+a 23-point reduction.** The worry was unfounded, and it was cheaper to check
+than to argue.
+
+**The honest field-country table, all in-game, same instrument:**
+
+| world | straight | sweepers 60–200 | median R |
+|---|---|---|---|
+| VINEYARD VELOCE (*the owner's drawing*) | **6.7%** | **33.6%** | 269 |
+| CIDER LANE (new) | 14.3% | 21.4% | 415 |
+| HARVEST RUN | 14.2% | 4.7% | 575 |
+| SAFARI PLAINS | 13.1% | 11.1% | 539 |
+| HEDGEROW DASH | 17.0% | 4.2% | 544 |
+
+CIDER LANE's new lap is aimed at the owner's FAMILY rather than at its two
+open-field siblings — 21.4% sweepers against their 4-5%, median radius 415
+against their 544 and 575, and no tight corner anywhere. Three farmland
+worlds, three characters.
+
+**Two things stated plainly rather than buried.**
+
+First, CIDER LANE was *borrowing the best lap in the game* and now has its
+own, which is a roster-normal one: 14.3% straight against the drawing's 6.7%.
+De-duplicating cost it something. It is in line with SAFARI PLAINS and
+HARVEST RUN and it is a distinct place to drive, which is what was asked for
+— but the trade is real and the owner may prefer the duplicate.
+
+Second, and more useful: **the generator has a floor the hand-drawing beats.**
+The offline search was recalibrated to the game (it had sampled 300 stations
+where the game samples 900 — predicted 7.0% straight, measured 14.3%), and
+the calibrated search could not find anything under ~16% straight with radial
+harmonics at this lap length. The owner's loop reaches 6.7% because lobes are
+not a radial-harmonic shape. If field country wants more laps of that
+quality, they want drawing, not search.
+
 ## r417 — TWO FARMLAND TRACKS, AND THERE WAS NOT EVEN ONE
 
 Owner: "Create farmland themed tracks." The fourth consecutive sentence
