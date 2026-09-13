@@ -45,7 +45,7 @@ const R = await p.evaluate(async () => {
     const before = { lap: pl.lap, idx: pl.trackIndex };
     setup(pl, g);
     let endedAtFrame = -1, crossFrame = -1, speedAtCross = 0;
-    let speedAfter = null, movedAfterM = 0, idxAtEnd = null;
+    let speedAfter = null, movedAfterM = 0, idxAtEnd = null, lastPos = null;
     for (let f = 0; f < 600; f++) {
       const prev = pl.trackIndex;
       g._frameBody();
@@ -55,7 +55,15 @@ const R = await p.evaluate(async () => {
       if (g.state === 'finished' && endedAtFrame < 0) { endedAtFrame = f; idxAtEnd = pl.trackIndex; }
       // 2 s after the terminal state: is the car still being driven?
       if (endedAtFrame >= 0 && f === endedAtFrame + 120) speedAfter = pl.speed;
-      if (endedAtFrame >= 0 && f > endedAtFrame) movedAfterM += Math.abs(pl.speed) / 3.6 / 60;
+      // REAL displacement, not the integral of a speed field that may simply
+      // be stale after the car stops being stepped. rollOn=42m came out of
+      // integrating pl.speed while the track index sat at 0 and the car had
+      // not moved a metre.
+      if (endedAtFrame >= 0 && f > endedAtFrame) {
+        if (lastPos) movedAfterM += Math.hypot(pl.mesh.position.x - lastPos.x,
+                                               pl.mesh.position.z - lastPos.z);
+        lastPos = { x: pl.mesh.position.x, z: pl.mesh.position.z };
+      }
     }
     return {
       name, before, crossed: crossFrame >= 0,
@@ -92,7 +100,9 @@ const R = await p.evaluate(async () => {
   out.cases.push(runCase('1 grounded', () => { drive(); }));
   out.cases.push(runCase('2 airborne', (pl) => { drive(); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
   out.cases.push(runCase('3 drifting', () => {
-    hold({ throttle: 1, brake: 0, steer: 0.12, drift: true });
+    // steer 0: the handbrake alone is the drift. Any steer angle on this
+    // approach walked the car off the ribbon and it never reached the line.
+    hold({ throttle: 1, steer: 0, drift: true });
   }));
   out.cases.push(runCase('4 shielded', (pl) => { drive(); pl.invuln = 5; pl.shieldT = 5; }));
   out.cases.push(runCase('5 mid-respawn', (pl) => { drive(); pl._teleportFrames = 8; }));
@@ -116,6 +126,6 @@ const R = await p.evaluate(async () => {
 await browser.close();
 console.log('lapsTotal', R.lapsTotal, 'N', R.N);
 for (const c of R.cases) {
-  console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  vCross=${c.speedAtCross}  v+2s=${c.speedAfter2s}  rollOn=${c.rollOnM}m  state=${c.stateAfter}`);
+  console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  vCross=${c.speedAtCross}  v+2s=${c.speedAfter2s}  rollOn=${c.rollOnM}m  idxEnd=${c.idxAfter}  state=${c.stateAfter}`);
 }
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
