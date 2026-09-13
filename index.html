@@ -1001,7 +1001,6 @@
       'rung shot name  state' 'rung shot tags  stars' 'rung shot surf  best'
       'rung feats feats feats'}
   #level-select.tl-view .wc-shot{grid-area:shot;width:64px;aspect-ratio:1/1;flex:none}
-  #level-select.tl-view .wc-map{width:44px;height:32px;top:2px;right:2px}
   #level-select.tl-view .wc-name{grid-area:name;min-height:0;justify-content:flex-start;
     font-size:14.5px;letter-spacing:1px}
   #level-select.tl-view .wc-tags{grid-area:tags;text-align:left}
@@ -1191,8 +1190,6 @@
     border:1px solid var(--line-soft)}
   .wc-shot::after{content:'';position:absolute;inset:0;
     background:linear-gradient(180deg,transparent 55%,rgba(12,8,3,.5));pointer-events:none}
-  .wc-map{position:absolute;top:4px;right:4px;width:64px;height:46px;border-radius:6px;
-    background:rgba(12,8,3,.55);border:1px solid var(--line);z-index:1}
   .level-chip.locked .wc-shot{filter:grayscale(.75) brightness(.7)}
   /* reserve two lines for the name and pin the best-time line to the card
      foot, so one- and two-line worlds still line up across a region row */
@@ -1774,7 +1771,7 @@
   /* the game already runs offline and the ~1 MB of world art is optional —
      this state is a BUTTON, so it has to look like one */
   /* a world with no hand-shot preview: a themed wash, with the circuit outline
-     the .wc-map canvas draws sitting on top of it */
+     a themed wash, no placeholder art */
   .wc-shot.no-shot{background:linear-gradient(150deg,#3a2a16 0%,#6b4a22 45%,#2a1c0e 100%)}
   #offline-badge.offer{color:var(--yellow);border-color:rgba(255,213,74,.55);cursor:pointer}
   #offline-badge.offer:active{transform:scale(.96)}
@@ -2347,7 +2344,7 @@ body.touch #feed{right:184px}
      r309 layout (owner-requested feature; §6.11 freezes what shipped — this
      occupies the empty top-centre lane and touches nothing pinned). -->
 <div id="copilot-note" style="display:none"></div>
-<div id="build-tag">r420</div>
+<div id="build-tag">r421</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2690,10 +2687,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r420"></script>
+<script type="module" src="./src/main.js?v=r421"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r420"></script>
+<script src="./src/offline.js?v=r421"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r420"></script>
+<script type="module" src="./src/traffic.js?v=r421"></script>
 </body>
 </html>

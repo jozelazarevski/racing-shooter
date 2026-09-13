@@ -6,7 +6,7 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, routePlanPoints, disposeSubtree, withSeed, seedForLevel,
+import { Track, LEVELS, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
@@ -4084,7 +4084,12 @@ class Game {
 
   /** World cards: static circuit-outline badge + flavor + career best per
    *  level, grouped under region headers (region order = first appearance).
-   *  The .wc-map badge is card decoration ONLY — never a HUD map (RULES §0).
+   *  r421: the circuit-outline badge is GONE (owner: "Remove or rework the
+   *  maps"). It had been wrong twice — drawn from untransformed control points
+   *  until r415, then redrawn as PINE VALLEY's loop by `_markCurrentCard`,
+   *  which kept calling the r415 signature with a route STRING where it now
+   *  wants a level. A 72 px outline that has to be right to be worth anything,
+   *  and was not, is decoration with a defect rate. The preview photo stays.
   /** MY SCENES — the worlds the owner built, above the shipped roster.
    *
    *  A saved scene is a base level plus its edits, so launching one is a level
@@ -4727,9 +4732,7 @@ class Game {
       const state = !unlocked ? 'LOCKED' : got >= 3 ? 'CLEARED' : best ? 'STARS LEFT' : 'OPEN';
       const badge = isNext
         ? `<div class="tl-next">${nextUp.why === 'locked' ? 'NEXT UNLOCK' : 'NEXT UP'}</div>` : '';
-      card.innerHTML = `${badge}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
-          <canvas class="wc-map" width="72" height="52"></canvas>
-        </div>
+      card.innerHTML = `${badge}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg"></div>
         <div class="tl-rung">${i + 1}</div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${isFin ? '🏆 ' : ''}${lv.name}</div>
         ${this._surfaceChip(lv)}
@@ -4740,7 +4743,6 @@ class Game {
         <div class="tl-state ${state.toLowerCase().replace(' ', '-')}">${state}</div>
         ${unlocked ? this._featChips(lv.id) : ''}
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
-      this._drawCircuitMap(card.querySelector(".wc-map"), lv, !unlocked, lv.id === curId);
       card.dataset.lvid = lv.id;
       card.addEventListener('click', () => {
         // "Already on it" is only true if what is standing is the SHIPPED
@@ -4825,11 +4827,6 @@ class Game {
       const cur = +card.dataset.lvid === curId;
       if (card.classList.contains('current') === cur) continue;
       card.classList.toggle('current', cur);
-      const lv = LEVELS.find((l) => l.id === +card.dataset.lvid);
-      if (lv) {
-        this._drawCircuitMap(card.querySelector('.wc-map'), lv.route || lv.theme,
-          !this.isLevelUnlocked(lv.id), cur);
-      }
     }
   }
 
@@ -4846,8 +4843,8 @@ class Game {
     if (!el || !el.dataset.shot) return;
     // Load through an Image so a MISSING preview is a known outcome rather than
     // a broken card: worlds added after the 21 hand-shot jpgs have no art, and
-    // they fall back to a themed wash with the circuit outline the .wc-map
-    // canvas already draws on top. No placeholder jpgs to author or ship.
+    // they fall back to a themed wash. No placeholder jpgs to author or ship.
+    // (The circuit outline that used to draw over this went with r421.)
     const load = (node) => {
       const url = node.dataset.shot;
       if (!url) return;
@@ -5888,63 +5885,6 @@ class Game {
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
-  /** THE CARD'S MAP IS THE LAP, r415.
-   *
-   *  Owner: "update the maps of each track. They don't match the current
-   *  now." They did not, and in three separate ways — this drew the RAW
-   *  control points of `CIRCUITS[key]` through a quadratic-midpoint path,
-   *  while the world is built (track.js) from the same points AFTER
-   *  `routeFlipX` and `routeReverse`, as a closed centripetal CatmullRom:
-   *
-   *    - 11 worlds declare `routeFlipX`, so their card showed the track's
-   *      MIRROR IMAGE — every left-hander drawn as a right;
-   *    - 5 declare `routeReverse`, so the card ran the lap backwards and put
-   *      the start dot at the wrong end;
-   *    - a quadratic-midpoint path only APPROACHES its control points while
-   *      a CatmullRom passes THROUGH them, so every corner on every card was
-   *      rounded off into a softer shape than the one being driven.
-   *
-   *  Both callers now take `routePlanPoints` (the transforms) and the same
-   *  curve class, so the card cannot drift from the world again. Sampling is
-   *  uniform in the curve parameter rather than arc length: that traces the
-   *  identical curve, and the card wants the shape, not station spacing. */
-  _drawCircuitMap(cnv, level, locked, current) {
-    const plan = routePlanPoints(level);
-    const curve = new THREE.CatmullRomCurve3(
-      plan.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'centripetal');
-    const pts = curve.getPoints(Math.max(160, plan.length * 12)).map((v) => [v.x, v.z]);
-    const ctx = cnv.getContext('2d');
-    const W = cnv.width, H = cnv.height, pad = Math.max(5, W * 0.08);
-    ctx.clearRect(0, 0, W, H);   // redrawn in place when the highlight moves
-    const lw = W / 150; // stroke scale — the badge canvas is small
-    let nx = Infinity, xx = -Infinity, nz = Infinity, xz = -Infinity;
-    for (const [x, z] of pts) {
-      nx = Math.min(nx, x); xx = Math.max(xx, x);
-      nz = Math.min(nz, z); xz = Math.max(xz, z);
-    }
-    const s = Math.min((W - pad * 2) / Math.max(1e-6, xx - nx),
-      (H - pad * 2) / Math.max(1e-6, xz - nz));
-    const ox = (W - (xx - nx) * s) / 2 - nx * s;
-    const oz = (H - (xz - nz) * s) / 2 - nz * s;
-    const P = pts.map(([x, z]) => [x * s + ox, z * s + oz]);
-    const n = P.length;
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(P[0][0], P[0][1]);
-      for (let i = 1; i < n; i++) ctx.lineTo(P[i][0], P[i][1]);
-      ctx.closePath();
-    };
-    path(); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 7 * lw; ctx.stroke();
-    path();
-    ctx.strokeStyle = locked ? 'rgba(255,233,168,.35)' : current ? '#ffd400' : '#f4e2b8';
-    ctx.lineWidth = 3 * lw; ctx.stroke();
-    if (!locked) { // start-line dot — station 0 of the lap as driven
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(P[0][0], P[0][1], 3 * lw, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5 * lw; ctx.stroke();
-    }
-  }
 
   /** Render each catalog car's real voxel mesh to a 3/4-view icon (cached). */
   /** ONE OFF-SCREEN STUDIO, borrowed by everything that needs a picture of a

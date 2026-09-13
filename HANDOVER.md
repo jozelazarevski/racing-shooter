@@ -4171,6 +4171,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r421 — THE MAP WAS WRONG TWICE, SO IT IS GONE
+
+Owner: "Remove or rework the maps."
+
+The circuit-outline badge on each world card — a 72x52 canvas sitting on top
+of the preview photo. Removed, and the choice is not laziness: **it had been
+wrong twice, and the second time was mine.**
+
+Until r415 it drew the raw control points with neither `routeFlipX` nor
+`routeReverse` applied, so eleven worlds showed the mirror image of the lap
+they represent. r415 fixed that — and fixed only ONE of its two call sites.
+
+`_markCurrentCard`, which runs every time the selection highlight moves, kept
+calling `_drawCircuitMap(canvas, lv.route || lv.theme, ...)` — a STRING —
+against the new signature that wants a LEVEL. `routePlanPoints` then read
+`undefined` for both `.route` and `.theme`, fell through to
+`CIRCUITS.forest`, and repainted the card as PINE VALLEY's loop. **Since
+r415, moving the selection has been redrawing cards as the wrong shape.**
+
+The gate could not catch it: no suite renders the level-select card
+highlight, so a broken second call site looks exactly like a working one.
+
+A 72-pixel outline has to be right to be worth anything. Twice wrong makes it
+decoration with a defect rate, and the owner offered the exit. Deleted
+properly — both call sites, the `_drawCircuitMap` method, the now-unused
+`routePlanPoints` import in main.js, two CSS rules, and the two comments that
+still named it.
+
+`routePlanPoints` itself stays. The track builder is its real caller, and it
+is the single source of truth that stopped eleven worlds driving a lap their
+card drew mirrored. The preview photo is untouched.
+
 ## r420 — TWENTY-SEVEN OF TWENTY-EIGHT WERE ALREADY FINE
 
 Owner: "You can also twist the tracks make them drive the other world and
