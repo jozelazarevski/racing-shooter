@@ -35,6 +35,7 @@ const R = await p.evaluate(async () => {
   const runCase = (name, setup) => {
     const pl = g.player;
     pl.step = ORIG_STEP;                 // undo any previous case's wrapper
+    hold({ throttle: 0, brake: 0, steer: 0, drift: false });
     g.state = 'race';
     pl.placeAt(Math.floor(N * 0.985), 0, true);   // ~13 indices short of the line
     arm(pl);
@@ -69,28 +70,33 @@ const R = await p.evaluate(async () => {
     };
   };
 
-  const drive = (pl) => {
-    const base = pl.step.bind(pl);
-    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, brake: 0 });
-  };
+  // DRIVE THROUGH THE GAME'S OWN INPUT LAYER. Wrapping pl.step and forcing
+  // throttle there lands AFTER `controlsLive` has zeroed the inputs, so it
+  // bypasses the very input lock the rule is about and the car sails on at
+  // full speed looking like a defect. Setting g.input is what a player does.
+  const hold = (o) => { for (const k in o) g.input[k] = o[k]; };
+  const drive = () => hold({ throttle: 1, brake: 0, steer: 0, drift: false });
 
-  out.cases.push(runCase('1 grounded', (pl) => { drive(pl); }));
-  out.cases.push(runCase('2 airborne', (pl) => { drive(pl); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
-  out.cases.push(runCase('3 drifting', (pl) => {
-    const base = pl.step.bind(pl);
-    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, drift: true, steer: 0.12 });
+  out.cases.push(runCase('1 grounded', () => { drive(); }));
+  out.cases.push(runCase('2 airborne', (pl) => { drive(); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
+  out.cases.push(runCase('3 drifting', () => {
+    hold({ throttle: 1, brake: 0, steer: 0.12, drift: true });
   }));
-  out.cases.push(runCase('4 shielded', (pl) => { drive(pl); pl.invuln = 5; pl.shieldT = 5; }));
-  out.cases.push(runCase('5 mid-respawn', (pl) => { drive(pl); pl._teleportFrames = 8; }));
+  out.cases.push(runCase('4 shielded', (pl) => { drive(); pl.invuln = 5; pl.shieldT = 5; }));
+  out.cases.push(runCase('5 mid-respawn', (pl) => { drive(); pl._teleportFrames = 8; }));
   // case 6 rewritten: pausing stops the physics, so the car never reaches the
   // line and the case proves nothing. What the `controlsLive` veto actually
   // needs is a state flip AT the moment of crossing — flip it when the car is
   // within two indices of the line, while it is still moving.
-  out.cases.push(runCase('6 state flips at the line', (pl, gg) => {
-    const base = pl.step.bind(pl);
-    pl.step = (dt, inp) => {
-      if (pl.trackIndex > gg.track.center.length - 3) gg.state = 'countdown';
-      return base(dt, { ...inp, throttle: 1, brake: 0 });
+  // case 6: flip the state BEFORE the update that will cross the line, so the
+  // `controlsLive` veto is genuinely in force on the crossing frame. Flipping
+  // it inside step is too late — controlsLive was already read that frame.
+  out.cases.push(runCase('6 controlsLive veto', (pl, gg) => {
+    drive();
+    const body = gg._frameBody.bind(gg);
+    gg._frameBody = () => {
+      if (pl.trackIndex > gg.track.center.length - 4) gg.state = 'countdown';
+      return body();
     };
   }));
   return out;
