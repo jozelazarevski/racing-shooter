@@ -35,6 +35,10 @@ const R = await p.evaluate(async () => {
   g.input.autoThrottle = false; g.input.bothSteer = false;
   g.input.analog.throttle = 1; g.input.analog.brake = 0; g.input.analog.steer = 0;
 
+  // ASK WHETHER THE THING RAN BEFORE EXPLAINING HOW IT RAN. The r426 change
+  // produced numbers identical to the baseline, which usually means the code
+  // never executed or never bound. Count both.
+  g.__boreSeen = 0; g.__boreBound = 0; g.__boreNull = 0;
   const q = cam.quaternion.clone();
   const samples = [];
   let shakeMax = 0;
@@ -44,7 +48,7 @@ const R = await p.evaluate(async () => {
     const degPerFrame = 2 * Math.acos(dot) * 180 / Math.PI;
     q.copy(cam.quaternion);
     shakeMax = Math.max(shakeMax, g.shake ?? 0);
-    samples.push({ i: pl.trackIndex, w: +(degPerFrame * 60).toFixed(1),
+    samples.push({ boreY: g._boreCeilY ?? null, i: pl.trackIndex, w: +(degPerFrame * 60).toFixed(1),
       shake: +(g.shake ?? 0).toFixed(3),
       // height ABOVE THE CAR, not world altitude: KARVEN CLIMB is a pass, so
       // cam.position.y of 75 says nothing on its own
@@ -58,12 +62,17 @@ const R = await p.evaluate(async () => {
   const bores = (g.track?._tunnels ?? []).map((t) => ({
     mid: t.mid, s: t.s, e: t.e, ridgeH: t.h }));
   return { world: g.level?.name, N, samples, bores, shakeMax,
+    boreCeilExists: '_boreCeilY' in g, boreCeilNow: g._boreCeilY ?? null,
+    driving: (window.__DRIVING?.patch02b?.boreCeilRiseUPerS ?? 'MISSING'),
     boreKeys: Object.keys(g.track ?? {}).filter((k) => /tunnel|bore/i.test(k)) };
 });
 await browser.close();
 
 const S = R.samples;
 console.log(`${R.world}  N=${R.N}  frames=${S.length}  peak g.shake=${R.shakeMax}`);
+console.log(`_boreCeilY present on game: ${R.boreCeilExists}  now ${R.boreCeilNow}  driving.boreCeilRiseUPerS ${R.driving}`);
+const withCeil = S.filter((s) => s.boreY !== null).length;
+console.log(`frames with an active bore ceiling: ${withCeil} of ${S.length}`);
 console.log(`track tunnel keys: ${JSON.stringify(R.boreKeys)}  bores: ${JSON.stringify(R.bores)}`);
 const w = S.map((s) => s.w);
 const sorted = [...w].sort((a, b) => a - b);
