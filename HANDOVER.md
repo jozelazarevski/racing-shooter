@@ -4171,6 +4171,62 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r427 — THE LERP AND THE CLAMP WERE FIGHTING INSIDE THE BORE
+
+The owner's tunnel shake (#116), root-caused by making the code name itself
+instead of reading it and guessing — which is what made r426 inert.
+
+**How it was found.** `camPos` is a THREE.Vector3 whose `y` is an own
+property, so it can be replaced with an accessor that records its own caller.
+Inside stations 106-116 on KARVEN CLIMB:
+
+| writer | writes | biggest single jump |
+|---|---|---|
+| the in-bore clamp (main.js:12070) | 180 | **-5.46 u** |
+| the chase lerp (main.js:11992) | 256 | **+4.46 u** |
+| the bore ceiling (main.js:12305) | 75 | 3.96 u — what r426 blamed |
+
+Alternating on consecutive frames: `91.55 -> 86.09`, then `87.14 -> 91.60`.
+The in-bore clamp forces the EYE into the bore's height band every frame,
+while `targetPos` — what the lerp eases toward — kept whatever the open-air
+rules wanted, which inside a bore is above the roof. Every frame the lerp
+pulled up toward an illegal height and the clamp slammed it back down.
+
+**The fix, and the false start inside it.** v1 clamped `targetPos` in the
+bore branch and changed nothing — identical to the decimal. The order is:
+`targetPos` is built fresh at 11921, consumed by the lerp at 11992, and the
+bore branch runs at ~12070, so v1 clamped an object the lerp had already
+used and the frame was about to throw away. v2 records the band
+(`_coverBand`, cleared when under neither bore nor deck) and applies it to
+the target just before the lerp — one frame late, invisible at 60 Hz, and far
+less invasive than reordering the camera pipeline.
+
+**Measured, KARVEN CLIMB stations 100-110:**
+
+| | before | after |
+|---|---|---|
+| camera angular velocity | 146-155 deg/s | **9-10 deg/s** |
+| height bob | 5.6..6.7 (1.1 u) | 5.5..5.9 (0.4 u) |
+| p95 / p99 over the lap | 12 / 21 | 11 / 19 |
+
+Ordinary driving is 3 deg/s, so the bore went from ~50x that to ~3x. The
+same fix lands in the `deckOverhead` branch, which was written as "same clamp
+shape as the tunnel branch" and had inherited the bug with the shape.
+
+**WHAT IS NOT FIXED, stated plainly.** The single-frame snap at station 113 —
+just past the portal, exactly where the owner says he sees it — is untouched:
+581 -> 594 deg/s, height 3.9 -> 9.3 in one frame. The writer probe names the
+LERP itself taking a +4.46 u step there, which means the target is far above
+the eye at that instant; the remaining unknown is why, and `_camDt` at that
+frame is the next thing to measure. The approach spike at station 94 also got
+slightly worse (727 -> 780), because `tunnelAt` carries a 6-station pad so the
+band now applies from 90.
+
+So #116 is HALF DONE: the sustained churn through the bore is fixed and
+measured, the portal snap is not. Shipping the half that is real rather than
+holding a measured 15x improvement hostage to the other half — and saying so
+rather than letting "camera fix" imply the whole report is closed.
+
 ## r426 — THE TUNING FILE HAD A SILENT DROP, AND IT COST A BUILD TO FIND
 
 r425 is not in this ledger because r425 changed nothing: twelve identical
