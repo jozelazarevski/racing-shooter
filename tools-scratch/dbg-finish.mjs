@@ -139,24 +139,29 @@ const R = await p.evaluate(async () => {
       arm(pl);
       for (let f = 0; f < 10; f++) g._frameBody();
       const before = pl.trackIndex;
-      g.rescuePlayer ? g.rescuePlayer() : (pl.unstuck ? pl.unstuck() : null);
-      for (let f = 0; f < 5; f++) g._frameBody();
+      // there is no rescue METHOD — the request is a flag the update reads
+      // (`input.justPressed('KeyR') || this._unstuckReq`), which is why the
+      // first cut of this case called nothing at all and every car "landed"
+      // exactly where it started.
+      pl.unstuckCool = 0;
+      pl._unstuckReq = true;
+      for (let f = 0; f < 30; f++) g._frameBody();
       const after = pl.trackIndex;
       landings.push({ before, after,
         pastLine: after < N * 0.5 && before > N * 0.85,
         metresToLine: Math.round(((N - after) % N) * (g.track.segLen ?? 4)) });
     }
     out.rescue = landings;
-    out.hasRescuePlayer = typeof g.rescuePlayer === 'function';
+    out.rescueIsFlag = true;
   }
   return out;
 });
 await browser.close();
 console.log('lapsTotal', R.lapsTotal, 'N', R.N);
 for (const c of R.cases) {
-  console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  vCross=${c.speedAtCross}  v+2s=${c.speedAfter2s}  rollOn=${c.rollOnM}m  idxEnd=${c.idxAfter}  state=${c.stateAfter}`);
+  console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  rollOn=${c.rollOnM}m  idxEnd=${c.idxAfter}  state=${c.stateAfter}`);
 }
-console.log('\nrescue near the line (hasRescuePlayer=' + R.hasRescuePlayer + '):');
+console.log('\nrescue near the line (via _unstuckReq):');
 for (const r of (R.rescue || [])) {
   console.log(`  from idx ${String(r.before).padStart(3)} -> ${String(r.after).padStart(3)}  pastLine=${r.pastLine}  ${r.metresToLine} m short of the line`);
 }
