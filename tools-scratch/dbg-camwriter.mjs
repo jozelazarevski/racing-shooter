@@ -30,7 +30,7 @@ const R = await p.evaluate(async () => {
               get elapsedTime() { return elapsed; } };
   const pl = g.player, cam = g.camera;
   // DRIVE. The first cut instrumented perfectly and never touched the
-  // throttle, so the car sat on the line, never reached stations 106-116,
+  // throttle, so the car sat on the line, never reached stations 111-115,
   // and the probe reported "0 writes" — which reads exactly like "nothing
   // writes the camera height" if you do not check.
   g.input.autoThrottle = false; g.input.bothSteer = false;
@@ -58,7 +58,7 @@ const R = await p.evaluate(async () => {
   let reached = false, maxStation = 0;
   for (let f = 0; f < 4200; f++) {
     // only record around the bore, or the log is 100k entries
-    armed = pl.trackIndex >= 106 && pl.trackIndex <= 116;
+    armed = pl.trackIndex >= 111 && pl.trackIndex <= 115;
     if (armed) reached = true;
     maxStation = Math.max(maxStation, pl.trackIndex);
     g._frameBody();
@@ -83,10 +83,10 @@ const R = await p.evaluate(async () => {
 });
 await browser.close();
 if (R.NEVER_REACHED) {
-  console.log(`HARNESS FAILURE: the car never reached stations 106-116 (max ${R.maxStation}). Nothing measured.`);
+  console.log(`HARNESS FAILURE: the car never reached stations 111-115 (max ${R.maxStation}). Nothing measured.`);
   process.exit(1);
 }
-console.log(`${R.world}: ${R.total} camPos.y writes recorded in stations 106-116\n`);
+console.log(`${R.world}: ${R.total} camPos.y writes recorded in stations 111-115\n`);
 console.log('writers, by biggest single jump:');
 for (const w of R.writers) {
   console.log(`  ${String(w.n).padStart(5)} writes  max jump ${String(w.maxJump).padStart(6)} u   ${w.where}`);
