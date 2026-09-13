@@ -11988,6 +11988,30 @@ class Game {
     // ...and the eye keeps up: at the cruise rate the boom trails a fast
     // fall by the better part of its own length, which is how the car ends
     // below the frame while the lens is still easing.
+    // r427: UNDER COVER, THE TARGET OBEYS THE COVER TOO. The bore and deck
+    // branches below force the EYE into a height band every frame, but the
+    // target the lerp eases toward was left at what the open-air rules
+    // wanted — above the roof. So the lerp pulled up toward an illegal
+    // height and the clamp slammed it back down, every frame, until the
+    // portal released them.
+    //
+    // MEASURED by instrumenting camPos.y with an accessor that records its
+    // own caller, KARVEN CLIMB bore s96-e104, stations 106-116:
+    //   the in-bore clamp   180 writes, biggest -5.46 u
+    //   the lerp below      256 writes, biggest +4.46 u
+    //   alternating: 91.55 -> 86.09, then 87.14 -> 91.60
+    // Camera angular velocity ran a sustained 145-160 deg/s through
+    // stations 92-111 against 3 for ordinary driving, then sprang 581 at
+    // station 113 as the fight ended.
+    //
+    // The band is carried from the previous frame because those branches run
+    // AFTER this lerp and targetPos is rebuilt fresh each frame — clamping it
+    // down there modifies an object the lerp has already used and is about to
+    // discard, which is exactly why the first cut changed nothing.
+    if (this._coverBand) {
+      targetPos.y = Math.max(this._coverBand.lo,
+        Math.min(targetPos.y, this._coverBand.hi));
+    }
     const k = 1 - Math.exp(-(5.5 + (vyNow < -9 ? 4 : 0)) * (this._camDt ?? dt));
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
@@ -12092,7 +12116,12 @@ class Game {
       // actually doing the work rather than the one 88 m overhead.
       const tunLo = fy + 1.9, tunHi = fy + tun.apex - 1.3;
       cp.y = Math.max(tunLo, Math.min(cp.y, tunHi));
-      targetPos.y = Math.max(tunLo, Math.min(targetPos.y, tunHi));
+      // r427 v2: RECORD the band; do NOT clamp targetPos here. targetPos is
+      // rebuilt fresh at the top of every frame and the lerp has already
+      // consumed it by the time this line runs, so clamping it here modifies
+      // a dead object — measured: the churn was unchanged to the decimal.
+      // The band is applied to NEXT frame's target, before the lerp.
+      this._coverBand = { lo: tunLo, hi: tunHi };
     } else if (tk?.deckOverhead
       && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex))) {
       // UNDER A BRIDGE, OBEY THE BRIDGE — the same rule as the bore above.
@@ -12123,8 +12152,9 @@ class Game {
       // the bug with the shape. The target gets the band too.
       const dkLo = dk.floorY + 1.9, dkHi = dk.deckY - 0.8;
       cp.y = Math.max(dkLo, Math.min(cp.y, dkHi));
-      targetPos.y = Math.max(dkLo, Math.min(targetPos.y, dkHi));
+      this._coverBand = { lo: dkLo, hi: dkHi };   // see the bore branch
     } else if (tk?.terrainHeight) {
+      this._coverBand = null;                     // out from under cover
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;
       let lift = 0, liftHard = 0;
