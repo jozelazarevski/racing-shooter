@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover lets the page paint under an iPhone's notch and home
+       indicator; every control below then pays that back with env(safe-area-*)
+       so nothing sits under either. maximum-scale/user-scalable stop Android
+       from zooming on a double tap — iOS ignores them, which is why the CSS
+       also sets touch-action and ui/touch.ts blocks `gesturestart`. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0f12" />
+  <title>DUSTLINE — rally combat racer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>" />
+  <script>
+    /* CAPABILITY, NOT USER AGENT, AND EARLY ENOUGH TO MATTER.
+     *
+     * `(pointer: coarse)` asks whether the PRIMARY pointer is a fingertip. A
+     * touchscreen laptop answers "fine" — it has a mouse — so it does not get
+     * thumb pads over its viewport, which `'ontouchstart' in window` (v1's
+     * second test) would have given it. `?touch=1` / `?touch=0` force it, for
+     * checking the phone layout on a desktop and for a device that lies.
+     *
+     * This runs inline, in <head>, because the track picker paints before any
+     * module does and its phone styling hangs off this class. `ui/touch.ts`
+     * re-runs the same test — that duplication is deliberate: the module must
+     * still be right if this snippet is ever stripped, and one predicate is
+     * cheaper to keep in step than a shared import that has to load first. */
+    (function () {
+      var q = new URLSearchParams(location.search).get('touch');
+      var coarse = q === '1' || (q !== '0' && matchMedia('(pointer: coarse)').matches);
+      document.documentElement.classList.toggle('touch', coarse);
+    })();
+  </script>
+  <style>
+    :root {
+      /* Safe-area insets, named once. `env()` resolves to 0px where there is
+         no notch, so these are inert on a desktop and on Android. */
+      --sa-t: env(safe-area-inset-top, 0px);
+      --sa-r: env(safe-area-inset-right, 0px);
+      --sa-b: env(safe-area-inset-bottom, 0px);
+      --sa-l: env(safe-area-inset-left, 0px);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden; background: #0d0f12;
+      -webkit-user-select: none; user-select: none;
+      -webkit-text-size-adjust: 100%;
+      /* NOT `touch-action: none` HERE, though v1 sets exactly that on html and
+         body. `none` on an ancestor cannot be opted back out of by a
+         descendant, and dustline has a scrolling list a phone must be able to
+         drag: the track picker's `#tsel .grid` (ui/trackSelect.ts). So the
+         document allows panning and only kills the double-tap zoom gesture,
+         and the two surfaces a thumb drives on — the canvas and the control
+         overlay — set `none` themselves, below. */
+      touch-action: manipulation;
+      /* no rubber-band overscroll, no pull-to-refresh mid-corner */
+      overscroll-behavior: none;
+    }
+    #app { position: fixed; inset: 0; display: block; touch-action: none; }
+    #telemetry {
+      position: fixed; top: 12px; left: 12px; padding: 10px 14px;
+      background: rgba(10, 12, 16, 0.72); border: 1px solid rgba(120, 220, 255, 0.25);
+      border-radius: 8px; color: #9fdcff; font: 12px/1.55 'Consolas', 'Menlo', monospace;
+      white-space: pre; pointer-events: none; backdrop-filter: blur(4px);
+    }
+    #telemetry .t-head { color: #ffffff; font-weight: 700; letter-spacing: 2px; margin-bottom: 4px; }
+    #boot {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #9fdcff; font: 16px 'Consolas', monospace; letter-spacing: 3px;
+    }
+
+    /* ================= TOUCH CONTROLS =================
+       Behaviour lives in src/ui/touch.ts; the axes and their tuning live in
+       src/core/input.ts. This is placement only.
+
+       EVERY TARGET IS AT LEAST 56 CSS px. The floor people cite is ~44 px,
+       which is roughly the contact patch of an adult fingertip — below it the
+       press lands next to the button rather than on it. 56 is that floor plus
+       margin for a thumb reaching across a phone one-handed, and the two
+       controls that matter mid-corner (the pad and DRIFT) are far larger. */
+    #touch-ui {
+      position: fixed; inset: 0; z-index: 5; display: none;
+      pointer-events: none;   /* only the controls themselves are pressable */
+      touch-action: none;     /* a drag in here never scrolls the page */
+      font: 800 13px/1 'Consolas', 'Menlo', monospace; letter-spacing: 2px;
+      color: #dff2ff;
+    }
+    /* Hidden until BOTH: this is a touch device, and ui/touch.ts has added
+       `.on` — which it does after the track picker has resolved, so the
+       controls never sit on top of the picker. */
+    html.touch #touch-ui.on { display: block; }
+
+    .tbtn {
+      pointer-events: auto; position: absolute;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      border: 2px solid rgba(159, 220, 255, .5); border-radius: 50%;
+      background: rgba(10, 14, 20, .5); color: inherit; font: inherit; text-align: center;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, .35); backdrop-filter: blur(3px);
+      -webkit-tap-highlight-color: transparent; touch-action: none;
+    }
+    /* `.active` is set by Input.bindTouchButtons on touchstart — the press has
+       to be visible on a screen with no click and no travel. */
+    .tbtn.active, .tbtn:active { background: rgba(159, 220, 255, .42); color: #06202c; transform: scale(.94); }
+    .tbtn .sub { font-size: 9px; letter-spacing: 1px; opacity: .8; font-weight: 700; }
+    /* A control that looks armed and does nothing is worse than no control:
+       disabled is drawn as disabled AND made unpressable, so a dead button
+       cannot be mistaken for a stuck one. */
+    .tbtn[disabled] { opacity: .32; border-style: dashed; box-shadow: none; pointer-events: none; }
+
+    /* ---- left thumb: the steering pad ----
+       The zone is an invisible capture area; the base is the ring that appears
+       wherever the thumb lands (Input.bindJoystick). min-width 150px because
+       the base is 124px wide and rests at min(120, zone·0.45) from the left —
+       at 150px that is 67.5px, the narrowest zone that still puts the whole
+       ring on screen. */
+    #joy-zone {
+      pointer-events: auto; position: absolute; left: 0; bottom: 0;
+      width: 46%; min-width: 150px; height: 62%; touch-action: none;
+    }
+    #joy-base {
+      position: absolute; width: 124px; height: 124px; margin: -62px 0 0 -62px;
+      border-radius: 50%; background: rgba(10, 14, 20, .4);
+      border: 2px solid rgba(159, 220, 255, .32);
+      box-shadow: inset 0 0 22px rgba(0, 0, 0, .35); backdrop-filter: blur(2px);
+      transition: opacity .2s, border-color .2s;
+    }
+    #joy-base.live { background: rgba(12, 22, 32, .55); border-color: rgba(159, 220, 255, .75); }
+    /* The legend has to clear the knob, which is 58px across and paints
+       between ::before and ::after — a percentage transform off the centre put
+       one label under the knob and the other on top of it. These are absolute
+       offsets inside the 124px base: 33px is the knob's edge, so 12 and 100
+       leave a clear ring at the top and bottom of the base. */
+    #joy-base::before {
+      content: '◀ ▲ ▶'; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      font: 700 10px 'Consolas', monospace; letter-spacing: 2px; color: rgba(223, 242, 255, .6);
+      white-space: nowrap;
+    }
+    #joy-base::after {
+      content: '▼'; position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+      font: 700 10px 'Consolas', monospace; color: rgba(223, 242, 255, .6); white-space: nowrap;
+    }
+    #joy-knob {
+      position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle at 35% 30%, #dff2ff, #4aa8d8);
+      border: 2px solid rgba(6, 32, 44, .9); box-shadow: 0 4px 8px rgba(0, 0, 0, .45);
+    }
+
+    /* ---- right thumb: one column, ordered by how much it matters mid-corner.
+       DRIFT (the handbrake) is on the bottom because that is where the thumb
+       rests. FIRE is at the top precisely because it does nothing yet. ---- */
+    #t-drift {
+      right: calc(16px + var(--sa-r)); bottom: calc(26px + var(--sa-b));
+      width: 96px; height: 96px; font-size: 14px; background: rgba(20, 60, 110, .55);
+    }
+    #t-nitro {
+      right: calc(24px + var(--sa-r)); bottom: calc(134px + var(--sa-b));
+      width: 76px; height: 76px; font-size: 12px; background: rgba(16, 44, 70, .5);
+    }
+    #t-fire {
+      right: calc(32px + var(--sa-r)); bottom: calc(222px + var(--sa-b));
+      width: 64px; height: 64px; font-size: 12px;
+    }
+
+    /* ---- top-left rail: away from both thumbs, so nothing here is pressed by
+       accident while driving. ---- */
+    .pill {
+      border-radius: 24px; height: 48px; padding: 0 16px; width: auto; min-width: 92px;
+      font-size: 12px; letter-spacing: 1px;
+    }
+    #t-reset  { left: calc(12px + var(--sa-l)); top: calc(12px + var(--sa-t)); }
+    #t-thumbs { left: calc(12px + var(--sa-l)); top: calc(68px + var(--sa-t)); min-width: 112px; }
+
+    /* ---- gauge cluster: bottom centre, between the pad and the buttons ---- */
+    #gauge {
+      position: absolute; left: 50%; bottom: calc(8px + var(--sa-b));
+      transform: translateX(-50%); pointer-events: none;
+    }
+    #speedo { display: block; width: 88px; height: 88px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .45)); }
+
+    /* ---- TWO-THUMB: the pad becomes a steering rail and the pedals move to
+       the right thumb (Input.steerOnly). One column again, because at 320px
+       there is not room for two clear of the pad's 150px capture zone. ---- */
+    .pedal { display: none; }
+    html.thumbs2 .pedal { display: flex; }
+    html.thumbs2 #joy-base::before { content: '◀ STEER ▶'; }
+    html.thumbs2 #joy-base::after { content: ''; }
+    html.thumbs2 #t-gas {
+      right: calc(16px + var(--sa-r)); bottom: calc(26px + var(--sa-b));
+      width: 100px; height: 100px; font-size: 14px; background: rgba(20, 80, 60, .55);
+    }
+    html.thumbs2 #t-brake {
+      right: calc(22px + var(--sa-r)); bottom: calc(138px + var(--sa-b));
+      width: 88px; height: 88px; font-size: 13px; background: rgba(96, 34, 28, .55);
+    }
+    html.thumbs2 #t-drift  { right: calc(30px + var(--sa-r)); bottom: calc(238px + var(--sa-b)); width: 72px; height: 72px; font-size: 12px; }
+    html.thumbs2 #t-nitro  { right: calc(36px + var(--sa-r)); bottom: calc(322px + var(--sa-b)); width: 62px; height: 62px; font-size: 11px; }
+    html.thumbs2 #t-fire   { right: calc(40px + var(--sa-r)); bottom: calc(394px + var(--sa-b)); width: 58px; height: 58px; font-size: 11px; }
+
+    /* ---- small portrait (320px is the narrowest screen worth supporting).
+       The pad's resting ring reaches x≈130 there, so the gauge steps right and
+       shrinks rather than sitting under it. ---- */
+    @media (max-width: 360px) {
+      #gauge { left: calc(50% + 8px); }
+      #speedo { width: 72px; height: 72px; }
+      #t-drift { width: 88px; height: 88px; }
+      #t-nitro { width: 68px; height: 68px; bottom: calc(126px + var(--sa-b)); }
+      #t-fire  { width: 60px; height: 60px; bottom: calc(206px + var(--sa-b)); }
+    }
+    /* ---- short viewport (landscape phone). The column has no room to stack,
+       so it spreads along the bottom edge instead — there is width to spare
+       here and there is not any height. ---- */
+    @media (max-height: 520px) {
+      /* 80%, not 84%: at 84% of a 390px-tall landscape phone the pad's capture
+         zone starts at y=62, and the scheme pill stacked below RESET sat at
+         y=68-116 — 112x48 of the steering pad that swallowed the touch instead
+         of steering with it. A dead patch in the middle of the one control you
+         need mid-corner is worse than a smaller pad, so the pills move into a
+         row above it and the zone gives up 15px to leave a clear gap. */
+      #joy-zone { width: 40%; height: 80%; }
+      #t-reset  { left: calc(12px + var(--sa-l)); top: calc(12px + var(--sa-t)); }
+      #t-thumbs { left: calc(132px + var(--sa-l)); top: calc(12px + var(--sa-t)); }
+      #t-drift { bottom: calc(16px + var(--sa-b)); width: 84px; height: 84px; }
+      #t-nitro { right: calc(112px + var(--sa-r)); bottom: calc(22px + var(--sa-b)); width: 64px; height: 64px; }
+      #t-fire  { right: calc(186px + var(--sa-r)); bottom: calc(24px + var(--sa-b)); width: 58px; height: 58px; }
+      #gauge { left: auto; right: calc(256px + var(--sa-r)); transform: none; }
+      #speedo { width: 74px; height: 74px; }
+      html.thumbs2 #t-gas   { bottom: calc(16px + var(--sa-b)); width: 88px; height: 88px; }
+      html.thumbs2 #t-brake { right: calc(114px + var(--sa-r)); bottom: calc(20px + var(--sa-b)); width: 76px; height: 76px; }
+      html.thumbs2 #t-drift { right: calc(200px + var(--sa-r)); bottom: calc(22px + var(--sa-b)); width: 68px; height: 68px; }
+      html.thumbs2 #t-nitro { right: calc(120px + var(--sa-r)); bottom: calc(104px + var(--sa-b)); width: 60px; height: 60px; }
+      html.thumbs2 #t-fire  { right: calc(30px + var(--sa-r)); bottom: calc(110px + var(--sa-b)); width: 58px; height: 58px; }
+    }
+
+    /* ================= what the rest of the UI does on a phone =================
+       These elements belong to src/ui/{hud,telemetry,trackSelect}.ts, which
+       this session does not own. Placement is a page concern, so the phone
+       overrides live here rather than as edits to those files. */
+
+    /* The debug telemetry overlay is ~44 monospace columns wide — most of a
+       phone — and it is a tuning instrument, not something a test drive needs.
+       Off on touch, back with ?telemetry=1 (ui/touch.ts sets the class). */
+    html.touch #telemetry { display: none; }
+    html.show-telemetry #telemetry { display: block; font-size: 10px; line-height: 1.4; opacity: .65; }
+
+    /* Position/lap/time clears the notch; the standings block moves out of the
+       bottom-left corner, which on a phone is where the steering pad lives. */
+    html.touch #race-hud { top: calc(10px + var(--sa-t)); right: calc(10px + var(--sa-r)); }
+    html.touch #race-hud .pos { font-size: 34px; }
+    html.touch #race-standings {
+      bottom: auto; top: calc(124px + var(--sa-t)); left: calc(12px + var(--sa-l));
+      font-size: 11px; line-height: 1.5; padding: 6px 10px;
+    }
+
+    /* The results card is min-width:340px, which overflows a 320px phone — and
+       the RESTART button inside it is the only way out of a finished race. */
+    html.touch #results .card { min-width: 0; width: min(92vw, 340px); padding: 22px 18px; }
+    html.touch #results button { padding: 14px 28px; }
+
+    /* The picker paints before any module runs, so it is styled off the inline
+       capability check rather than anything ui/touch.ts does. */
+    html.touch #tsel {
+      padding: calc(20px + var(--sa-t)) calc(14px + var(--sa-r)) calc(20px + var(--sa-b)) calc(14px + var(--sa-l));
+    }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="boot">LOADING PHYSICS…</div>
+
+  <!-- ON-SCREEN CONTROLS. Every button carries `data-key` and nothing else:
+       Input.bindTouchButtons makes it behave exactly like that keyboard key,
+       so a screen control and a key can never disagree about what they do.
+       FIRE is the exception — it has no data-key because there is nothing for
+       it to send. -->
+  <div id="touch-ui">
+    <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+
+    <!-- Space is the handbrake, and the handbrake is what makes it drift. -->
+    <button class="tbtn" id="t-drift" data-key="Space">DRIFT</button>
+    <button class="tbtn" id="t-nitro" data-key="ShiftLeft">NITRO</button>
+    <!-- Combat is M4 and is not built. This button is drawn disabled and is
+         unpressable, rather than looking armed and doing nothing. -->
+    <button class="tbtn" id="t-fire" disabled aria-disabled="true" title="Weapons arrive in M4">FIRE<span class="sub">M4</span></button>
+
+    <!-- TWO-THUMB pedals: hidden unless html.thumbs2. ArrowUp/ArrowDown are
+         already throttle/brake in Input.poll, so the scheme needs no new
+         input path — same trick v1 uses for its pedals. -->
+    <button class="tbtn pedal" id="t-gas" data-key="ArrowUp">GAS</button>
+    <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
+
+    <button class="tbtn pill" id="t-reset" data-key="KeyR">RESET</button>
+    <button class="tbtn pill" id="t-thumbs"><span class="mode">1 THUMB</span><span class="sub">TAP TO SWAP</span></button>
+
+    <div id="gauge"><canvas id="speedo" width="300" height="300"></canvas></div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

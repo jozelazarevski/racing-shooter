@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #efe9de; }
+    a { color: #b4562f; } a:hover { color: #8e4223; }
+    .ser { font-family: "Bodoni Moda", Didot, "Bodoni MT", Georgia, serif; }
+    .san { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+    .grp { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; align-items: start;
+           padding: 16px 0; border-top: 1px solid #ddd4c4; }
+    .gname { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; font-size: 13px; font-weight: 600; color: #26221e; }
+    .gnote { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; font-size: 11px; line-height: 1.45; color: #8a7f70; margin-top: 4px; }
+    .row { display: flex; gap: 10px; }
+    .sw { width: 100px; }
+    .chip { height: 62px; border-radius: 2px; }
+    .nm { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; font-size: 11px; font-weight: 600; color: #26221e; margin-top: 6px; }
+    .hx { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 10.5px; color: #6f665b; margin-top: 1px; }
+    .rf { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 10px; color: #a2988a; margin-top: 2px; }
+    .rf.chg { color: #b83028; }
+  </style>
+</helmet>
+
+<div style="width: 980px; height: 1420px; background: #efe9de; padding: 26px 30px 30px; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <div class="ser" style="font-size: 34px; font-weight: 700; color: #26221e; line-height: 1;">The palette</div>
+    <div class="san" style="font-size: 12px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: #8a7f70;">Reference values · repo constant beneath</div>
+  </div>
+  <div class="san" style="font-size: 12.5px; line-height: 1.5; color: #6f665b; margin-top: 8px; max-width: 620px;">
+    Grey lines under a swatch name the constant already in <span class="mono">src/track.js</span> or <span class="mono">src/textures.js</span> that matches it. Red lines are the four places the running game disagrees with the reference.
+  </div>
+
+  <div class="grp" style="margin-top: 16px;">
+    <div><div class="gname">Sky &amp; air</div><div class="gnote">Overcast, faceted, no blue. Darkest facet top-left.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #5f6d7c;"></div><div class="nm">Cloud dark</div><div class="hx">#5f6d7c</div><div class="rf chg">skyTop is #3a86c8</div></div>
+      <div class="sw"><div class="chip" style="background: #78848f;"></div><div class="nm">Cloud</div><div class="hx">#78848f</div></div>
+      <div class="sw"><div class="chip" style="background: #8a949f;"></div><div class="nm">Cloud mid</div><div class="hx">#8a949f</div></div>
+      <div class="sw"><div class="chip" style="background: #b4bcc3;"></div><div class="nm">Cloud light</div><div class="hx">#b4bcc3</div></div>
+      <div class="sw"><div class="chip" style="background: #c6ccd1;"></div><div class="nm">Cloud pale</div><div class="hx">#c6ccd1</div></div>
+      <div class="sw"><div class="chip" style="background: #d3dae0;"></div><div class="nm">Horizon haze</div><div class="hx">#d3dae0</div><div class="rf chg">skyHorizon is #eee4d2</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Water &amp; distance</div><div class="gnote">The sea takes its value from the cloud, not from a clear sky.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #a4bcc8;"></div><div class="nm">Sea near</div><div class="hx">#a4bcc8</div></div>
+      <div class="sw"><div class="chip" style="background: #93aebd;"></div><div class="nm">Sea</div><div class="hx">#93aebd</div><div class="rf chg">seaColor is #2f74a6</div></div>
+      <div class="sw"><div class="chip" style="background: #9aa8b4;"></div><div class="nm">Ridge far</div><div class="hx">#9aa8b4</div></div>
+      <div class="sw"><div class="chip" style="background: #82919e;"></div><div class="nm">Ridge mid</div><div class="hx">#82919e</div></div>
+      <div class="sw"><div class="chip" style="background: #6e7e8b;"></div><div class="nm">Ridge near</div><div class="hx">#6e7e8b</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Stucco</div><div class="gnote">Already right. These are the frontage tints the town worlds paint with.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #d8ab5e;"></div><div class="nm">Ochre</div><div class="hx">#d8ab5e</div><div class="rf">alassio #efc07e</div></div>
+      <div class="sw"><div class="chip" style="background: #e7dcc2;"></div><div class="nm">Cream</div><div class="hx">#e7dcc2</div><div class="rf">sanremo #dcd2ba</div></div>
+      <div class="sw"><div class="chip" style="background: #efe7d6;"></div><div class="nm">Chalk</div><div class="hx">#efe7d6</div><div class="rf">face.trim #fdf6ea</div></div>
+      <div class="sw"><div class="chip" style="background: #dcc0aa;"></div><div class="nm">Rose</div><div class="hx">#dcc0aa</div><div class="rf">azur #efc9b0</div></div>
+      <div class="sw"><div class="chip" style="background: #cbd0b4;"></div><div class="nm">Sage</div><div class="hx">#cbd0b4</div></div>
+      <div class="sw"><div class="chip" style="background: #c9705a;"></div><div class="nm">Sienna</div><div class="hx">#c9705a</div><div class="rf">liguria #c9705a</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Roof &amp; joinery</div><div class="gnote">The strongest match in the game already — pantile, louvre, iron, pane.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #b4562f;"></div><div class="nm">Terracotta</div><div class="hx">#b4562f</div><div class="rf">liguria roof #b4552e</div></div>
+      <div class="sw"><div class="chip" style="background: #8e4223;"></div><div class="nm">Under-eave</div><div class="hx">#8e4223</div></div>
+      <div class="sw"><div class="chip" style="background: #40684a;"></div><div class="nm">Shutter</div><div class="hx">#40684a</div><div class="rf">face.shutter #3f6b46</div></div>
+      <div class="sw"><div class="chip" style="background: #2a2724;"></div><div class="nm">Ironwork</div><div class="hx">#2a2724</div><div class="rf">face.iron #26221e</div></div>
+      <div class="sw"><div class="chip" style="background: #333c46;"></div><div class="nm">Window pane</div><div class="hx">#333c46</div><div class="rf">face.pane #39465a</div></div>
+      <div class="sw"><div class="chip" style="background: #b83028;"></div><div class="nm">Awning</div><div class="hx">#b83028</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Stone &amp; paving</div><div class="gnote">Rampart stone is right; the plaza underfoot is mauve, not red-brown.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #d6ccb6;"></div><div class="nm">Coping</div><div class="hx">#d6ccb6</div></div>
+      <div class="sw"><div class="chip" style="background: #cabfa8;"></div><div class="nm">Stone</div><div class="hx">#cabfa8</div><div class="rf">piazza #cabfa9</div></div>
+      <div class="sw"><div class="chip" style="background: #bdb2a1;"></div><div class="nm">Rustication</div><div class="hx">#bdb2a1</div><div class="rf">piazza #bdb2a0</div></div>
+      <div class="sw"><div class="chip" style="background: #a89c85;"></div><div class="nm">Stone shade</div><div class="hx">#a89c85</div></div>
+      <div class="sw"><div class="chip" style="background: #b09a97;"></div><div class="nm">Plaza flag</div><div class="hx">#b09a97</div><div class="rf chg">fringe is #947e6e</div></div>
+      <div class="sw"><div class="chip" style="background: #9a8583;"></div><div class="nm">Flag joint</div><div class="hx">#9a8583</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Foliage</div><div class="gnote">Two values per clump: a near-black mass and one lighter top plane.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #27402c;"></div><div class="nm">Cypress</div><div class="hx">#27402c</div></div>
+      <div class="sw"><div class="chip" style="background: #2f4a33;"></div><div class="nm">Clump mass</div><div class="hx">#2f4a33</div></div>
+      <div class="sw"><div class="chip" style="background: #456a45;"></div><div class="nm">Clump top</div><div class="hx">#456a45</div></div>
+      <div class="sw"><div class="chip" style="background: #3d5c40;"></div><div class="nm">Palm frond</div><div class="hx">#3d5c40</div></div>
+      <div class="sw"><div class="chip" style="background: #4f6a44;"></div><div class="nm">Slope</div><div class="hx">#4f6a44</div><div class="rf">terrainLow #7f8a58</div></div>
+      <div class="sw"><div class="chip" style="background: #5c7a4d;"></div><div class="nm">Slope lit</div><div class="hx">#5c7a4d</div></div>
+      <div class="sw"><div class="chip" style="background: #7a6a52;"></div><div class="nm">Palm trunk</div><div class="hx">#7a6a52</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Street &amp; circuit</div><div class="gnote">Charcoal asphalt. The race furniture is inside the town, not beside it.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #4c4d54;"></div><div class="nm">Asphalt</div><div class="hx">#4c4d54</div><div class="rf chg">road.base is #7b756a</div></div>
+      <div class="sw"><div class="chip" style="background: #5a5b62;"></div><div class="nm">Asphalt lit</div><div class="hx">#5a5b62</div></div>
+      <div class="sw"><div class="chip" style="background: #e8e6de;"></div><div class="nm">Marking</div><div class="hx">#e8e6de</div></div>
+      <div class="sw"><div class="chip" style="background: #c8382e;"></div><div class="nm">Kerb red</div><div class="hx">#c8382e</div></div>
+      <div class="sw"><div class="chip" style="background: #ece7dd;"></div><div class="nm">Kerb white</div><div class="hx">#ece7dd</div></div>
+      <div class="sw"><div class="chip" style="background: #b9bcbe;"></div><div class="nm">Armco</div><div class="hx">#b9bcbe</div></div>
+      <div class="sw"><div class="chip" style="background: #e2732c;"></div><div class="nm">Cone</div><div class="hx">#e2732c</div></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div><div class="gname">Parked cars</div><div class="gnote">Saturated but never neon — one flat body colour, one darker sill.</div></div>
+    <div class="row">
+      <div class="sw"><div class="chip" style="background: #2f6b45;"></div><div class="nm">Racing green</div><div class="hx">#2f6b45</div></div>
+      <div class="sw"><div class="chip" style="background: #c0392b;"></div><div class="nm">Red</div><div class="hx">#c0392b</div></div>
+      <div class="sw"><div class="chip" style="background: #3f6f9e;"></div><div class="nm">Blue</div><div class="hx">#3f6f9e</div></div>
+      <div class="sw"><div class="chip" style="background: #e0b13a;"></div><div class="nm">Yellow</div><div class="hx">#e0b13a</div></div>
+      <div class="sw"><div class="chip" style="background: #c6c9cc;"></div><div class="nm">Silver</div><div class="hx">#c6c9cc</div></div>
+      <div class="sw"><div class="chip" style="background: #3d4650;"></div><div class="nm">Glasshouse</div><div class="hx">#3d4650</div></div>
+    </div>
+  </div>
+
+  <div style="margin-top: 20px; border: 1px solid #d6cdbd; background: #e7e0d2; padding: 18px 20px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px;">
+    <div style="grid-column: span 4;">
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #b83028; letter-spacing: 0.02em;">Four values the running game disagrees with</div>
+    </div>
+    <div>
+      <div class="san" style="font-size: 12px; font-weight: 600; color: #26221e;">Sky</div>
+      <div class="san" style="font-size: 11.5px; line-height: 1.5; color: #6f665b; margin-top: 3px;">The reference is under weather. <span class="mono">skyTop</span> and <span class="mono">skyHorizon</span> on <span class="mono">azur</span> and <span class="mono">liguria</span> are a clear blue day.</div>
+    </div>
+    <div>
+      <div class="san" style="font-size: 12px; font-weight: 600; color: #26221e;">Sea</div>
+      <div class="san" style="font-size: 11.5px; line-height: 1.5; color: #6f665b; margin-top: 3px;">Follows the sky it reflects. <span class="mono">seaColor</span> stays a bright Riviera blue that no cloud could cast.</div>
+    </div>
+    <div>
+      <div class="san" style="font-size: 12px; font-weight: 600; color: #26221e;">Asphalt</div>
+      <div class="san" style="font-size: 11.5px; line-height: 1.5; color: #6f665b; margin-top: 3px;">Dark charcoal with crisp white lines. The town road is a warm grey sett — right for a village, too pale for a Grand Prix street.</div>
+    </div>
+    <div>
+      <div class="san" style="font-size: 12px; font-weight: 600; color: #26221e;">Plaza paving</div>
+      <div class="san" style="font-size: 11.5px; line-height: 1.5; color: #6f665b; margin-top: 3px;">A mauve-rose flag, not the red-brown <span class="mono">fringe</span>. It is the largest flat area in the frame, so the hue carries.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

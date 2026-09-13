@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1280, "h": 880 },
+    { "file": "Palette.dc.html", "x": 1400, "y": 0, "w": 980, "h": 1420 },
+    { "file": "Facade.dc.html", "x": 0, "y": 1010, "w": 1040, "h": 1210 },
+    { "file": "Street.dc.html", "x": 1400, "y": 1560, "w": 1280, "h": 760 }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -220, "w": 620, "text": "MONTE CARLO, OVERCAST\nArt direction pulled off the reference and checked against what src/track.js already paints.\n\nRoof, shutter, iron, stucco and terrace stone are already right in the game.\nSky, sea, asphalt and plaza paving are not — see the red lines on the palette board." },
+    { "id": "next", "x": 2760, "y": 1560, "w": 300, "text": "Reading order:\n1 · the scene as six planes\n2 · the palette, with repo constants\n3 · the townhouse, dimensioned\n4 · the parts the frame is furnished with" }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,14 @@
+# The two games are public; the authoring tools are not meant to be found by
+# search. This is a request, not a control — GitHub Pages is a static host and
+# cannot authenticate anyone, so anybody with a URL can open these. That is
+# acceptable because the editor writes only to the visitor's own browser
+# storage and nothing here can change what either game ships.
+
+User-agent: *
+Disallow: /admin/
+Disallow: /play-dustline/editor.html
+Disallow: /dustline/
+Disallow: /src/
+Disallow: /tests/
+Disallow: /spec/
+Allow: /

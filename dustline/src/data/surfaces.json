@@ -1,0 +1,8 @@
+{
+  "tarmac": { "muLong": 1.0, "muLat": 1.0, "rollingResistance": 0.015 },
+  "gravel": { "muLong": 0.72, "muLat": 0.6, "rollingResistance": 0.045 },
+  "mud": { "muLong": 0.55, "muLat": 0.45, "rollingResistance": 0.09 },
+  "snow": { "muLong": 0.45, "muLat": 0.38, "rollingResistance": 0.06 },
+  "ice": { "muLong": 0.2, "muLat": 0.15, "rollingResistance": 0.01 },
+  "sand": { "muLong": 0.6, "muLat": 0.5, "rollingResistance": 0.11 }
+}
