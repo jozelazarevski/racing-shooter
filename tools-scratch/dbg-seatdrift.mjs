@@ -41,6 +41,10 @@ const R = await p.evaluate(async (reps) => {
     pl.invuln = 0; pl._gridInvuln = false;
     pl.damage(99999, null, true);
     let seat = null, seatIdx = null, worst = 0, offRoadFrames = 0, endLat = 0;
+    // 7 of 8 runs the car does not move at all; the outlier travelled 37
+    // stations (~148 m). No camber does that, so record WHAT WAS NEAR IT and
+    // whether it was still invulnerable when it first moved.
+    let firstMove = null;
     for (let f = 0; f < 700; f++) {
       g._frameBody();
       if (seat === null && pl.alive) { seat = Math.abs(pl.lateral ?? 0); seatIdx = pl.trackIndex; }
@@ -50,18 +54,33 @@ const R = await p.evaluate(async (reps) => {
         if (Math.abs(lat - seat) > Math.abs(worst)) worst = lat - seat;
         if (lat > half) offRoadFrames++;
         endLat = lat;
+        if (firstMove === null && Math.abs(pl.trackIndex - seatIdx) >= 2) {
+          let near = Infinity, who = null;
+          for (const e of (g.enemies ?? [])) {
+            if (!e.alive) continue;
+            const d = Math.hypot(e.mesh.position.x - pl.mesh.position.x,
+                                 e.mesh.position.z - pl.mesh.position.z);
+            if (d < near) { near = d; who = e.name ?? 'rival'; }
+          }
+          firstMove = { atFrame: f, sinceSeatS: +((f) / 60).toFixed(2),
+            nearestRivalM: +near.toFixed(1), who,
+            invulnLeft: +(pl.invuln ?? 0).toFixed(2) };
+        }
       }
     }
     out.runs.push({ seat: +(seat ?? 0).toFixed(2), seatIdx,
       drift: +worst.toFixed(2), endLat: +endLat.toFixed(2),
-      offRoadFrames, movedIdx: pl.trackIndex - seatIdx });
+      offRoadFrames, movedIdx: pl.trackIndex - seatIdx, firstMove });
   }
   return out;
 }, REPS);
 await browser.close();
 console.log(`${R.world}  narrowest half ${R.minHalf} u  — ${R.runs.length} identical resets`);
 for (const r of R.runs) {
-  console.log(`  seat ${String(r.seat).padStart(5)} @${String(r.seatIdx).padStart(3)}  drift ${String(r.drift).padStart(6)} u  end ${String(r.endLat).padStart(5)}  offRoad ${String(r.offRoadFrames).padStart(3)} frames  idx moved ${r.movedIdx}`);
+  const fm = r.firstMove
+    ? `  MOVED at +${r.firstMove.sinceSeatS}s, nearest rival ${r.firstMove.nearestRivalM} m (${r.firstMove.who}), invuln left ${r.firstMove.invulnLeft}s`
+    : '';
+  console.log(`  seat ${String(r.seat).padStart(5)} @${String(r.seatIdx).padStart(3)}  drift ${String(r.drift).padStart(6)} u  end ${String(r.endLat).padStart(5)}  offRoad ${String(r.offRoadFrames).padStart(3)} frames  idx moved ${r.movedIdx}${fm}`);
 }
 const d = R.runs.map((r) => Math.abs(r.drift));
 console.log(`drift: min ${Math.min(...d).toFixed(2)}  max ${Math.max(...d).toFixed(2)}  mean ${(d.reduce((a, b) => a + b, 0) / d.length).toFixed(2)} u`);
