@@ -417,18 +417,41 @@ export async function loadDrivingOverrides(url = './driving.json') {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return false;
     const json = await res.json();
+    // r426: A DROPPED KEY IS NOW LOUD. The guards below are deliberate — they
+    // stop a typo in the JSON from inventing a constant nothing reads — but
+    // they were also SILENT, and the working spec says every tuning number
+    // lives in driving.json. Adding one there and nowhere else therefore did
+    // exactly nothing, with no warning: measured the hard way when a camera
+    // constant read back MISSING at runtime and a whole build was spent
+    // tuning a value that never loaded. Audited at the same time: 122 keys
+    // reach DRIVING today and none are dropped, so this warns about the next
+    // one, not a backlog.
+    const dropped = [];
     for (const k of Object.keys(json)) {
-      if (!(k in DRIVING) || typeof json[k] !== typeof DRIVING[k]) continue;
+      if (!(k in DRIVING)) { dropped.push(k); continue; }
+      if (typeof json[k] !== typeof DRIVING[k]) {
+        dropped.push(`${k} (type ${typeof json[k]}, expected ${typeof DRIVING[k]})`);
+        continue;
+      }
       if (json[k] && typeof json[k] === 'object') {
         // nested block (patch02): merge key-by-key so a partial override
         // — one constant in the JSON — doesn't wipe the other defaults
         for (const kk of Object.keys(json[k])) {
           if (kk in DRIVING[k] && typeof json[k][kk] === typeof DRIVING[k][kk]) {
             DRIVING[k][kk] = json[k][kk];
+          } else if (!(kk in DRIVING[k])) {
+            dropped.push(`${k}.${kk}`);
+          } else {
+            dropped.push(`${k}.${kk} (type ${typeof json[k][kk]}, expected ${typeof DRIVING[k][kk]})`);
           }
         }
       } else DRIVING[k] = json[k];
     }
+    if (dropped.length) {
+      console.warn(`driving.json: ${dropped.length} key(s) IGNORED — no default of the `
+        + `same type exists in src/driving.js, so these tune nothing: ${dropped.join(', ')}`);
+    }
+    DRIVING.__droppedKeys = dropped;      // probes and suites can assert on it
     return true;
   } catch { return false; }
 }
