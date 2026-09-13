@@ -50,7 +50,7 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 
 // One per surface family that carries the world-spanning river.
 const WORLDS = [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [31, 'HEDGEROW DASH'],
-                [9, 'AMAZON RAPIDS'], [29, 'OLIVE COAST']];
+                [9, 'GREENWATER RAPIDS'], [29, 'OLIVE COAST']];
 
 let withRiver = 0;
 for (const [id, name] of WORLDS) {

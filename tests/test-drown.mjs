@@ -24,7 +24,7 @@ const page = await browser.newPage({ viewport: { width: 640, height: 400 } });
 page.setDefaultTimeout(600000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.message)));
-// AEGEAN BLUE: a coast world with a sea and a shoreline road
+// WHITEWASH BAY: a coast world with a sea and a shoreline road
 await page.goto(`${BASE}/?level=51&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
 await page.waitForFunction(() => window.__game?.track?.center && window.__game.player,
   undefined, { timeout: 600000 });

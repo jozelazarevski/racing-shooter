@@ -24,8 +24,8 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 
 const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown'],
              [31, 'HEDGEROW DASH', 'farmland'], [32, 'RED CENTRE RUN', 'outback'],
-             [33, 'ALPENRING', 'alpine'], [34, 'PRINCIPALITY STREETS', 'principality'],
-             [35, 'AERODROME CIRCUIT', 'farmland'], [36, 'ARDENNES SWEEP', 'forest'],
+             [33, 'ALPENRING', 'alpine'], [34, 'CROWN HARBOUR', 'principality'],
+             [35, 'AERODROME CIRCUIT', 'farmland'], [36, 'BEECHWOOD SWEEP', 'forest'],
              [37, 'CROSSOVER RING', 'redwood'], [38, 'WALDSCHLEIFE', 'forest'],
              [39, 'AUTODROMO VELOCE', 'medterrace'], [40, 'NEON MARINA', 'neon'],
              [41, 'RAZORBACK MOUNTAIN', 'outback'], [42, 'RALLYCROSS ARENA', 'flume'],
@@ -33,10 +33,10 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
              [45, 'TOUR DES CAPS', 'medterrace'], [46, 'VINEYARD VELOCE', 'vineyard'],
              [47, 'DEEPWOOD TRAIL', 'deepwood'], [48, 'DOLOMITI CORSA', 'dolomiti'],
              [49, 'HARBOR QUAY', 'harbor'],
-  // THE MEDITERRANEAN FIVE
-  [50, 'CINQUE TERRE', 'liguria'], [51, 'AEGEAN BLUE', 'aegean'],
-  [52, 'COSTA BRAVA', 'brava'], [53, 'DALMATIA DRIVE', 'dalmatia'],
-  [54, 'COTE D AZUR', 'azur'], [55, 'BRIDGE RUN', 'vineyard'],
+  // THE INLAND SEA FIVE
+  [50, 'HILLTOWN STACK', 'liguria'], [51, 'WHITEWASH BAY', 'aegean'],
+  [52, 'WINDWARD COVES', 'brava'], [53, 'LIMESTONE COAST', 'dalmatia'],
+  [54, 'SAPPHIRE SHORE', 'azur'], [55, 'BRIDGE RUN', 'vineyard'],
   [56, 'OLIVE CROSSING', 'olivecountry'], [57, 'MOUNTAIN TO SEA', 'mountainsea'],
   [58, 'CITADEL BAY', 'citadel'],
   // SKETCH D, drawn and handed over with its own labels: tunnels, a bridge

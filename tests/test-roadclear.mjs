@@ -44,9 +44,9 @@ const CURATED = [
   [7, 'GLACIAL PASS'],       // hoardings; the bore the reach fix rescued
   [28, 'ESTONIA CRESTS'],    // 6.5 u fallen logs across the line
   [32, 'RED CENTRE RUN'],    // start line at y = -3.99
-  [34, 'PRINCIPALITY STREETS'],    // hoarding posts from a second leg
+  [34, 'CROWN HARBOUR'],    // hoarding posts from a second leg
   [37, 'CROSSOVER RING'],            // 14 corridor pines; start line at y = 7.87
-  [54, 'COTE D AZUR'],       // sea foam, the overlay rule
+  [54, 'SAPPHIRE SHORE'],       // sea foam, the overlay rule
   [55, 'BRIDGE RUN'],        // hoarding over a second leg
   [57, 'MOUNTAIN TO SEA'],   // two stacked-road stretches
   [59, 'CLIFF KNOT'],        // start line at y = 3.57
@@ -66,7 +66,7 @@ const DEEP = 3.0;
 // work; growing it silently is the thing to catch.
 const KNOWN_BARE = {
   'RED CENTRE RUN': { max: 6.0, why: 'gantry cabin/braces: tower spot is scored by a FLAT _clearsRoad, which cannot see a leg passing at the cabin\'s own height 10 u up' },
-  'CINQUE TERRE': { max: 7.0, why: 'a Dodecahedron rock, builder unidentified (colours are computed, so grep will not find it)' },
+  'HILLTOWN STACK': { max: 7.0, why: 'a Dodecahedron rock, builder unidentified (colours are computed, so grep will not find it)' },
 };
 // Counted as RUNS, and each stretch is found from both sides, so the two
 // clashes on MOUNTAIN TO SEA are four runs and the one on SEA CLIFF RUN is two.

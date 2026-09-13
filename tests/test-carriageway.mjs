@@ -190,7 +190,7 @@ for (const [id, name] of PLACED) {
 //                   23 posts and bands in a carriageway, worst 7.91 u.
 //
 // Pinned on the worlds each was measured worst on.
-const OFFSETS = [[55, 'BRIDGE RUN'], [34, 'PRINCIPALITY STREETS'], [57, 'MOUNTAIN TO SEA'],
+const OFFSETS = [[55, 'BRIDGE RUN'], [34, 'CROWN HARBOUR'], [57, 'MOUNTAIN TO SEA'],
   [4, 'CANYON RUN'], [37, 'CROSSOVER RING'], [47, 'DEEPWOOD TRAIL'], [59, 'CLIFF KNOT']];
 const seen = { boards: 0, trunks: 0, posts: 0 };
 for (const [id, name] of OFFSETS) {

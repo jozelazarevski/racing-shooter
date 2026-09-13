@@ -74,7 +74,7 @@
  * ones: a TUNNEL BORE is narrower than the road it carries, and its wall
  * colliders sit at the bore's half-width. Those show as BLOCKERS on every
  * world with a tunnel and they are the tunnel doing its job. Read `stone`
- * counts on SUZUKA, HARBOR QUAY, COTE D AZUR and SILVERSTONE with that in
+ * counts on SUZUKA, HARBOR QUAY, SAPPHIRE SHORE and SILVERSTONE with that in
  * mind, and compare runs against each other rather than against zero.
  *
  * A TOOL, not a test: it prints a census and exits 0. The pass/fail line

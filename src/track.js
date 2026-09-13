@@ -40,7 +40,7 @@ export const LEVELS = [
     tune: { tunnels: { count: 1 } } },
   { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK',
     tune: { tunnels: { count: 1 } } },
-  { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
+  { id: 8, name: 'GREENWATER RAPIDS', theme: 'jungle', region: 'GREENWATER' },
   { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
   { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
@@ -51,8 +51,8 @@ export const LEVELS = [
   // a gallery through the slope is exactly what avalanche country builds
   { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK',
     tune: { tunnels: { count: 1 } } },
-  { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
-  { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
+  { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEON DISTRICT' },
+  { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEON DISTRICT' },
   // ---- CAREER ORDER IS THIS ARRAY, NOT THE ids. ROCKFALL RAVINE sat at slot
   // 10 of 21 and measured as the HARDEST track in the game: 25.8 % of its lap
   // under a 40 u corner radius and 14.3 % under 25 u — both the worst figures
@@ -125,7 +125,7 @@ export const LEVELS = [
   // ladder slope exactly as it does the index rung, so writing a number here
   // says WHERE in the career the world sits and nothing about how steep the
   // climb to it is — retuning the slope must never re-order the roster.
-  { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN', cost: 6, fresh: true },
+  { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'INLAND SEA', cost: 6, fresh: true },
 
   // ---- OLD TOWN: the only urban region, and the only night stage that is not
   // NEO-KYOTO. Appended, never inserted — career order is this array and
@@ -148,13 +148,13 @@ export const LEVELS = [
   // region, laddered so the collection spans a career.
   { id: 33, name: 'ALPENRING', theme: 'alpine', route: 'alpenring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
-  { id: 34, name: 'PRINCIPALITY STREETS', theme: 'principality', route: 'principality', region: 'GRAND CIRCUITS',
+  { id: 34, name: 'CROWN HARBOUR', theme: 'principality', route: 'principality', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'AERODROME CIRCUIT', theme: 'farmland', route: 'aerodrome', region: 'GRAND CIRCUITS',
     cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
       sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
       skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
-  { id: 36, name: 'ARDENNES SWEEP', theme: 'forest', route: 'ardennes', region: 'GRAND CIRCUITS',
+  { id: 36, name: 'BEECHWOOD SWEEP', theme: 'forest', route: 'ardennes', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'CROSSOVER RING', theme: 'redwood', route: 'crossover', region: 'GRAND CIRCUITS',
     cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
@@ -200,26 +200,26 @@ export const LEVELS = [
     // obviously should have had them and did not
     tune: { tunnels: { count: 2 } } },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
-  // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
+  // THE INLAND SEA FIVE - one coast each, all with bridges where the route
   // crosses itself and tunnels where a headland gets in the way.
-  { id: 50, name: 'CINQUE BORGHI', theme: 'liguria', region: 'MEDITERRANEAN', cost: 22, fresh: true,
+  { id: 50, name: 'HILLTOWN STACK', theme: 'liguria', region: 'INLAND SEA', cost: 22, fresh: true,
     route: 'liguriaRun', tune: { tunnels: { count: 1 } } },
-  { id: 51, name: 'AEGEAN BLUE', t01: true, theme: 'aegean', region: 'MEDITERRANEAN', cost: 23, fresh: true,
+  { id: 51, name: 'WHITEWASH BAY', t01: true, theme: 'aegean', region: 'INLAND SEA', cost: 23, fresh: true,
     route: 'aegeanRun' },
-  { id: 52, name: 'COSTA BRAVA', theme: 'brava', region: 'MEDITERRANEAN', cost: 24, fresh: true,
+  { id: 52, name: 'WINDWARD COVES', theme: 'brava', region: 'INLAND SEA', cost: 24, fresh: true,
     route: 'bravaRun', tune: { tunnels: { count: 1 } } },
-  { id: 53, name: 'DALMATIA DRIVE', theme: 'dalmatia', region: 'MEDITERRANEAN', cost: 25, fresh: true,
+  { id: 53, name: 'LIMESTONE COAST', theme: 'dalmatia', region: 'INLAND SEA', cost: 25, fresh: true,
     route: 'dalmatiaRun' },
-  { id: 54, name: 'COTE D AZUR', t01: true, theme: 'azur', region: 'MEDITERRANEAN', cost: 26, fresh: true,
+  { id: 54, name: 'SAPPHIRE SHORE', t01: true, theme: 'azur', region: 'INLAND SEA', cost: 26, fresh: true,
     route: 'azurRun', tune: { tunnels: { count: 1 } } },
   // ON LAND, deliberately. First cut put this on a coastal theme and part of
   // the lap ran through the sea - the chase frame was the car floating in a
   // flooded tunnel bore. The drawing has no water in it; it has bridges.
   { id: 55, name: 'BRIDGE RUN', theme: 'vineyard', region: 'HEARTLAND',
     cost: 27, fresh: true, route: 'bridgeRun', tune: { tunnels: { count: 1 } } },
-  { id: 56, name: 'OLIVE CROSSING', theme: 'olivecountry', region: 'MEDITERRANEAN',
+  { id: 56, name: 'OLIVE CROSSING', theme: 'olivecountry', region: 'INLAND SEA',
     cost: 28, fresh: true, route: 'oliveCross', tune: { tunnels: { count: 1 } } },
-  { id: 57, name: 'MOUNTAIN TO SEA', theme: 'mountainsea', region: 'MEDITERRANEAN',
+  { id: 57, name: 'MOUNTAIN TO SEA', theme: 'mountainsea', region: 'INLAND SEA',
     // FIVE TIMES WIDER, asked for directly. `roadWidth` multiplies the one
     // width profile `widthAt(i)` serves, so the ribbon, the verges, the AI's
     // lateral clamp, the scenery clearance and the rail placement all widen
@@ -231,7 +231,7 @@ export const LEVELS = [
   // standing over the whole thing. Shares the Aegean route because that lap
   // hugs its coast for most of its length, which is what puts the citadel in
   // frame from the road.
-  { id: 58, name: 'CITADEL BAY', t01: true, theme: 'citadel', region: 'MEDITERRANEAN',
+  { id: 58, name: 'CITADEL BAY', t01: true, theme: 'citadel', region: 'INLAND SEA',
     cost: 30, fresh: true, route: 'aegeanRun', routeFlipX: true },
   // SKETCH D, drawn and handed over with its own labels on it: tunnels where
   // the north-south strand crosses the two straights, a bridge where the
@@ -245,7 +245,7 @@ export const LEVELS = [
   // this one. The shoreline runs north-south just off the eastern flank, so
   // the lap's right-hand lobe — the part the drawing labels "Sea clifs" —
   // runs along a real drop with real water under it.
-  { id: 59, name: 'CLIFF KNOT', theme: 'mountainsea', region: 'MEDITERRANEAN',
+  { id: 59, name: 'CLIFF KNOT', theme: 'mountainsea', region: 'INLAND SEA',
     cost: 31, fresh: true, route: 'seaKnot',
     tune: {
       tunnels: { count: 1 },
@@ -267,9 +267,9 @@ export const LEVELS = [
   // still refuses any station that is too curved, too near a gorge, too near
   // the start gate or (since r190) sitting on a crest, so asking for three is
   // asking for AT MOST three — the planner places what the mountain allows.
-  { id: 61, name: 'OLIVE PASS', theme: 'olivecountry', region: 'MEDITERRANEAN',
+  { id: 61, name: 'OLIVE PASS', theme: 'olivecountry', region: 'INLAND SEA',
     cost: 33, fresh: true, route: 'turini', routeFlipX: true, tune: { tunnels: { count: 3 } } },
-  { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
+  { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'INLAND SEA',
     cost: 32, fresh: true, route: 'seaCliffRun',
     tune: {
       tunnels: { count: 1 },
@@ -295,11 +295,11 @@ export const LEVELS = [
   // order is the same track wearing a different hat, however different the
   // profile over it. Each takes a distinct authored route now, which is the
   // pattern the roster already uses to make one road serve two worlds —
-  // CITADEL BAY on AEGEAN BLUE's route, OLIVE PASS on COL DE TURINI's.
+  // CITADEL BAY on WHITEWASH BAY's route, OLIVE PASS on COL DE TURINI's.
   //
   // Career order is this array and `starCost` prices by INDEX, so they are
   // APPENDED, never inserted, with ascending ids.
-  { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'MEDITERRANEAN',
+  { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'INLAND SEA',
     cost: 34, fresh: true, route: 'liguriaRun', routeFlipX: true,
     // THE MOUNTAIN ONE. Asked for directly: "change cape oliveto to run inside
     // mountains." It was the headland world — a coast road boring through the
@@ -364,7 +364,7 @@ export const LEVELS = [
     // A player filtering MOUNTAIN would not find it and a player filtering
     // COAST would be sent to a world with no water.
     scenery: ['MOUNTAIN', 'FARMLAND'] },
-  { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
+  { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'INLAND SEA',
     cost: 35, fresh: true, route: 'caps', routeFlipX: true,
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
     // elevation amplitude, and corners that arrive uphill.
@@ -392,7 +392,7 @@ export const LEVELS = [
     // there. It keeps FARMLAND and gains nothing else — it is a hill climb
     // through terraces, not a mountain world.
     scenery: ['FARMLAND'] },
-  { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
+  { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'INLAND SEA',
     cost: 36, fresh: true, route: 'autodromo', routeFlipX: true,
     // THE FLAT ONE. The salt flats behind the olive coast: almost no
     // elevation, no bridges, no bores — the fastest thing in the family,
@@ -682,7 +682,7 @@ export const LEVELS = [
       elev: { amp: 14, ph: [1.8, 0.9, 2.4] },
     } },
 
-  /* ---- THE ITALIAN RIVIERA (73-76) --------------------------------------
+  /* ---- THE ALBAROSA COAST (73-76) --------------------------------------
    * Alassio, Liguria, asked for with a photograph out of a shuttered window
    * over the old town and a render of a street circuit cut through it.
    *
@@ -696,7 +696,7 @@ export const LEVELS = [
    * shape that already exists rather than inventing a fifth.
    * ---------------------------------------------------------------------- */
 
-  { id: 73, name: 'ALBAROSA SEAFRONT', theme: 'riviera', region: 'RIVIERA',
+  { id: 73, name: 'ALBAROSA SEAFRONT', theme: 'riviera', region: 'ALBAROSA',
     cost: 46, fresh: true, route: 'corniche', routeFlipX: true,
     // THE POSTCARD, and the introduction. `corniche` is the coast-road shape:
     // long open sweeps with the water on one side, which is exactly the
@@ -708,7 +708,7 @@ export const LEVELS = [
       elev: { amp: 7, ph: [0.4, 1.2, 2.0] },
     } },
 
-  { id: 74, name: 'IL VICOLO', theme: 'riviera', region: 'RIVIERA',
+  { id: 74, name: 'IL VICOLO', theme: 'riviera', region: 'ALBAROSA',
     cost: 47, fresh: true, route: 'principality', routeFlipX: true,
     // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
     // shopfront barely wide enough for a car, and `monaco` is the roster's
@@ -843,7 +843,7 @@ export const LEVELS = [
       elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
     } },
 
-  { id: 75, name: 'PORTO MOLO', theme: 'riviera', region: 'RIVIERA',
+  { id: 75, name: 'PORTO MOLO', theme: 'riviera', region: 'ALBAROSA',
     cost: 48, fresh: true, route: 'marina', routeFlipX: true,
     // THE HARBOUR. `marina` runs the quays, which is stop-start by nature —
     // and the one lap on the coast where the sea is on BOTH sides of you.
@@ -853,7 +853,7 @@ export const LEVELS = [
       elev: { amp: 4, ph: [2.2, 0.5, 1.7] },
     } },
 
-  { id: 76, name: 'CAPO VELA', theme: 'riviera', region: 'RIVIERA',
+  { id: 76, name: 'CAPO VELA', theme: 'riviera', region: 'ALBAROSA',
     cost: 49, fresh: true, route: 'turini', routeReverse: true,
     // THE HEADLAND, and the hard one. Capo Mele is the cape at the east end of
     // the bay and the road over it stacks hairpins the whole way up; `turini`
@@ -888,7 +888,7 @@ export const LEVELS = [
       },
     } },
 
-  { id: 77, name: 'PORTO GRANDE', theme: 'genova', region: 'RIVIERA',
+  { id: 77, name: 'PORTO GRANDE', theme: 'genova', region: 'ALBAROSA',
     cost: 50, fresh: true, route: 'panorama', routeReverse: true,
     // THE CITY. `panorama` is the roster's flat-then-mountain shape, which is
     // Genova exactly: a long fast run along the docks and then straight up
@@ -899,7 +899,7 @@ export const LEVELS = [
       elev: { amp: 30, ph: [0.6, 1.9, 2.8] },
     } },
 
-  { id: 78, name: 'LIGURIA STAGE', theme: 'sanremo', region: 'RIVIERA',
+  { id: 78, name: 'OLEANDER STAGE', theme: 'sanremo', region: 'ALBAROSA',
     cost: 51, fresh: true, route: 'caps', routeFlipX: true, routeReverse: true,
     // THE RALLY. Sanremo's stages run in the mountains BEHIND the town, not
     // along the front, and `corse` is the roster's tight unforgiving mountain
@@ -960,7 +960,7 @@ const LOOK_VARIANTS = {
   27: { skyTop: '#4f8fd0', skyHorizon: '#f2dcc0', fogColor: 0xd8cdb4, hemiGround: 0xa8754c },
   // ALPENRING — meadow morning, greener and softer
   33: { skyTop: '#4f8ad8', skyHorizon: '#d8ecd0', fogColor: 0xd2e4cc, hemiGround: 0x6f9c4a },
-  // ARDENNES SWEEP — damp northern light, the greens deeper
+  // BEECHWOOD SWEEP — damp northern light, the greens deeper
   36: { skyTop: '#4f86b8', skyHorizon: '#dce6cc', fogColor: 0xc8d6d0, hemiGround: 0x3c6a3c },
   // CROSSOVER RING — cool coastal morning, the air washed clean
   37: { skyTop: '#5fa0e0', skyHorizon: '#d4e8e4', fogColor: 0xcadedc, hemiGround: 0x4a6a58 },
@@ -976,9 +976,9 @@ const LOOK_VARIANTS = {
   44: { skyTop: '#7fb0d8', skyHorizon: '#f6e8c8', fogColor: 0xeeddb8, hemiGround: 0xd0a670 },
   // TOUR DES CAPS — cape wind, high clear air off the headland
   45: { skyTop: '#3f9ae8', skyHorizon: '#b9d2e2', fogColor: 0xbcd6d8, hemiGround: 0x9c9068 },
-  // COSTA BRAVA — bright white-stone coast, sand in the light
+  // WINDWARD COVES — bright white-stone coast, sand in the light
   52: { skyTop: '#2a8ce0', skyHorizon: '#eee4cc', fogColor: 0xe4dcc8, hemiGround: 0xb4aa94 },
-  // COTE D AZUR — deep azure, a clean pale horizon
+  // SAPPHIRE SHORE — deep azure, a clean pale horizon
   54: { skyTop: '#1f6cd0', skyHorizon: '#d6e8f4', fogColor: 0xcfe0ee, hemiGround: 0xa89070 },
   // BRIDGE RUN — river valley, greener and cooler than the vineyard
   55: { skyTop: '#3f92d8', skyHorizon: '#dce8d8', fogColor: 0xd2e2d4, hemiGround: 0x7f9e5c },
@@ -1067,7 +1067,7 @@ export const CHAPTERS = [
     blurb: 'Bay lights, a mountain course, and the long ones.' },
   { n: 8, from: 46, name: 'THE HEARTLAND',
     blurb: 'Vineyard, deepwood, dolomite and a working harbour.' },
-  { n: 9, from: 50, name: 'THE MEDITERRANEAN',
+  { n: 9, from: 50, name: 'THE INLAND SEA',
     blurb: 'Coast roads, headlands and the crossings between them.' },
   { n: 10, from: 58, name: 'THE OLIVE COAST',
     blurb: 'Citadel, cliffs and terraces — the family built from one world.' },
@@ -1075,7 +1075,7 @@ export const CHAPTERS = [
     blurb: 'Narrows, col and gorge. The hardest driving on the roster.' },
   { n: 12, from: 68, name: 'AUTUMN',
     blurb: 'The season turns: gold woodland, harvest country, russet moor.' },
-  { n: 13, from: 73, name: 'THE ITALIAN RIVIERA',
+  { n: 13, from: 73, name: 'THE ALBAROSA COAST',
     blurb: 'Albarosa: the seafront, the vicolo, the harbour and the cape.' },
 ];
 
@@ -1479,7 +1479,7 @@ const CIRCUITS = {
     [-93, 70],
   ],
 
-  // ---- THE MEDITERRANEAN FIVE. Five coasts, five layout IDEAS - a cliff
+  // ---- THE INLAND SEA FIVE. Five coasts, five layout IDEAS - a cliff
   // corniche with a village loop, an island round two bays, a seafront blast
   // into inland hairpins, a peninsula through a narrow neck, and a corniche
   // that crosses its own return leg twice so both crossings bridge.
@@ -1584,7 +1584,7 @@ const CIRCUITS = {
     [-95.0, 200.0], [-20.0, 238.0], [60.0, 225.0], [95.0, 160.0], [60.0, 105.0],
     [34.0, -40.0], [52.0, -110.0], [62.0, -170.0], [30.0, -222.0], [-10.0, -228.0],
   ],
-  // AMAZON RAPIDS: snaking jungle lap threading between the river crossings
+  // GREENWATER RAPIDS: snaking jungle lap threading between the river crossings
   jungle: [
     [0, -220], [90, -230], [165, -195], [230, -150], [245, -70],
     [200, -20], [235, 50], [190, 120], [215, 185], [130, 220],
@@ -1841,7 +1841,7 @@ const CIRCUITS = {
   //     card badge IoU, the real _drawCircuitMap at 72x52 px      67 %
   //         roster median 14 %, next-highest distinct pair 54 %
   //         (the eight 100 % pairs are deliberate route sharing —
-  //          OLIVE PASS on this route, CITADEL BAY on AEGEAN BLUE's)
+  //          OLIVE PASS on this route, CITADEL BAY on WHITEWASH BAY's)
   //     nearest station of one lap to the other, median      8.8 / 9.5 u
   //         ROAD_HALF is 9, so half of each lap lay INSIDE the other's
   //         carriageway; every genuinely distinct pair measures 24-66 u
@@ -2861,7 +2861,7 @@ const THEMES = {
     // vizZoneSpec key mistfell carries is read by nothing).
     viz: [['fogbank', 4]],
   },
-  // AMAZON RAPIDS: dense deep-green jungle — layered canopies close over a
+  // GREENWATER RAPIDS: dense deep-green jungle — layered canopies close over a
   // dark mud road, rivers cross beneath it, humid haze hangs low.
   jungle: {
     surface: 'wet',                                    // downpour — physics reads this
@@ -4885,7 +4885,7 @@ const THEMES = {
   },
 };
 
-/** THE MEDITERRANEAN FIVE.
+/** THE INLAND SEA FIVE.
  *
  *  Built by CLONING the harbour, deliberately: the coastal machinery (the
  *  faceted sea, the quay strip, the open-to-the-water frontage rule, the
@@ -4909,7 +4909,7 @@ for (const [key, over] of [
     // up a cliff, not shoulder to shoulder along a street.
     // THE DARK END OF THIS LIST WAS DRAGGING THE WHOLE STREET DOWN. Measured
     // against the reference (facade P50 124, P90 188, saturation 0.33),
-    // CINQUE TERRE came out at 66 / 103 / 0.69 — its lit walls half as bright
+    // HILLTOWN STACK came out at 66 / 103 / 0.69 — its lit walls half as bright
     // as the reference's and twice as saturated, the darkest town on the
     // roster by a distance. Three mid-saturated entries lifted toward the
     // sheet's own pastels and two pale ones added, so a run is punctuated
@@ -5650,7 +5650,7 @@ const ligChimney = (x, y, z, h = 1.8) => [
 ];
 
 export const HOUSE_TEMPLATES = {
-  // ---- THE MEDITERRANEAN COASTS ----
+  // ---- THE INLAND SEA COASTS ----
   // Four archetypes that are genuinely different SHAPES, not the farmhouse
   // retinted: a tall narrow Ligurian terrace house, a flat-roofed Aegean cube,
   // its domed neighbour, and an Andalusian house around a walled patio. The
@@ -6448,7 +6448,7 @@ const ELEMENT_KITS = {
     field: [], fenceRuns: 4,
   },
   // ---------------------------------------------------------------------
-  // THE MEDITERRANEAN KITS. Five coasts, five building cultures - not one
+  // THE INLAND SEA KITS. Five coasts, five building cultures - not one
   // kit retinted five times, which is the trap the back half of the roster
   // already fell into. Each carries its own PALETTE, so a quay is a row of
   // differently painted houses the way the reference art is, and its own
@@ -6640,7 +6640,7 @@ const FLORA_MIX = {
   // above Sanremo actually are
   sanremo: [['oliveOld', 0.36], ['oliveRow', 0.26], ['umbrellaPine', 0.2],
     ['cypress', 0.1], ['corkOak', 0.08]],
-  // THE MEDITERRANEAN FIVE inherit the harbour's machinery but must not
+  // THE INLAND SEA FIVE inherit the harbour's machinery but must not
   // inherit a northern forest with it: olive, cypress and umbrella pine, with
   // the cypress weighted up because it is the species that says "this coast"
   // in one silhouette - it lines the roads in the reference art.
@@ -7345,7 +7345,7 @@ export class Track {
     // A COAST ROAD RUNS ABOVE THE WATER.
     //
     // The elevation profile is written without any knowledge of the sea, and on
-    // CINQUE TERRE it dipped the carriageway up to 2.9 u BELOW the waterline for
+    // HILLTOWN STACK it dipped the carriageway up to 2.9 u BELOW the waterline for
     // 70 of 225 sampled stations. The sea is a flat plane at coast.level drawn
     // over everything, so the racing line was simply submerged: the player
     // drives out along the seafront and ends up steering a car across open
@@ -7747,7 +7747,7 @@ export class Track {
   }
 
   /** SHADOWS ARE A LAW, NOT A HABIT (owner, 2026-09-09: "Shades needs to be
-   *  consistent and constantly there", on a PRINCIPALITY STREETS frame).
+   *  consistent and constantly there", on a CROWN HARBOUR frame).
    *
    *  Fifty-odd builders each decided for themselves whether the thing they
    *  had just made casts or receives, and the census says what that produced
@@ -8212,7 +8212,7 @@ export class Track {
     // seeded LCG from the theme name — layouts stay deterministic across
     // loads. T.seedKey overrides the string: the §11.10 rename of the
     // monteCarlo theme key would otherwise have silently REGENERATED
-    // PRINCIPALITY STREETS' narrows (measured: seven new guard-fence
+    // CROWN HARBOUR' narrows (measured: seven new guard-fence
     // violations in the carriageway) — the seed is an RNG input, not a
     // name, so it keeps its historical value.
     const seedKey = T.seedKey ?? themeKey;
@@ -10197,7 +10197,7 @@ export class Track {
     // is built — "the road is the one thing in this world that is never allowed
     // to be wrong, so it wins" — and then THIS runs, hundreds of lines later,
     // and digs the lower leg of every crossing to buy clearance. Nothing
-    // re-asked the sea. Measured on COTE D AZUR, whose sea plane sits at y = 0:
+    // re-asked the sea. Measured on SAPPHIRE SHORE, whose sea plane sits at y = 0:
     // the dig took the carriageway to -3.51 and the tunnel sited on that
     // stretch was flooded for over half its length — you drive into a lit bore
     // and through three and a half metres of Mediterranean.
@@ -10208,7 +10208,7 @@ export class Track {
     // and the NEXT pass buys it with `bump` instead — the solver's own split
     // between digging below and lifting above, doing what it already knows how
     // to do. Clamping afterwards cannot do that: measured, it held the road up
-    // but cost COTE D AZUR 11.5 u of clearance -> 7.5 and CLIFF KNOT 11.5 ->
+    // but cost SAPPHIRE SHORE 11.5 u of clearance -> 7.5 and CLIFF KNOT 11.5 ->
     // 7.5, because nothing was left to compensate.
     const seaFloor = this.T.coast ? (this.T.coast.level ?? -2) + 1.6 : -Infinity;
     const sink = (at, depth) => {
@@ -10526,7 +10526,7 @@ export class Track {
     // TREMOLA DESCENT (bore 547-585, 6.48 u of rise inside it): clearance
     // -0.07 u at i=575 at 46.2 u/s with maxSpeed 64 — the VIPER's STOCK
     // figure, on the racing line, no nitro. GOTTHARD's two bores sit at 0.98
-    // and 1.52 u and COSTA BRAVA's AI field at 1.39 u: not yet through the
+    // and 1.52 u and WINDWARD COVES's AI field at 1.39 u: not yet through the
     // rock, one tuning step away from it.
     //
     // Refuse the station. There is always another straight to put a tunnel
@@ -14882,7 +14882,7 @@ export class Track {
       if (!clear) continue;
       const sscale = 1.2 + hsh2(cand + 2.9) * 3.4;
       // A SEA ROCK IS IN THE SEA, and on a coast road the sea comes close: two
-      // of these stood 6.28 u inside CINQUE TERRE's carriageway, which is the
+      // of these stood 6.28 u inside HILLTOWN STACK's carriageway, which is the
       // last road defect that world had. The shoulder lump beside it reaches
       // 1.1 scales further out, so the clearance is asked for the pair.
       if (!this._clearsRoad(bx, bz, sscale * 1.7, 0.6)) continue;
@@ -16045,7 +16045,7 @@ export class Track {
       //
       // This checked the mole's WATERLINE ANCHOR against a coarse distance
       // and then put the lighthouse 30 u further along the normal, unchecked.
-      // On CINQUE TERRE that landed the tower 4.18 u inside the carriageway
+      // On HILLTOWN STACK that landed the tower 4.18 u inside the carriageway
       // with a 2.7 u collider biting 1.95 u — and the sea rocks poured around
       // it went in with it, which is every one of that world's road defects
       // in one object. The anchor is walked ALONG the coast until the tower
@@ -16094,7 +16094,7 @@ export class Track {
         if (SR.next >= SR.mesh.instanceMatrix.count) return;
         // THE SKERRIES FOLLOW THE TOWER, AND THE TOWER IS NOT THE ONLY THING
         // NEARBY. These are poured at fixed offsets around the lighthouse,
-        // and on CINQUE TERRE two of them ended up in the carriageway that
+        // and on HILLTOWN STACK two of them ended up in the carriageway that
         // runs along the shore behind it — the last of that world's road
         // defects after the tower itself was resited.
         if (!this._clearsRoad(px, pz, Math.max(sx, sz), 0.6)) return;
@@ -16604,7 +16604,7 @@ export class Track {
       //
       // r252 registered three solids of radius D/2 down the middle of the
       // plate, which is the square's own size and therefore reaches back
-      // across the road it stands beside: COTE D AZUR came out with fourteen
+      // across the road it stands beside: SAPPHIRE SHORE came out with fourteen
       // stone blockers biting 9.27 u into a 5.6 u half-width, i.e. an
       // invisible wall across the whole carriageway. A collider describes the
       // FACE a car can hit, not the area the thing covers.
@@ -17252,7 +17252,7 @@ export class Track {
 
     // THE STRAIGHT COASTLINE IS A LIE ON A MEANDERING SHORE. dn = 0 is where
     // the sea MESH lays its first row, and on a straight quay front that is
-    // the waterline everywhere. On a bay like AEGEAN BLUE the heightfield
+    // the waterline everywhere. On a bay like WHITEWASH BAY the heightfield
     // walks back ABOVE the water well seaward of the line, and everything
     // laid off the straight frame - a whole basin, its pontoon, its fleet -
     // moors in a meadow with the masts standing out of the grass
@@ -17331,7 +17331,7 @@ export class Track {
     const FINGERS = SLIPS + BASINS.length;
     // Conform each basin to the REAL shore before anything is laid off it.
     // The condition is JOINT: the first version took the max of each
-    // finger's own wetDn, and on COSTA BRAVA one headland pushed the basin
+    // finger's own wetDn, and on WINDWARD COVES one headland pushed the basin
     // 78 u out - onto an island that the OTHER fingers' windows had never
     // been checked against. Scan candidate offsets and accept the first at
     // which EVERY finger fronts water through the whole slip depth; a basin
@@ -17716,7 +17716,7 @@ export class Track {
     for (let du = -SPAN * 0.8; du <= SPAN * 0.8 && bk < bolls.count; du += 11) {
       // a bollard belongs on a quay LIP. Where the beach walks out seaward
       // there is no lip, and the same bollard stands alone in a meadow -
-      // eighteen of them did, in a row, across the AEGEAN BLUE headland
+      // eighteen of them did, in a row, across the WHITEWASH BAY headland
       const w = wetDn(du, 10);
       if (w === null || w > 8) continue;
       const p = at(du, -4);
@@ -20143,7 +20143,7 @@ export class Track {
         // ABOUT ANOTHER LEG OF THE LAP.
         //
         // These went in unguarded. Where a tunnel passes close to a different
-        // stretch of road — COTE D AZUR does, fourteen times — the wall lands
+        // stretch of road — SAPPHIRE SHORE does, fourteen times — the wall lands
         // in THAT carriageway as an invisible collider a car hits at speed
         // with nothing to see. The wall MESH stays either way; only the
         // collider is dropped, which is the rule the grandstand and the start
@@ -20155,7 +20155,7 @@ export class Track {
         if (!this._clearsRoad(wx, wz, 1.4, 0.2)) continue;
         // r343: ...and a wall whose collider stands in ANOTHER leg's kicker
         // landing fan yields it (mesh stays — the same rule as the
-        // carriageway drop above). One record on COTE D AZUR: a bore wall
+        // carriageway drop above). One record on SAPPHIRE SHORE: a bore wall
         // 10.5 u off a different stretch of road, inside a crest's fan.
         const gi2 = this.nearestIndex ? this.nearestIndex({ x: wx, z: wz }, null) : i;
         const own = this._circDist(gi2, Math.round((s0 + e0) / 2) % N) <= (e0 - s0) / 2 + 8;
@@ -24862,7 +24862,7 @@ export class Track {
     const oakBuild = bentTree(1, 1.28);
     const mapleBuild = bentTree(-1, 1.2);
     // --- rainforest ---
-    // AMAZON RAPIDS was falling through to the default two-pine stand, so the
+    // GREENWATER RAPIDS was falling through to the default two-pine stand, so the
     // Amazon was planted with conifers. Three storeys instead, which is what
     // actually reads as rainforest from a car: a buttressed emergent standing
     // clear of everything, an umbrella-crowned mid-storey, and a low tree fern.
@@ -27766,7 +27766,7 @@ export class Track {
     //
     // THE BUG: `waterY` above reads the bed under every station, so the surface
     // followed the ground along its length and the river rendered as a ribbon
-    // draped down the hillside. Measured on PINE VALLEY, AMAZON RAPIDS and LOG
+    // draped down the hillside. Measured on PINE VALLEY, GREENWATER RAPIDS and LOG
     // FLUME FURY the `river-water` mesh had 2502 level triangles, ZERO vertical
     // ones, and slopes running up to 41.8 degrees. Reported, correctly, as
     // "the water is not falling 90 degrees as asked".

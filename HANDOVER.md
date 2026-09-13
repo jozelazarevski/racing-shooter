@@ -4171,6 +4171,102 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r422 — SEVEN NAMES OFF A MAP OF THE REAL WORLD
+
+The owner's sentence was "Rename the tracks", and the temptation was to treat it
+as an invitation to redecorate — 78 fresh names, all mine. That would have thrown
+away his own work. SERPENT PASS came off the hand-drawn sheet he sent at r327.
+CIDER LANE, HARVEST RUN, LARCH GOLD are names this project earned. A rename build
+that quietly overwrites them is vandalism with good manners.
+
+So the build looked for a criterion that was not taste, and the spec already had
+one: §7.10, "No real circuit, city, mountain, brand or driver names in stage
+data", with acceptance query R9 a literal string scan for exactly that. That rule
+has sat in CLAUDE.md since v2.3 and R9 has never actually been run against the
+roster. The owner's sentence and the rule point at the same seven worlds.
+
+The census (`tools-scratch/dbg-namecheck.mjs`) walks every LEVELS entry — the
+post-hoc assignment trap of r414 and r420 taken seriously this time, so generated
+and late-assigned worlds are included — and checks each display name against a
+list of real circuits, cities, regions, massifs, marques and drivers. Result:
+**78 worlds, 7 flagged** on the first pass.
+
+| was | is | why it was flagged |
+|---|---|---|
+| PRINCIPALITY STREETS | CROWN HARBOUR | Monaco by periphrasis |
+| ARDENNES SWEEP | BEECHWOOD SWEEP | real massif; Spa's own forest |
+| CINQUE BORGHI | HILLTOWN STACK | Cinque Terre, barely disguised |
+| AEGEAN BLUE | WHITEWASH BAY | real sea |
+| DALMATIA DRIVE | LIMESTONE COAST | real region |
+| COTE D AZUR | SAPPHIRE SHORE | real coast, verbatim |
+| LIGURIA STAGE | OLEANDER STAGE | real region |
+
+Each replacement is built from what the world actually looks like rather than
+from a thesaurus of the old name: HILLTOWN STACK because the borghi world stacks
+its houses up a slope, WHITEWASH BAY because the Aegean world is white cubes over
+blue, LIMESTONE COAST because the Dalmatian one is bare karst above water.
+Re-census after the edit: **0 flagged** — against that list.
+
+**Then the instrument turned out to be the weak part, again.** The census matched
+display names against a list I had written by hand, so it could only ever find
+the real places I had already thought of. Reading `test-naming.mjs` before
+gating, rather than after, exposed what the list was missing. A second pass over
+*every* display string in the roster — 182 of them, not just the 78 names —
+found five more:
+
+| was | is | what it really is |
+|---|---|---|
+| AMAZON RAPIDS (world) | GREENWATER RAPIDS | real river, and a brand besides |
+| COSTA BRAVA (world) | WINDWARD COVES | real Spanish coast |
+| AMAZON (region) | GREENWATER | same |
+| NEO-KYOTO (region) | NEON DISTRICT | a real city with a prefix taped on |
+| MEDITERRANEAN (region + chapter 9) | INLAND SEA / THE INLAND SEA | real sea |
+| RIVIERA (region) + THE ITALIAN RIVIERA (chapter 13) | ALBAROSA / THE ALBAROSA COAST | real coast, real country |
+
+The chapter titles are the sharp one. `test-naming.mjs` has carried the sentence
+"every level's name, region and blurb, **and the chapter titles**" in its header
+since r334, and it has never once looked at a chapter title — the evaluate block
+only ever walked LEVELS. THE ITALIAN RIVIERA sat at the top of chapter 13,
+visible on the career screen, through every build since. The suite now scans
+CHAPTERS too, so its docstring and its behaviour agree. That is the r419 lesson
+restated: a tool that lies is worse than no tool, and this one was lying by
+omission in its own first paragraph.
+
+ALBAROSA is not a substitution of convenience — the chapter's own blurb already
+called the place Albarosa, and four of its six worlds are named for it. The
+fiction was there; only the label was borrowed from the atlas.
+
+Twelve strings changed in total. R9 passes on the roster for the first time, and
+now it passes over the fields it always claimed to cover.
+
+The other 71 names are legal and they stay. That is the part worth saying out
+loud, because "rename the tracks" could fairly have meant all of them: if the
+owner wants the full sweep he gets it on one word, but he will not get it by
+accident from a rule-driven build.
+
+**What was deliberately NOT renamed, and why it matters.** Fifteen internal
+route/theme KEYS are real-world names — turini, pikes, estonia, principality,
+ardennes, tremola, furka, dolomiti, liguria, aegean, dalmatia, azur, riviera,
+genova, sanremo. They never reach the screen, and they are load-bearing:
+`seedForLevel(level, epoch)` hashes `` `${epoch}:${id}:${route||theme}` ``, so
+renaming a key re-rolls that world's entire scatter. Every tree, rock, hut and
+stone wall moves. That is a stage-data rewrite wearing a rename's clothes, and
+working rule 1 says one system per build. Keys untouched; recorded as K-17 so the
+owner can order the re-roll deliberately if he wants them clean too.
+
+**The failure this build nearly shipped.** Renaming worlds breaks anything that
+keys on a world NAME, and two of the things that do are in the DEPLOY SET:
+`test-nothing-floats.mjs` and `test-nothing-on-road.mjs` both carry waiver dicts
+keyed by name. A waiver whose key no longer matches does not fail loudly — it
+stops applying, and the suite goes red for a reason that has nothing to do with
+the change. Caught before gating rather than during it, because the lesson of
+r415 and r420 is that the instrument is likelier to be wrong than the code. Ten
+test files updated in the same change-set as the rename, plus a stale `CINQUE
+TERRE` string found sitting inside the tests themselves — the real place name,
+still in the repo, which the rename sweep flushed out.
+
+Scope: stage data and the references to it. No geometry, no physics, no HUD.
+
 ## r421 — THE MAP WAS WRONG TWICE, SO IT IS GONE
 
 Owner: "Remove or rework the maps."

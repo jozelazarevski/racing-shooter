@@ -35,7 +35,7 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 
 // A forested world, a jungle world (which also has the small streams), and the
 // timber world — all three carry the world-spanning river.
-for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FLUME FURY']]) {
+for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'GREENWATER RAPIDS'], [13, 'LOG FLUME FURY']]) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
   await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load' });
   const ok = await p.waitForFunction(() => window.__game?.track?.center,

@@ -83,7 +83,7 @@ const KNOWN_BODY = {
   'TERRAZZA ALTA': { max: 4, why: 'the same pylon legs — TERRAZZA ALTA runs the corse route' },
   // r199 found it and could not name the builder: the colours are computed, so
   // a literal grep does not reach it.
-  'CINQUE TERRE': { max: 4, why: 'measured 4: a Dodecahedron rock at 6.28 u, builder unidentified since r199' },
+  'HILLTOWN STACK': { max: 4, why: 'measured 4: a Dodecahedron rock at 6.28 u, builder unidentified since r199' },
   // HANDOVER item 3. Two legs of the lap interpenetrate, so anything correctly
   // placed beside one leg stands in the other. Fix the overlap, not the props.
   'SEA CLIFF RUN': { max: 8, why: '80 u of road stacked on road (HANDOVER item 3)' },
@@ -127,11 +127,11 @@ const KNOWN_HARD = {
   // a tunnel bore is NARROWER than the road it carries, so its wall colliders
   // sit inside the drivable width by construction. tool-road-census records
   // this and says to compare runs against each other, not against zero.
-  'COTE D AZUR': { max: 16, why: 'tunnel-bore wall colliders — narrower than the road they carry' },
+  'SAPPHIRE SHORE': { max: 16, why: 'tunnel-bore wall colliders — narrower than the road they carry' },
   // measured 77 solids + 3 barriers, down from 185 + 26. What is left is the
   // world's own masonry, placed off its own offsets rather than off widthAt.
   'MOUNTAIN TO SEA': { max: 90, why: 'roadWidth 5: masonry builders still use their own offsets (HANDOVER)' },
-  'CINQUE TERRE': { max: 2, why: 'the 1.95 u stone r199 could not attribute — colours are computed, grep does not reach it' },
+  'HILLTOWN STACK': { max: 2, why: 'the 1.95 u stone r199 could not attribute — colours are computed, grep does not reach it' },
   'CLIFF KNOT': { max: 4, why: 'a knotted lap: masonry beside one leg reaches the next' },
   'BRIDGE RUN': { max: 3, why: '2 bridge parapet segments at the deck edge' },
   // r392: six worlds with 1-2 EDGE-CLIPPING stones, measured (bites 0.31 to

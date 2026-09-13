@@ -17,6 +17,10 @@ const PROTECTED = [
   'GOTTHARD', 'TREMOLA', 'FURKA', 'TURINI', 'FAFE', 'ESTONIA', 'DOLOMITI',
   'CINQUE TERRE', 'ALASSIO', 'BUDELLO', 'CAPO MELE', 'OUNINPOHJA',
   'NURBURGRING', 'MONZA', 'LE MANS', 'DAYTONA', 'GOODWOOD',
+  // r422 — the seven display names the E-20 audit retired
+  'PRINCIPALITY', 'ARDENNES', 'CINQUE BORGHI', 'AEGEAN', 'DALMATIA',
+  'COTE D AZUR', 'LIGURIA', 'RIVIERA', 'GENOVA', 'SANREMO',
+  'AMAZON', 'KYOTO', 'MEDITERRANEAN', 'COSTA BRAVA',
 ];
 
 const browser = await chromium.launch({
@@ -28,11 +32,16 @@ await p.goto(`${BASE}/?level=1`, { waitUntil: 'load', timeout: 300000 });
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 300000 });
 
 const r = await p.evaluate(async () => {
-  const { LEVELS } = await import('./src/track.js');
+  const { LEVELS, CHAPTERS } = await import('./src/track.js');
   const rows = [];
   for (const l of LEVELS) {
     rows.push([l.id, [l.name, l.region, l.blurb, l.sub, l.desc]
       .filter(Boolean).join(' | ').toUpperCase()]);
+  }
+  // r422: the header always claimed chapter titles were scanned; they were not,
+  // and THE ITALIAN RIVIERA sat in one for thirteen chapters' worth of builds.
+  for (const c of (CHAPTERS || [])) {
+    rows.push([`ch${c.n}`, [c.name, c.blurb].filter(Boolean).join(' | ').toUpperCase()]);
   }
   return rows;
 });

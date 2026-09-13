@@ -1159,7 +1159,7 @@ const _rollS = new THREE.Vector3();
 //
 //   FROST PEAK (snow)   DUNE 39.1s ... BRAWLER 47.1s   — 8 seconds
 //   LOG FLUME (dry)     CROWN 31.9s ... SLEEK   34.0s   — and DUNE is 5th
-//   AMAZON RAPIDS (wet) DUNE 34.9s ... BRAWLER 40.7s
+//   GREENWATER RAPIDS (wet) DUNE 34.9s ... BRAWLER 40.7s
 //
 // Six different orderings across eight worlds. What was missing was any way for
 // a player to KNOW that before buying, so the garage read as "bigger numbers are
@@ -1181,7 +1181,7 @@ const DEMANDS = {
   5:  { loose: 0.12, twist: 0.30, fast: 0.18, climb: 0.71 }, // EMBER PASS
   6:  { loose: 0.12, twist: 0.46, fast: 0.71, climb: 0.59 }, // SUMMIT CLIMB
   7:  { loose: 1.00, twist: 0.53, fast: 0.20, climb: 0.42 }, // GLACIAL PASS
-  8:  { loose: 0.55, twist: 0.64, fast: 0.16, climb: 0.29 }, // AMAZON RAPIDS
+  8:  { loose: 0.55, twist: 0.64, fast: 0.16, climb: 0.29 }, // GREENWATER RAPIDS
   9:  { loose: 0.12, twist: 0.26, fast: 0.14, climb: 0.61 }, // THE DUNE SERPENT
   10: { loose: 0.12, twist: 1.00, fast: 0.10, climb: 0.05 }, // ROCKFALL RAVINE
   11: { loose: 0.12, twist: 0.35, fast: 0.19, climb: 0.19 }, // OASIS AMBUSH
@@ -1253,14 +1253,14 @@ const DEMANDS = {
   47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
   48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA
   49: { loose: 0.15, twist: 0.55, fast: 0.50, climb: 0.10 }, // HARBOR QUAY
-  // THE MEDITERRANEAN FIVE. Estimates from each route's own geometry, not
+  // THE INLAND SEA FIVE. Estimates from each route's own geometry, not
   // measured laps: corniche shelves are fast and twisty and barely climb, the
   // island is tighter, the Brava's seafront straight makes it the fastest.
-  50: { loose: 0.20, twist: 0.62, fast: 0.48, climb: 0.30 }, // CINQUE TERRE
-  51: { loose: 0.28, twist: 0.58, fast: 0.45, climb: 0.18 }, // AEGEAN BLUE
-  52: { loose: 0.22, twist: 0.50, fast: 0.62, climb: 0.20 }, // COSTA BRAVA
-  53: { loose: 0.24, twist: 0.55, fast: 0.52, climb: 0.16 }, // DALMATIA DRIVE
-  54: { loose: 0.18, twist: 0.60, fast: 0.55, climb: 0.24 }, // COTE D AZUR
+  50: { loose: 0.20, twist: 0.62, fast: 0.48, climb: 0.30 }, // HILLTOWN STACK
+  51: { loose: 0.28, twist: 0.58, fast: 0.45, climb: 0.18 }, // WHITEWASH BAY
+  52: { loose: 0.22, twist: 0.50, fast: 0.62, climb: 0.20 }, // WINDWARD COVES
+  53: { loose: 0.24, twist: 0.55, fast: 0.52, climb: 0.16 }, // LIMESTONE COAST
+  54: { loose: 0.18, twist: 0.60, fast: 0.55, climb: 0.24 }, // SAPPHIRE SHORE
   55: { loose: 0.22, twist: 0.64, fast: 0.44, climb: 0.20 }, // BRIDGE RUN
   56: { loose: 0.24, twist: 0.58, fast: 0.50, climb: 0.26 }, // OLIVE CROSSING
   57: { loose: 0.20, twist: 0.70, fast: 0.38, climb: 0.34 }, // MOUNTAIN TO SEA
@@ -1760,7 +1760,7 @@ class Game {
     //
     // +-72 was "tight frustum around the player = crisp shadows", and crisp
     // it was — for the 144 u around the car and nowhere else. Measured on a
-    // PRINCIPALITY STREETS frame: the houses to the left and ahead threw
+    // CROWN HARBOUR frame: the houses to the left and ahead threw
     // long shadows down the street and the ones to the right threw none at
     // all, with a hard straight line between them. That is the whole report:
     // shadows are not "constantly there" because two thirds of the visible
@@ -7148,7 +7148,7 @@ class Game {
       });
     }
     // world special (concept screens): FREEZE STRIKE on GLACIAL PASS,
-    // JUNGLE FURY on AMAZON RAPIDS — one violet orb that slows every rival
+    // JUNGLE FURY on GREENWATER RAPIDS — one violet orb that slows every rival
     const themeKey = this.level?.theme;
     if (themeKey === 'glacial' || themeKey === 'jungle') {
       defs.push({ type: 'slowfield', index: Math.floor(t.N * 0.55), lateral: 0 });
