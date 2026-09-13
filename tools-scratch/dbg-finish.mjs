@@ -43,18 +43,29 @@ const R = await p.evaluate(async () => {
     pl.speed = 40;                       // rolling, so the line arrives in ~1 s
     const before = { lap: pl.lap, idx: pl.trackIndex };
     setup(pl, g);
-    let endedAtFrame = -1, minIdx = pl.trackIndex, maxIdx = pl.trackIndex, wrapped = false;
+    let endedAtFrame = -1, crossFrame = -1, speedAtCross = 0;
+    let speedAfter = null, movedAfterM = 0, idxAtEnd = null;
     for (let f = 0; f < 600; f++) {
       const prev = pl.trackIndex;
       g._frameBody();
-      if (prev > N * 0.85 && pl.trackIndex < N * 0.15) wrapped = true;
-      minIdx = Math.min(minIdx, pl.trackIndex); maxIdx = Math.max(maxIdx, pl.trackIndex);
-      if (g.state === 'finished' && endedAtFrame < 0) endedAtFrame = f;
+      if (crossFrame < 0 && prev > N * 0.85 && pl.trackIndex < N * 0.15) {
+        crossFrame = f; speedAtCross = pl.speed;
+      }
+      if (g.state === 'finished' && endedAtFrame < 0) { endedAtFrame = f; idxAtEnd = pl.trackIndex; }
+      // 2 s after the terminal state: is the car still being driven?
+      if (endedAtFrame >= 0 && f === endedAtFrame + 120) speedAfter = pl.speed;
+      if (endedAtFrame >= 0 && f > endedAtFrame) movedAfterM += Math.abs(pl.speed) / 3.6 / 60;
     }
     return {
-      name, before, wrapped,
+      name, before, crossed: crossFrame >= 0,
       lapAfter: pl.lap, idxAfter: pl.trackIndex, stateAfter: g.state,
-      endedAtFrame, endedMs: endedAtFrame < 0 ? null : Math.round(endedAtFrame * 1000 / 60),
+      // THE number the rule is about: crossing -> terminal state
+      latencyMs: (crossFrame >= 0 && endedAtFrame >= 0)
+        ? Math.round((endedAtFrame - crossFrame) * 1000 / 60) : null,
+      speedAtCross: Math.round(speedAtCross),
+      speedAfter2s: speedAfter === null ? null : Math.round(speedAfter),
+      rollOnM: Math.round(movedAfterM),
+      ended: endedAtFrame >= 0,
     };
   };
 
@@ -67,16 +78,26 @@ const R = await p.evaluate(async () => {
   out.cases.push(runCase('2 airborne', (pl) => { drive(pl); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
   out.cases.push(runCase('3 drifting', (pl) => {
     const base = pl.step.bind(pl);
-    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, drift: true, steer: 0.5 });
+    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, drift: true, steer: 0.12 });
   }));
   out.cases.push(runCase('4 shielded', (pl) => { drive(pl); pl.invuln = 5; pl.shieldT = 5; }));
   out.cases.push(runCase('5 mid-respawn', (pl) => { drive(pl); pl._teleportFrames = 8; }));
-  out.cases.push(runCase('6 state=paused at the line', (pl, gg) => { drive(pl); gg.state = 'paused'; }));
+  // case 6 rewritten: pausing stops the physics, so the car never reaches the
+  // line and the case proves nothing. What the `controlsLive` veto actually
+  // needs is a state flip AT the moment of crossing — flip it when the car is
+  // within two indices of the line, while it is still moving.
+  out.cases.push(runCase('6 state flips at the line', (pl, gg) => {
+    const base = pl.step.bind(pl);
+    pl.step = (dt, inp) => {
+      if (pl.trackIndex > gg.track.center.length - 3) gg.state = 'countdown';
+      return base(dt, { ...inp, throttle: 1, brake: 0 });
+    };
+  }));
   return out;
 });
 await browser.close();
 console.log('lapsTotal', R.lapsTotal, 'N', R.N);
 for (const c of R.cases) {
-  console.log(`${c.name.padEnd(28)} state=${String(c.stateAfter).padEnd(9)} lap ${c.before.lap}->${c.lapAfter}  idx ${c.before.idx}->${c.idxAfter}  crossed=${c.wrapped}  ended=${c.endedMs === null ? 'NEVER' : c.endedMs + 'ms'}`);
+  console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  vCross=${c.speedAtCross}  v+2s=${c.speedAfter2s}  rollOn=${c.rollOnM}m  state=${c.stateAfter}`);
 }
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
