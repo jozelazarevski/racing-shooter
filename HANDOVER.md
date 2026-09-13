@@ -4171,6 +4171,65 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r428 — THE CEILING CAPPED HEIGHT; NOTHING CAPPED RATE
+
+The half r427 left open: the snap just past the portal, which is the half the
+owner's sentence — "camera shakes AFTER the tunnel" — actually names.
+
+**Measured at KARVEN CLIMB's exit, station 113, by wrapping the lerp itself:**
+
+| | |
+|---|---|
+| target | 139.2 |
+| eye | 88.34 |
+| gap | **50.86 u** |
+| k | 0.0876 (nominal) |
+| camDt | 0.0167 (nominal) |
+| ceiling | **93.6 — it binds** |
+
+Two candidate explanations existed and the numbers pick one: the timestep is
+innocent, and the gap is the whole story. The open-air lift is trying to
+clear the ridge the road has just tunnelled under, so the eye sits 50 u below
+a legal ceiling and closes 4.46 u in a single frame — about **268 u/s**. The
+ceiling catches it one frame later at exactly 93.68. Height was capped. Rate
+was not.
+
+**This corrects r426 on the record.** That build read `_boreCeilY now 163` —
+a snapshot taken after the 4200-frame run, wherever the car finished — and
+concluded the ceiling "sits 88 m above the camera and never binds". At the
+portal it binds at 93.6. The revert itself was still right: the constant read
+back MISSING so the rate limit ran on a default, and the numbers were
+identical to baseline, so the change was inert. But limiting how fast the
+CEILING rises could never have helped while the eye is underneath it
+sprinting upward. The eye's own climb is the thing to limit.
+
+**Fix.** Inside the bore approach/exit window only, the eye may climb no
+faster than `boreRiseCapUPerS` (22 u/s, driving.json). Outside the window the
+open-air rules are already smooth, and the anchor is cleared on exit so
+nothing leaks into ordinary driving. Per J-9 the constant is declared in BOTH
+places — the default in `src/driving.js` and the value in `driving.json` —
+which is the trap r426 made loud, and which would otherwise have silently
+made this build inert too.
+
+**Result, station 113:** 581-594 deg/s -> **45**. Height climbs 3.9 -> 6.8 ->
+9.9 over two stations instead of 3.9 -> 9.3 in one frame.
+
+**#116's two measured halves are now both closed:**
+
+| | before | after |
+|---|---|---|
+| in-bore churn (r427) | 146-155 deg/s | 9-10 |
+| portal snap (r428) | 581-594 deg/s | 45 |
+
+**WHAT IS STILL THERE, and it is not what he reported.** The APPROACH spikes
+survive — stations 90, 91, 94, 95 at 780 / 690 / 584 / 539 deg/s, and 94 got
+worse in r427 (727 -> 780) because `tunnelAt` carries a 6-station pad. Those
+are the eye DESCENDING as the ceiling falls ahead of the portal, and the fall
+direction is deliberately unlimited: it is what keeps the eye out of the rock.
+Capping it symmetrically would trade a visible snap for a camera inside a
+mountain, so the entry side wants a smoother descent ramp rather than a cap,
+and that is its own build. Recorded, not quietly folded into this one.
+
 ## r427 — THE LERP AND THE CLAMP WERE FIGHTING INSIDE THE BORE
 
 The owner's tunnel shake (#116), root-caused by making the code name itself
