@@ -12338,6 +12338,7 @@ class Game {
     // (camY 108 over a car at 70) — 0.18 caps that pump at ~+7. Fractional
     // station distance so the ceiling walks down continuously instead of
     // stepping 2.7 u at every station crossing.
+    let boreWindow = false;
     if (!tun && tk?._tunnels?.length && tk.center?.length) {
       const cp = this.camPos;
       const fi9 = tk.fracIndexAt ? tk.fracIndexAt(p.pos, p.trackIndex) : p.trackIndex;
@@ -12363,9 +12364,31 @@ class Game {
         const ceil9 = tk.center[Math.round(eng9)].y + info9.apex - 1.3
           + Math.max(0, dIn - 6) * (tk.segLen ?? 6) * 0.18;
         if (cp.y > ceil9) cp.y = ceil9;
+        // r428 (#116, the half r427 left): THE CEILING CAPS HEIGHT, NOTHING
+        // CAPPED RATE. Measured at KARVEN CLIMB's exit portal, station 113:
+        //   target 139.2, eye 88.34 — a 50.86 u gap, because the open-air
+        //     lift is trying to clear the ridge the road has just gone under
+        //   k 0.0876 and camDt 0.0167 — both nominal, so the timestep is
+        //     innocent and the gap is the whole story
+        //   ceiling 93.6 — it DOES bind, and catches the eye one frame later
+        // so the eye closed 4.46 u in a single frame, ~268 u/s. That is the
+        // snap, and it is why r426's rise-limited CEILING was inert even
+        // before its constant failed to load: limiting how fast the ceiling
+        // rises does nothing while the eye is below it, sprinting up.
+        //
+        // The eye's own climb is what needs the limit, and only inside the
+        // portal window — outside it the open-air rules are already smooth.
+        const riseCap = (window.__DRIVING?.patch02b?.boreRiseCapUPerS ?? 22)
+          * (this._camDt ?? dt);
+        if (cp.y > (this._boreLastY ?? cp.y) + riseCap) {
+          cp.y = (this._boreLastY ?? cp.y) + riseCap;
+        }
+        this._boreLastY = cp.y;
+        boreWindow = true;
         break;
       }
     }
+    if (!boreWindow) this._boreLastY = undefined;   // r428: out of every window
     // a solid pine on the camera->player sightline fills the whole frame —
     // slide the camera sideways off the trunk instead
     if (tk?.trees) {

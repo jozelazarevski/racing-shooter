@@ -196,6 +196,13 @@ export const DRIVING = {
   //                          Col: lateral 3.6 u, heading offset 0°)
   //   stuckDetectS / lowSpeedTorqueMul -> fix 14, next build per rollout
   patch02b: {
+    // r428 (#116): how fast the chase eye may CLIMB inside a bore's approach
+    // and exit window, u/s. Measured at the portal: the target sits ~50 u
+    // above the eye (the lift clearing the ridge the road tunnels under), the
+    // ceiling correctly caps the HEIGHT at ~93.6, and nothing caps the RATE —
+    // so the eye closed 4.46 u in one frame, about 268 u/s, which is the snap
+    // the owner reports just past the tunnel.
+    boreRiseCapUPerS: 22,
     propShoveRadiusU: 1.15,
     camClearanceM: 2.2,
   },
