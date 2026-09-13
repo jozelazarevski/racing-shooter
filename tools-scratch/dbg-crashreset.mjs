@@ -36,9 +36,19 @@ const R = await p.evaluate(async () => {
   const rows = [];
   for (const lat of [0, 4, 8, 14, 22, 30]) {
     g.state = 'race';
+    // TWO HARNESS BUGS FROM THE FIRST RUN, both fixed here:
+    //  - placeAt hands out a spawn shield, so `damage` bounced off and the
+    //    lat 0 rows reported "alive, full hull, came back in 0 ms" for a car
+    //    that had never died at all;
+    //  - `deaths` accumulates across iterations, so by the fourth kill the
+    //    player was out of hulls (HULL_LIVES = 3) and simply never respawned.
+    //    That is the three-wreck rule working, not a lateral-dependent bug,
+    //    and reading it as one would have been a fabricated finding.
+    g.deaths = 0;
     pl.outOfHulls = false; pl.alive = true; pl.health = pl.maxHealth;
     pl.placeAt(300, lat, true);
     for (let f = 0; f < 20; f++) g._frameBody();
+    pl.invuln = 0; pl._gridInvuln = false;
     const died = { lat: +(pl.lateral ?? 0).toFixed(1), idx: pl.trackIndex };
     pl.damage(99999, null, true);            // a crash, not a fall
     let cameBack = -1;
