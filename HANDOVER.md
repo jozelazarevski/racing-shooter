@@ -4171,6 +4171,68 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r423 — THE P0 WAS NOT BROKEN, AND FINDING THAT OUT COST SEVEN STRAW MEN
+
+R-FINISH-01 is the top P0 in RALLY_RACE_INTEGRITY: "crossing the finish
+trigger MUST transition the race to a terminal state within 500 ms". It comes
+from capture R21, where the player crossed at 3:21.7 and the game ran on past
+3:23.7 with no results. The patch names two candidate causes and says to test
+both before writing anything.
+
+Reading the code first turned up a line that looked exactly like the culprit:
+
+    if (this.checkLap(prevIndex) && controlsLive) g.onPlayerLap();
+
+`checkLap` runs first and increments the lap counter; `controlsLive`
+(`g.state === 'race'`) can then veto the call. A crossing in any non-race
+state would advance the lap and silently drop the finish. That is a tidy
+story, it fits the capture, and it is wrong. Seven harness corrections later,
+the measurements say so.
+
+**What the probe found, once it was measuring the game instead of itself.**
+Crossing ends the race at **0 ms — the same frame** — in five states:
+grounded, airborne, drifting, shielded, mid-respawn. It still ends at 0 ms
+with the `controlsLive` veto forced onto the crossing frame, which kills the
+theory outright. The input lock holds: the car rolls **3 m** past the flag and
+stops. And no rescue taken on the closing stretch lands past the trigger
+plane — 880->880, 890->896, 895->896, 898->898, 899->899 — which refutes the
+patch's other candidate. Both candidate causes are refuted at HEAD. The P0 as
+specified is already met.
+
+**The seven straw men, because they are the actual lesson.** Every one of
+them would have produced a confident, wrong finding if I had written it up
+instead of re-reading my own output:
+
+| what it printed | what was actually true |
+|---|---|
+| "never finishes, any state" | the line was 250 m away and the car had 4 s from a standstill |
+| three cases drove backwards | each case wrapped `pl.step` on the previous case's wrapper |
+| "ignores the input lock, 42 m roll-on" | the probe wrapped `step` and forced throttle AFTER the lock zeroed it |
+| "the car never moves at all" | throttle/steer/brake/drift are GETTERS; assigning them is a silent no-op |
+| "rolls on at 40 km/h" | `pl.speed` is a stale field — it reads back what you wrote and never changes |
+| "every rescue lands where it started" | `g.rescuePlayer()` does not exist; the rescue is a FLAG, `_unstuckReq` |
+| cases 4-6 roll-on changed 3 m -> 0 m | case 3's `_frameBody` wrapper leaked into every later case |
+
+Two of those are worth carrying forward as standing traps. **The input axes
+are prototype getters with no setters**, so `g.input.throttle = 1` inside a
+non-strict page evaluate fails silently — no error, no effect — and a scripted
+driver must set `analog` and the key set. **`pl.speed` is not a velocity**; it
+is whatever was last written to it, which is why a stationary car reported
+40 km/h and a 42 m roll-on while its track index sat unmoved at 0.
+
+**What shipped.** No game code. `tests/test-finish.mjs`, 16 assertions over
+the five states plus the rescue sweep, added to the blocking gate's DEPLOY_SET
+so the behaviour cannot regress quietly — which is the real risk now that the
+P0 is known good. Its header carries all seven traps, so the next probe of
+this area does not pay for them again.
+
+**One deviation, recorded rather than fixed.** The rule also asks that the
+respawn nearest the finish sit at least 30 m before the trigger plane. It does
+not: a rescue at index 898 or 899 declines to move the car at all, leaving it
+15 m and 8 m out. That is a no-op rescue, not a placement past the line, and
+"correcting" it would mean dragging a player backwards away from a finish they
+had nearly reached. Left as is, recorded as K-18.
+
 ## r422 — SEVEN NAMES OFF A MAP OF THE REAL WORLD
 
 The owner's sentence was "Rename the tracks", and the temptation was to treat it

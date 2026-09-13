@@ -36,6 +36,7 @@ const DEPLOY_SET = [
   ['test-patch02.mjs',        'camera framing, grid, AI separation acceptance (FIX-1/2/4)'],
   ['test-killspos.mjs',       'kill respawns behind the player + stuck law (FIX-8b, FIX-7)'],
   ['test-camstable.mjs',      'camera twitch harness + frozen-time sky pixel-crawl diff (WR-4)'],
+  ['test-finish.mjs',         'the line ends the race in every state (R-FINISH-01, P0)'],
 ];
 const FULL_EXTRA = [
   ['test-airace.mjs',         'AI field acceptance §5.6 (FIX-1, FIX-8 pace)'],
