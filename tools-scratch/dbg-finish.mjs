@@ -31,10 +31,16 @@ const R = await p.evaluate(async () => {
   };
 
   const ORIG_STEP = Object.getPrototypeOf(g.player).step;
+  const ORIG_BODY = g._frameBody.bind(g);
 
   const runCase = (name, setup, entrySpeed = 40) => {
     const pl = g.player;
     pl.step = ORIG_STEP;                 // undo any previous case's wrapper
+    // …and put _frameBody back: cases 3 and 6 wrap it, and a wrapper left in
+    // place re-armed the drift hold inside every later case. Cases 4-6 still
+    // crossed, but their roll-on read 0 m instead of 3 m — contamination I
+    // introduced, not a change in the game.
+    g._frameBody = ORIG_BODY;
     hold({ throttle: 0, brake: 0, steer: 0, drift: false });
     g.state = 'race';
     pl.placeAt(Math.floor(N * 0.985), 0, true);   // ~13 indices short of the line
@@ -108,8 +114,8 @@ const R = await p.evaluate(async () => {
     hold({ throttle: 1, steer: 0, drift: false });
     const body = gg._frameBody.bind(gg);
     gg._frameBody = () => {
-      if (pl.trackIndex > gg.track.center.length - 6) {
-        hold({ throttle: 1, steer: 0.1, drift: true });
+      if (pl.trackIndex > gg.track.center.length - 3) {
+        hold({ throttle: 1, steer: 0, drift: true });   // no steer scrub
       }
       return body();
     };
