@@ -24,44 +24,42 @@ for (const id of IDS) {
     const r = await p.evaluate(() => {
       const g = window.__game, tk = g.track, N = tk.center.length;
       const T = tk.T ?? {};
-      const seaY = T.seaLevel ?? T.waterY ?? tk.seaLevel ?? null;
-      const half = (i) => Number(tk.widthAt ? tk.widthAt(i) : 9);
-      // walk outward from each station on both sides until the ground drops
-      // to/below sea level — that lateral distance IS the road-to-waterline gap
-      const dists = [];
-      if (seaY !== null && tk.groundHeightAtFrac) {
-        for (let i = 0; i < N; i += 2) {
-          let best = Infinity;
-          for (const sgn of [1, -1]) {
-            for (let lat = half(i); lat <= 260; lat += 4) {
-              const h = tk.groundHeightAtFrac(i, sgn * lat);
-              if (h !== undefined && h <= seaY + 0.4) {
-                best = Math.min(best, lat - half(i)); break;
-              }
-            }
-          }
-          if (best < Infinity) dists.push(best);
-        }
+      // THE GAME'S OWN MODEL, asked rather than guessed: T.coast is a LINE
+      // a->b with a sea `level`. My first census guessed T.seaLevel/T.waterY,
+      // matched nothing, and printed "sea? none" for every coast world.
+      const C = T.coast;
+      if (!C || !C.a || !C.b) {
+        return { name: g.level?.name, theme: g.level?.theme, quay: !!T.quay,
+          hasCoast: false, sampled: 0 };
       }
-      dists.sort((a, b) => a - b);
-      const med = dists.length ? dists[dists.length >> 1] : null;
-      const sampled = Math.ceil(N / 2);
-      return { name: g.level?.name, theme: g.level?.theme, seaY,
-        quay: !!T.quay, coast: !!T.coast,
+      const [ax, az] = C.a, [bx, bz] = C.b;
+      const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+      const half = (i) => Number(tk.widthAt ? tk.widthAt(i) : 9);
+      const dists = [];
+      for (let i = 0; i < N; i++) {
+        const c = tk.center[i];
+        // perpendicular distance from the station to the coast line, minus
+        // the carriageway half-width: the gap from ROAD EDGE to waterline
+        const t = L2 ? Math.max(0, Math.min(1, ((c.x - ax) * dx + (c.z - az) * dz) / L2)) : 0;
+        const px = ax + t * dx, pz = az + t * dz;
+        dists.push(Math.max(0, Math.hypot(c.x - px, c.z - pz) - half(i)));
+      }
+      const sorted = [...dists].sort((a, b2) => a - b2);
+      return { name: g.level?.name, theme: g.level?.theme, quay: !!T.quay,
+        hasCoast: true, seaLevel: C.level, sampled: N,
         near40: dists.filter((d) => d <= 40).length,
         near80: dists.filter((d) => d <= 80).length,
-        sampled, withWater: dists.length,
-        min: dists.length ? +dists[0].toFixed(1) : null,
-        med: med === null ? null : +med.toFixed(1) };
+        min: +sorted[0].toFixed(1),
+        med: +sorted[N >> 1].toFixed(1) };
     });
     out.push({ id, ...r, err: errs[0] ?? null });
   } catch (e) { out.push({ id, name: '(load failed)', err: String(e.message).slice(0, 90) }); }
   await p.close();
 }
 await browser.close();
-console.log('world                 theme        marina  sea?   min   med   %lap<=40u  %lap<=80u');
+console.log('world                 theme        marina  sea?     min     med   %lap<=40u  %lap<=80u');
 for (const w of out) {
   if (!w.name || w.name === '(load failed)') { console.log(`${String(w.id).padStart(3)} LOAD FAILED  ${w.err}`); continue; }
   const pct = (n) => w.sampled ? String(Math.round(100 * n / w.sampled)).padStart(3) + '%' : '  --';
-  console.log(`${w.name.padEnd(20)} ${String(w.theme).padEnd(12)} ${(w.quay ? 'YES' : ' no').padEnd(6)} ${(w.seaY === null ? 'none' : 'yes').padEnd(5)} ${String(w.min ?? '--').padStart(5)} ${String(w.med ?? '--').padStart(5)}  ${pct(w.near40)}       ${pct(w.near80)}`);
+  console.log(`${w.name.padEnd(20)} ${String(w.theme).padEnd(12)} ${(w.quay ? 'YES' : ' no').padEnd(6)} ${(w.hasCoast ? 'yes' : 'NONE').padEnd(5)} ${String(w.min ?? '--').padStart(6)} ${String(w.med ?? '--').padStart(7)}  ${pct(w.near40)}       ${pct(w.near80)}`);
 }
