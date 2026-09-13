@@ -74,8 +74,20 @@ const R = await p.evaluate(async () => {
   // throttle there lands AFTER `controlsLive` has zeroed the inputs, so it
   // bypasses the very input lock the rule is about and the car sails on at
   // full speed looking like a defect. Setting g.input is what a player does.
-  const hold = (o) => { for (const k in o) g.input[k] = o[k]; };
-  const drive = () => hold({ throttle: 1, brake: 0, steer: 0, drift: false });
+  // throttle/brake/steer/drift are GETTERS on Input.prototype, so assigning
+  // g.input.throttle = 1 does nothing at all (silently, in a non-strict
+  // evaluate) — which is why the whole roster of cases suddenly showed a car
+  // that never moved. The getters read `analog` and the key set, so that is
+  // what a scripted driver has to set.
+  const hold = ({ throttle = 0, brake = 0, steer = 0, drift = false }) => {
+    g.input.autoThrottle = false;
+    g.input.bothSteer = false;
+    g.input.analog.throttle = throttle;
+    g.input.analog.brake = brake;
+    g.input.analog.steer = steer;
+    if (drift) g.input.keys.add('ShiftLeft'); else g.input.keys.delete('ShiftLeft');
+  };
+  const drive = () => hold({ throttle: 1 });
 
   out.cases.push(runCase('1 grounded', () => { drive(); }));
   out.cases.push(runCase('2 airborne', (pl) => { drive(); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
