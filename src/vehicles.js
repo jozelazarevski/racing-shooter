@@ -4793,7 +4793,22 @@ export class Car {
       this.placeAt(gIdx, 0, true);   // r410: placeAt sets the index, see above
       return;
     }
-    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
+    // r424: CLAMP TO THE ROAD, NOT TO A CONSTANT. This was `clamp(lateral,
+    // -6, 6)`, a figure from before the roads varied in width, and it does
+    // not know the carriageway it is clamping to. Measured on IL VICOLO,
+    // whose owner-directed lane runs 3.04 u half-width and whose 900 stations
+    // are ALL narrower than 6: a crash at lateral 6, 12 or 20 put the car
+    // back 2.9 to 3.8 u OUTSIDE the road every time — the owner's "the resets
+    // after a crash need fixing". A wide world hid it completely (half-width
+    // 9, so +-6 always landed on the tarmac, which is why six clean rows at
+    // the default station showed nothing wrong).
+    //
+    // The reset now seats the car inside the road it is actually on, keeping
+    // a car's width clear of the edge so it does not come back teetering on
+    // the lip, and never inverts on a road narrower than that margin.
+    const halfHere = g.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
+    const seat = Math.max(0, halfHere - 1.5);
+    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -seat, seat), true);
   }
 
   /** Lap bookkeeping — call with previous index before this frame's update.
