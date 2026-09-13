@@ -38,6 +38,28 @@ const R = await p.evaluate(async () => {
         gap: +(target.y - this.y).toFixed(2), k: +k.toFixed(4),
         camDt: +(g._camDt ?? -1).toFixed(4),
         band: g._coverBand ? `${g._coverBand.lo.toFixed(1)}..${g._coverBand.hi.toFixed(1)}` : 'none',
+        // recompute the bore ceiling HERE, at the portal, instead of reading a
+        // snapshot after the run — r426 read the latter and concluded the
+        // ceiling never binds, which justified a revert on unsound grounds
+        // even though the revert itself was right for other reasons.
+        ceil: (() => {
+          const tk = g.track;
+          if (!tk?._tunnels?.length) return null;
+          const fi = tk.fracIndexAt ? tk.fracIndexAt(pl.pos, pl.trackIndex) : pl.trackIndex;
+          for (const T of tk._tunnels) {
+            const dIn = (fi >= T.s - 80 && fi < T.s) ? T.s - fi
+              : (fi > T.e && fi <= T.e + 80) ? fi - T.e : null;
+            if (dIn === null) continue;
+            const portal = fi < T.s ? T.s : T.e;
+            const info = tk.tunnelAt(tk.center[portal], portal, 0);
+            if (!info) continue;
+            const eng = Math.max(0, Math.min(tk.center.length - 1,
+              fi < T.s ? T.s - 6 : T.e + 6));
+            return +(tk.center[Math.round(eng)].y + info.apex - 1.3
+              + Math.max(0, dIn - 6) * (tk.segLen ?? 6) * 0.18).toFixed(2);
+          }
+          return null;
+        })(),
         step: +((target.y - this.y) * k).toFixed(2) });
     }
     return origLerp(target, k);
@@ -54,6 +76,6 @@ await browser.close();
 if (R.FAIL) { console.log('HARNESS FAILURE:', R.FAIL, R.max); process.exit(1); }
 console.log(`${R.n} lerp calls in stations 108-116; the biggest steps:`);
 for (const r of R.rows.sort((a, b) => Math.abs(b.step) - Math.abs(a.step)).slice(0, 14)) {
-  console.log(`  @${String(r.st).padStart(3)}  cam ${String(r.camY).padStart(7)} -> target ${String(r.tgtY).padStart(7)}  gap ${String(r.gap).padStart(7)}  k ${r.k}  camDt ${r.camDt}  step ${String(r.step).padStart(6)}  band ${r.band}`);
+  console.log(`  @${String(r.st).padStart(3)}  cam ${String(r.camY).padStart(7)} -> target ${String(r.tgtY).padStart(7)}  gap ${String(r.gap).padStart(7)}  k ${r.k}  camDt ${r.camDt}  step ${String(r.step).padStart(6)}  ceil ${r.ceil === null ? '   none' : String(r.ceil).padStart(7)}  band ${r.band}`);
 }
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
