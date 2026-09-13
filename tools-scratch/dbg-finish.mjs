@@ -32,7 +32,7 @@ const R = await p.evaluate(async () => {
 
   const ORIG_STEP = Object.getPrototypeOf(g.player).step;
 
-  const runCase = (name, setup) => {
+  const runCase = (name, setup, entrySpeed = 40) => {
     const pl = g.player;
     pl.step = ORIG_STEP;                 // undo any previous case's wrapper
     hold({ throttle: 0, brake: 0, steer: 0, drift: false });
@@ -41,7 +41,7 @@ const R = await p.evaluate(async () => {
     arm(pl);
     for (let f = 0; f < 30; f++) g._frameBody();  // let the teleport guard clear
     arm(pl);
-    pl.speed = 40;                       // rolling, so the line arrives in ~1 s
+    pl.speed = entrySpeed;               // rolling, so the line arrives shortly
     const before = { lap: pl.lap, idx: pl.trackIndex };
     setup(pl, g);
     let endedAtFrame = -1, crossFrame = -1, speedAtCross = 0;
@@ -99,11 +99,14 @@ const R = await p.evaluate(async () => {
 
   out.cases.push(runCase('1 grounded', () => { drive(); }));
   out.cases.push(runCase('2 airborne', (pl) => { drive(); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
+  // 80 km/h in: the handbrake scrubs so much speed that a 40 km/h entry
+  // coasted to a halt at index 898 of 900 — two short of the line, which
+  // proves nothing about crossing while drifting.
   out.cases.push(runCase('3 drifting', () => {
     // steer 0: the handbrake alone is the drift. Any steer angle on this
     // approach walked the car off the ribbon and it never reached the line.
     hold({ throttle: 1, steer: 0, drift: true });
-  }));
+  }, 80));
   out.cases.push(runCase('4 shielded', (pl) => { drive(); pl.invuln = 5; pl.shieldT = 5; }));
   out.cases.push(runCase('5 mid-respawn', (pl) => { drive(); pl._teleportFrames = 8; }));
   // case 6 rewritten: pausing stops the physics, so the car never reaches the
@@ -121,11 +124,40 @@ const R = await p.evaluate(async () => {
       return body();
     };
   }));
+  // ---- case 7: THE CAPTURED SYMPTOM. The patch's own root-cause note says
+  // the respawn may have placed the car PAST the trigger plane, so the
+  // crossing never happened and the race ran on. Measure where a rescue
+  // taken just short of the line actually lands, and whether the race can
+  // still be finished afterwards.
+  {
+    const pl = g.player;
+    pl.step = ORIG_STEP;
+    g.state = 'race';
+    const landings = [];
+    for (const startIdx of [880, 890, 895, 898, 899]) {
+      pl.placeAt(startIdx, 0, true);
+      arm(pl);
+      for (let f = 0; f < 10; f++) g._frameBody();
+      const before = pl.trackIndex;
+      g.rescuePlayer ? g.rescuePlayer() : (pl.unstuck ? pl.unstuck() : null);
+      for (let f = 0; f < 5; f++) g._frameBody();
+      const after = pl.trackIndex;
+      landings.push({ before, after,
+        pastLine: after < N * 0.5 && before > N * 0.85,
+        metresToLine: Math.round(((N - after) % N) * (g.track.segLen ?? 4)) });
+    }
+    out.rescue = landings;
+    out.hasRescuePlayer = typeof g.rescuePlayer === 'function';
+  }
   return out;
 });
 await browser.close();
 console.log('lapsTotal', R.lapsTotal, 'N', R.N);
 for (const c of R.cases) {
   console.log(`${c.name.padEnd(26)} crossed=${String(c.crossed).padEnd(5)} ended=${String(c.ended).padEnd(5)} latency=${c.latencyMs === null ? '   n/a' : String(c.latencyMs).padStart(4) + 'ms'}  lap ${c.before.lap}->${c.lapAfter}  vCross=${c.speedAtCross}  v+2s=${c.speedAfter2s}  rollOn=${c.rollOnM}m  idxEnd=${c.idxAfter}  state=${c.stateAfter}`);
+}
+console.log('\nrescue near the line (hasRescuePlayer=' + R.hasRescuePlayer + '):');
+for (const r of (R.rescue || [])) {
+  console.log(`  from idx ${String(r.before).padStart(3)} -> ${String(r.after).padStart(3)}  pastLine=${r.pastLine}  ${r.metresToLine} m short of the line`);
 }
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
