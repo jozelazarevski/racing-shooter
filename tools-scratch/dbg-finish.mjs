@@ -1,54 +1,78 @@
-/* R-FINISH-01 acceptance, stated as properties rather than a drive:
- *  F1 a return to gate 0 seats the car BEFORE the line, not on it
- *  F2 that return does not gain or lose a lap (progress stays honest)
- *  F3 a real crossing after such a return counts, so finishRace is reachable
- *  F4 a teleport across the line is never itself a crossing
- *  F5 the ordinary lap path still counts a lap                          */
+/* R-FINISH-01 probe: does crossing the finish line end the race, in every
+ * vehicle state?  Measurement only — no fix, no claim beyond what it prints.
+ */
 import { chromium } from 'playwright-core';
-const LVL = Number(process.env.LVL ?? 21);
+const BASE = process.env.BASE ?? 'http://localhost:8921';
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
-const p = await browser.newPage({ viewport: { width: 320, height: 200 } });
-p.setDefaultTimeout(600000);
-await p.goto(`http://localhost:8901/?level=${LVL}&go=1&unlockall=1`,
-  { waitUntil: 'load', timeout: 600000 });
-await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
-  undefined, { timeout: 600000 });
-const r = await p.evaluate(() => {
-  const g = window.__game, t = g.track, N = t.center.length;
-  g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
-  for (let k = 0; k < 500 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
-  const c = g.player, ALL = 0b1111;
-  const out = {};
-  const armed = () => { c._cpMask = ALL; c._midCP = true; c._everCP1 = true; };
+const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+p.setDefaultTimeout(300000);
+const errors = [];
+p.on('pageerror', (e) => errors.push(String(e.message)));
+await p.goto(`${BASE}/?level=1&go=1&unlockall=1`, { waitUntil: 'load', timeout: 180000 });
+await p.waitForFunction(() => window.__game?.player && window.__game.state === 'race',
+  undefined, { timeout: 300000 });
 
-  // F1 / F2 — return to gate 0 from just before the line on lap 1
-  c.lap = 1; c._wraps = 1; c.placeAt(Math.round(N * 0.9), 0, true); armed();
-  const lapBefore = c.lap, progBefore = c.lap + c.trackIndex / N;
-  g.returnToGate(c, 0, 'test');
-  out.seatIndexFrac = +(c.trackIndex / N).toFixed(3);
-  out.F1_seatedBeforeLine = c.trackIndex > N * 0.85;
-  out.lapAfter = c.lap;
-  out.progAfter = +(c.lap + c.trackIndex / N).toFixed(2);
-  out.F2_progressHonest = Math.abs((c.lap + c.trackIndex / N) - progBefore) < 0.2;
+const R = await p.evaluate(async () => {
+  const g = window.__game;
+  if (g.composer) g.composer.render = () => {};
+  let elapsed = g.clock.elapsedTime;
+  g.clock = { getDelta: () => { elapsed += 1 / 60; return 1 / 60; },
+              get elapsedTime() { return elapsed; } };
+  const N = g.track.center.length;
+  const out = { lapsTotal: g.lapsTotal, N, cases: [] };
 
-  // F4 — the placement itself must not have counted as a crossing
-  out.F4_teleportNotACrossing = c.checkLap(Math.round(N * 0.9)) === false;
+  // put the car on the last stretch with every lap gate already down, so the
+  // only thing under test is the crossing itself
+  const arm = (pl) => {
+    pl._cpMask = 0b1111; pl._midCP = true; pl._everCP1 = true;
+    pl.lap = g.lapsTotal;              // this crossing is the finishing one
+    pl.finished = false;
+  };
 
-  // F3 — a REAL crossing after that return counts
-  armed();
-  c._teleportFrames = 0;                 // two frames of immunity have passed
-  const prev = Math.round(N * 0.95);
-  c.trackIndex = Math.round(N * 0.02);
-  out.F3_realCrossingCounts = c.checkLap(prev) === true;
-  out.lapAfterCrossing = c.lap;
+  const runCase = (name, setup) => {
+    // fresh-ish state each time
+    g.state = 'race';
+    const pl = g.player;
+    pl.placeAt(Math.floor(N * 0.93), 0, true);
+    arm(pl);
+    for (let f = 0; f < 20; f++) g._frameBody();   // let any teleport guard clear
+    arm(pl);
+    const before = { state: g.state, lap: pl.lap, idx: pl.trackIndex };
+    setup(pl, g);
+    let endedAtFrame = -1;
+    for (let f = 0; f < 240; f++) {
+      g._frameBody();
+      if (g.state === 'finished' && endedAtFrame < 0) endedAtFrame = f;
+    }
+    return {
+      name, before,
+      lapAfter: pl.lap, idxAfter: pl.trackIndex, stateAfter: g.state,
+      endedAtFrame, endedMs: endedAtFrame < 0 ? null : Math.round(endedAtFrame * 1000 / 60),
+    };
+  };
 
-  // F5 — ordinary lap path, no teleport anywhere near it
-  c.lap = 1; c._wraps = 1; c._teleportFrames = 0; armed();
-  c.trackIndex = Math.round(N * 0.03);
-  out.F5_ordinaryLapCounts = c.checkLap(Math.round(N * 0.97)) === true;
+  const drive = (pl) => {
+    // full throttle straight ahead, whatever the input layer thinks
+    pl._probeDrive = true;
+    const step = pl.step.bind(pl);
+    pl.step = (dt, inp) => step(dt, { ...inp, throttle: 1, brake: 0 });
+  };
 
+  out.cases.push(runCase('1 grounded', (pl) => { drive(pl); }));
+  out.cases.push(runCase('2 airborne', (pl) => { drive(pl); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
+  out.cases.push(runCase('3 drifting', (pl) => {
+    const step = pl.step.bind(pl);
+    pl.step = (dt, inp) => step(dt, { ...inp, throttle: 1, drift: true, steer: 0.6 });
+  }));
+  out.cases.push(runCase('4 shielded', (pl) => { drive(pl); pl.invuln = 5; pl.shieldT = 5; }));
+  out.cases.push(runCase('5 mid-respawn', (pl) => { drive(pl); pl._teleportFrames = 8; }));
+  out.cases.push(runCase('6 state=paused at the line', (pl, gg) => { drive(pl); gg.state = 'paused'; }));
   return out;
 });
-console.log(JSON.stringify(r, null, 1));
 await browser.close();
+console.log('lapsTotal', R.lapsTotal, 'N', R.N);
+for (const c of R.cases) {
+  console.log(`${c.name.padEnd(28)} state=${String(c.stateAfter).padEnd(9)} lap ${c.before.lap}->${c.lapAfter}  idx ${c.before.idx}->${c.idxAfter}  ended=${c.endedMs === null ? 'NEVER' : c.endedMs + 'ms'}`);
+}
+if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
