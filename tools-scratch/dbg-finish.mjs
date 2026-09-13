@@ -30,40 +30,44 @@ const R = await p.evaluate(async () => {
     pl.finished = false;
   };
 
+  const ORIG_STEP = Object.getPrototypeOf(g.player).step;
+
   const runCase = (name, setup) => {
-    // fresh-ish state each time
-    g.state = 'race';
     const pl = g.player;
-    pl.placeAt(Math.floor(N * 0.93), 0, true);
+    pl.step = ORIG_STEP;                 // undo any previous case's wrapper
+    g.state = 'race';
+    pl.placeAt(Math.floor(N * 0.985), 0, true);   // ~13 indices short of the line
     arm(pl);
-    for (let f = 0; f < 20; f++) g._frameBody();   // let any teleport guard clear
+    for (let f = 0; f < 30; f++) g._frameBody();  // let the teleport guard clear
     arm(pl);
-    const before = { state: g.state, lap: pl.lap, idx: pl.trackIndex };
+    pl.speed = 40;                       // rolling, so the line arrives in ~1 s
+    const before = { lap: pl.lap, idx: pl.trackIndex };
     setup(pl, g);
-    let endedAtFrame = -1;
-    for (let f = 0; f < 240; f++) {
+    let endedAtFrame = -1, minIdx = pl.trackIndex, maxIdx = pl.trackIndex, wrapped = false;
+    for (let f = 0; f < 600; f++) {
+      const prev = pl.trackIndex;
       g._frameBody();
+      if (prev > N * 0.85 && pl.trackIndex < N * 0.15) wrapped = true;
+      minIdx = Math.min(minIdx, pl.trackIndex); maxIdx = Math.max(maxIdx, pl.trackIndex);
       if (g.state === 'finished' && endedAtFrame < 0) endedAtFrame = f;
     }
     return {
-      name, before,
+      name, before, wrapped,
       lapAfter: pl.lap, idxAfter: pl.trackIndex, stateAfter: g.state,
       endedAtFrame, endedMs: endedAtFrame < 0 ? null : Math.round(endedAtFrame * 1000 / 60),
     };
   };
 
   const drive = (pl) => {
-    // full throttle straight ahead, whatever the input layer thinks
-    pl._probeDrive = true;
-    const step = pl.step.bind(pl);
-    pl.step = (dt, inp) => step(dt, { ...inp, throttle: 1, brake: 0 });
+    const base = pl.step.bind(pl);
+    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, brake: 0 });
   };
 
   out.cases.push(runCase('1 grounded', (pl) => { drive(pl); }));
   out.cases.push(runCase('2 airborne', (pl) => { drive(pl); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
   out.cases.push(runCase('3 drifting', (pl) => {
-    const step = pl.step.bind(pl);
-    pl.step = (dt, inp) => step(dt, { ...inp, throttle: 1, drift: true, steer: 0.6 });
+    const base = pl.step.bind(pl);
+    pl.step = (dt, inp) => base(dt, { ...inp, throttle: 1, drift: true, steer: 0.5 });
   }));
   out.cases.push(runCase('4 shielded', (pl) => { drive(pl); pl.invuln = 5; pl.shieldT = 5; }));
   out.cases.push(runCase('5 mid-respawn', (pl) => { drive(pl); pl._teleportFrames = 8; }));
@@ -73,6 +77,6 @@ const R = await p.evaluate(async () => {
 await browser.close();
 console.log('lapsTotal', R.lapsTotal, 'N', R.N);
 for (const c of R.cases) {
-  console.log(`${c.name.padEnd(28)} state=${String(c.stateAfter).padEnd(9)} lap ${c.before.lap}->${c.lapAfter}  idx ${c.before.idx}->${c.idxAfter}  ended=${c.endedMs === null ? 'NEVER' : c.endedMs + 'ms'}`);
+  console.log(`${c.name.padEnd(28)} state=${String(c.stateAfter).padEnd(9)} lap ${c.before.lap}->${c.lapAfter}  idx ${c.before.idx}->${c.idxAfter}  crossed=${c.wrapped}  ended=${c.endedMs === null ? 'NEVER' : c.endedMs + 'ms'}`);
 }
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
