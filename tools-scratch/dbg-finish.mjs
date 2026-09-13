@@ -99,14 +99,21 @@ const R = await p.evaluate(async () => {
 
   out.cases.push(runCase('1 grounded', () => { drive(); }));
   out.cases.push(runCase('2 airborne', (pl) => { drive(); pl.airborne = true; pl.mesh.position.y += 6; pl.vel.y = 2; }));
-  // 80 km/h in: the handbrake scrubs so much speed that a 40 km/h entry
-  // coasted to a halt at index 898 of 900 — two short of the line, which
-  // proves nothing about crossing while drifting.
-  out.cases.push(runCase('3 drifting', () => {
-    // steer 0: the handbrake alone is the drift. Any steer angle on this
-    // approach walked the car off the ribbon and it never reached the line.
-    hold({ throttle: 1, steer: 0, drift: true });
-  }, 80));
+  // The handbrake from a standing start never gets the car to the line, and
+  // `entrySpeed` could not help: pl.speed is a stale field, so assigning it
+  // does nothing. Build speed on the throttle first and pull the handbrake
+  // only in the last few metres — which is what crossing the line in a drift
+  // actually looks like.
+  out.cases.push(runCase('3 drifting', (pl, gg) => {
+    hold({ throttle: 1, steer: 0, drift: false });
+    const body = gg._frameBody.bind(gg);
+    gg._frameBody = () => {
+      if (pl.trackIndex > gg.track.center.length - 6) {
+        hold({ throttle: 1, steer: 0.1, drift: true });
+      }
+      return body();
+    };
+  }));
   out.cases.push(runCase('4 shielded', (pl) => { drive(); pl.invuln = 5; pl.shieldT = 5; }));
   out.cases.push(runCase('5 mid-respawn', (pl) => { drive(); pl._teleportFrames = 8; }));
   // case 6 rewritten: pausing stops the physics, so the car never reaches the
