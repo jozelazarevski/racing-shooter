@@ -12278,8 +12278,8 @@ class Game {
     // (camY 108 over a car at 70) — 0.18 caps that pump at ~+7. Fractional
     // station distance so the ceiling walks down continuously instead of
     // stepping 2.7 u at every station crossing.
+    let boreCeil = null;
     if (!tun && tk?._tunnels?.length && tk.center?.length) {
-      const cp = this.camPos;
       const fi9 = tk.fracIndexAt ? tk.fracIndexAt(p.pos, p.trackIndex) : p.trackIndex;
       // 80 stations, not 40: at 40 the ceiling still bound (~+37 vs a
       // top-down anchor at +46) and vanished at the window edge, so the eye
@@ -12302,8 +12302,46 @@ class Game {
           fi9 < T9.s ? T9.s - 6 : T9.e + 6));
         const ceil9 = tk.center[Math.round(eng9)].y + info9.apex - 1.3
           + Math.max(0, dIn - 6) * (tk.segLen ?? 6) * 0.18;
-        if (cp.y > ceil9) cp.y = ceil9;
+        boreCeil = boreCeil === null ? ceil9 : Math.min(boreCeil, ceil9);
         break;
+      }
+    }
+    // r426 (#116, owner: "camera shakes AFTER the tunnel"). THE CEILING WAS
+    // ALREADY SMOOTH; THE APPLICATION WAS NOT. This was `if (cp.y > ceil9)
+    // cp.y = ceil9` — a hard one-sided clamp. Whenever the camera's desired
+    // height sits near the ceiling, the clamp pushes down on one frame and
+    // the camera's own lerp pulls up on the next, and the eye churns.
+    //
+    // MEASURED, KARVEN CLIMB (bore s96-e104), camera angular velocity:
+    //   p50 3 deg/s, p95 12, p99 21 — ordinary driving
+    //   stations 92-111: SUSTAINED 145-160 deg/s, height chattering 5.6<->6.7
+    //   stations 90/91/94/95: 585 / 539 / 727 / 691 deg/s snaps
+    //   station 113, just past the portal: 581 deg/s, height 4.5 -> 9.3 IN
+    //     ONE FRAME as the constraint let go
+    //   station 114 onward: 4 deg/s
+    // g.shake was 0 through every one of those frames, so this was never the
+    // shake system that r398 worked on — the owner's second report has its
+    // own code path, as working rule 3 says it must.
+    //
+    // The asymmetry is the fix: a ceiling may FALL as fast as it likes, since
+    // that is the direction that keeps the eye out of the rock, but it may
+    // only RISE at a bounded rate, which turns both the release spring and
+    // the window edge into a ramp. Nothing about the ceiling's own shape
+    // changes — the 80-station window and the 0.18 walk-down stand.
+    {
+      const cp = this.camPos;
+      const rise = (window.__DRIVING?.patch02b?.boreCeilRiseUPerS ?? 9) * (1 / 60);
+      if (boreCeil !== null) {
+        this._boreCeilY = this._boreCeilY === null || this._boreCeilY === undefined
+          ? boreCeil                       // engage on the true ceiling
+          : Math.min(boreCeil, this._boreCeilY + rise);
+        if (cp.y > this._boreCeilY) cp.y = this._boreCeilY;
+      } else if (this._boreCeilY !== null && this._boreCeilY !== undefined) {
+        // out of every bore window: let the ceiling climb away instead of
+        // vanishing, and drop it only once it no longer binds
+        this._boreCeilY += rise;
+        if (this._boreCeilY >= cp.y) this._boreCeilY = null;
+        else cp.y = this._boreCeilY;
       }
     }
     // a solid pine on the camera->player sightline fills the whole frame —

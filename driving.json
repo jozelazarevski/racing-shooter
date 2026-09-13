@@ -59,7 +59,8 @@
   },
   "patch02b": {
     "propShoveRadiusU": 1.15,
-    "camClearanceM": 2.2
+    "camClearanceM": 2.2,
+    "boreCeilRiseUPerS": 9
   },
   "route": {
     "streetPadM": 2,
