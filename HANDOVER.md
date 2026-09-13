@@ -4171,6 +4171,69 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r426 — THE TUNING FILE HAD A SILENT DROP, AND IT COST A BUILD TO FIND
+
+r425 is not in this ledger because r425 changed nothing: twelve identical
+resets said the post-reset "drift" I had reported twice was a rival hitting a
+car parked on the racing line. Recorded against E-21, closed, no build.
+
+r426 started as the owner's tunnel-camera report (#116) and ended somewhere
+else entirely, which is worth writing down honestly.
+
+**The camera measurements, which stand and are the useful part.** KARVEN
+CLIMB, bore s96-e104, camera angular velocity per frame:
+
+| where | stations | camera |
+|---|---|---|
+| ordinary driving | — | p50 3 deg/s, p95 12, p99 21 |
+| approach | 90-95 | snaps of 585 / 539 / 727 / 691 deg/s |
+| through the bore | 92-111 | SUSTAINED 145-160 deg/s, height chattering 5.6 <-> 6.7 |
+| just past the portal | 113 | 581 deg/s, height 4.5 -> 9.3 IN ONE FRAME |
+| clear | 114+ | 4 deg/s |
+
+`g.shake` is 0 in every one of those frames, so the owner's second shake
+report is NOT the shake system r398 worked on. Working rule 3 said there
+would be a second code path and there is. Also worth noting: the sustained
+churn is 145-160 against test-camstable's 120 deg/s sustained limit — it
+WOULD trip that suite, except that suite drives level 2, which has no bore.
+
+**The fix that was not a fix.** I read the bore ceiling clamp, found it
+applied as a hard one-sided `if (cp.y > ceil9) cp.y = ceil9`, and shipped an
+asymmetric rise limit: a ceiling may fall freely, rise only slowly. The
+re-measurement came back IDENTICAL to baseline — 582 deg/s at station 113,
+same 4.5 -> 9.3.
+
+Identical output after a behavioural change is not a subtly wrong theory, it
+is a change that did not happen, so the next step was instrumentation rather
+than tuning. It reported: the code ran (2687 of 4200 frames had an active
+ceiling), the new constant read back **MISSING**, and the ceiling sat at
+**163** while the camera was at ~75. A clamp that only pushes DOWN, from 88 m
+above, cannot be what springs the camera UP. The change was inert and is
+reverted — dead code that looks like a fix is worse than no fix, because the
+next reader believes the exit spring was handled.
+
+**What the constant reading MISSING actually meant.** `loadDrivingOverrides`
+merges nested blocks with `if (kk in DRIVING[k] && typeof matches)`, so a key
+in `driving.json` with no default in `src/driving.js` is discarded WITHOUT A
+WORD. The guard is correct — it stops a typo inventing a constant nothing
+reads — but the silence is not, because the spec says every tuning number
+lives in driving.json. Add one there and nowhere else and it tunes nothing,
+quietly, and a build gets spent tuning a value that never loaded.
+
+That is what shipped: the loader now collects every ignored key with its
+reason, warns once with the list, and exposes `DRIVING.__droppedKeys` for
+probes. Audited at the same time — **122 keys reach DRIVING today and zero
+are dropped**, so this warns about the next one, not a backlog. Proved by
+negative control rather than assumed: the real file reports no drops, a
+planted file with a defaultless key and a non-existent block reports exactly
+those two, and a valid key in the same block still loads.
+
+**#116 REMAINS OPEN.** The owner's tunnel shake is measured, its cause is NOT
+the bore ceiling, and the numbers above are the handover to the next attempt:
+height pinned at EXACTLY 4.5 for stations 111-112 before releasing to 9.3 (an
+exact figure means a different constraint), and a ~1.1 u bob through the bore
+that the ceiling at 163 plainly is not driving.
+
 ## r424 — A CONSTANT THAT DID NOT KNOW WHICH ROAD IT WAS ON
 
 The owner's report from r411 was four words: "the resets after a crash need
