@@ -4171,6 +4171,66 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r424 — A CONSTANT THAT DID NOT KNOW WHICH ROAD IT WAS ON
+
+The owner's report from r411 was four words: "the resets after a crash need
+fixing." This is the build that found what he was looking at.
+
+`respawn()`'s fallback — the path a player takes when wrecked by damage rather
+than a fall or a drowning — seated the car with
+
+    placeAt(this.trackIndex, clamp(this.lateral, -6, 6), true)
+
+Six is a number from before the roads varied in width. It does not know the
+carriageway it is clamping to, and since r394's widening work every road has
+carried its own `widthAt(station)` profile.
+
+**The first measurement said the bug did not exist.** Six kills at lateral 0
+through 22 on PINE VALLEY: every one came back inside the road, the big
+offsets pulled in to 6, hull restored, 2.5 s to redeploy. At half-width 9,
++-6 is always tarmac. Had the probe stopped there — and it nearly did — #119
+would have been closed as not reproducible, with a table of green rows to
+prove it.
+
+**IL VICOLO is where it lives.** Its owner-directed lane runs 3.04 u
+half-width and ALL 900 of its stations are narrower than the old clamp:
+
+| died at lateral | came back at | road half-width | verdict |
+|---|---|---|---|
+| 0 | 0 | 3.04 | on the road |
+| 6 | 6.0 | 3.04 | **2.91 u outside** |
+| 12 | 6.8 | 3.04 | **3.77 u outside** |
+| 20 | 6.0 | 3.04 | **2.91 u outside** |
+
+Every crash anywhere off the centreline put the car back off the road — in
+the verge, in whatever had just wrecked it, on the owner's narrowest and most
+deliberately authored world. That is the report.
+
+The fix reads the road instead of a constant: `widthAt(trackIndex) ??
+ROAD_HALF`, less 1.5 u so the car does not come back teetering on the lip,
+floored at zero so it cannot invert on a road narrower than its own margin.
+The same defensive idiom already sits at vehicles.js:1942 — the width profile
+was always there to be asked.
+
+After: IL VICOLO's 6/12/20 come back at 1.5/0.3/1.5 inside a 3.04 half-width.
+PINE VALLEY is unchanged in character (0 and 4 preserved; 8 and beyond seat at
+7.5 rather than 6, still tarmac, and nearer to where the driver actually
+crashed).
+
+**The thing to remember from this build.** PINE VALLEY's own narrowest station
+is 5.42 u — under the old clamp too. This was never an IL VICOLO bug; it was a
+roster-wide bug that the typical world hid, because a probe crashing at a
+typical station never met a road narrow enough to expose it. `tests/test-reset.mjs`
+therefore races BOTH worlds and crashes at each one's narrowest station on
+purpose, and it is in the blocking gate. A suite that only drives a typical
+world proves a typical world.
+
+**Recording debt, stated plainly.** The working spec says an owner sentence
+goes into RALLY_RULES.md as OPEN before any code is written against it. This
+one arrived at r411 and lived in the task list instead; it is recorded as E-21
+now, after the fix rather than before. The order was wrong even though the
+outcome is right.
+
 ## r423 — THE P0 WAS NOT BROKEN, AND FINDING THAT OUT COST SEVEN STRAW MEN
 
 R-FINISH-01 is the top P0 in RALLY_RACE_INTEGRITY: "crossing the finish
