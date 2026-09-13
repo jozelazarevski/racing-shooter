@@ -12067,7 +12067,32 @@ class Game {
       const fy = tk.groundHeightAtFrac
         ? tk.groundHeightAtFrac(tk.fracIndexAt(cp, tun.i), 0)
         : tk.center[ci].y;
-      cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
+      // r427 (#116, owner: "camera shakes AFTER the tunnel"). CLAMP THE
+      // TARGET, NOT JUST THE RESULT. The line below forces the EYE into the
+      // bore's band every frame, but `targetPos` — what the chase lerp at
+      // ~11992 is easing toward — was left at whatever the open-air rules
+      // wanted, which inside a bore is above the roof. So every frame the
+      // lerp pulled the eye UP toward an illegal target and this clamp
+      // slammed it back DOWN, and the two fought until the portal released
+      // them.
+      //
+      // MEASURED, KARVEN CLIMB (bore s96-e104), by instrumenting camPos.y
+      // with an accessor that records its own caller:
+      //   main.js:12070 (this clamp)      180 writes, biggest -5.46 u
+      //   Vector3.lerp from main.js:11992 256 writes, biggest +4.46 u
+      //   alternating, e.g. 91.55 -> 86.09 then 87.14 -> 91.60
+      // and the camera's angular velocity ran a SUSTAINED 145-160 deg/s
+      // through stations 92-111 against 3 deg/s for ordinary driving, with
+      // a 581 deg/s spring one frame past the portal as the fight ended.
+      //
+      // Clamping the target into the same band removes the disagreement: the
+      // eye eases to a legal height and stays there. Nothing about the band
+      // itself changes, so the bore is no less protected than before — this
+      // is the r426 attempt's intent, applied to the constraint that was
+      // actually doing the work rather than the one 88 m overhead.
+      const tunLo = fy + 1.9, tunHi = fy + tun.apex - 1.3;
+      cp.y = Math.max(tunLo, Math.min(cp.y, tunHi));
+      targetPos.y = Math.max(tunLo, Math.min(targetPos.y, tunHi));
     } else if (tk?.deckOverhead
       && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex))) {
       // UNDER A BRIDGE, OBEY THE BRIDGE — the same rule as the bore above.
@@ -12093,7 +12118,12 @@ class Game {
         cp.x -= n.x * over;
         cp.z -= n.z * over;
       }
-      cp.y = Math.max(dk.floorY + 1.9, Math.min(cp.y, dk.deckY - 0.8));
+      // r427: the same fight, under a deck instead of a bore — this branch
+      // was written as "same clamp shape as the tunnel branch" and inherited
+      // the bug with the shape. The target gets the band too.
+      const dkLo = dk.floorY + 1.9, dkHi = dk.deckY - 0.8;
+      cp.y = Math.max(dkLo, Math.min(cp.y, dkHi));
+      targetPos.y = Math.max(dkLo, Math.min(targetPos.y, dkHi));
     } else if (tk?.terrainHeight) {
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;
