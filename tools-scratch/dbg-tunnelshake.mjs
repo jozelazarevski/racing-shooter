@@ -46,12 +46,17 @@ const R = await p.evaluate(async () => {
     shakeMax = Math.max(shakeMax, g.shake ?? 0);
     samples.push({ i: pl.trackIndex, w: +(degPerFrame * 60).toFixed(1),
       shake: +(g.shake ?? 0).toFixed(3),
-      camY: +cam.position.y.toFixed(2),
-      inBore: !!pl._inTunnel || !!g._inTunnel });
+      // height ABOVE THE CAR, not world altitude: KARVEN CLIMB is a pass, so
+      // cam.position.y of 75 says nothing on its own
+      camH: +(cam.position.y - pl.mesh.position.y).toFixed(2),
+      camDist: +Math.hypot(cam.position.x - pl.mesh.position.x,
+                           cam.position.z - pl.mesh.position.z).toFixed(2) });
   }
   // find the bores from the world's own tunnel record if it exposes one
-  const bores = (g.track?.tunnels ?? g.track?._tunnels ?? []).map((t) => ({
-    a: t.si ?? t.startIndex ?? t.i0, b: t.ei ?? t.endIndex ?? t.i1 }));
+  // the record is {mid, s, e, pts, h} — my first guesses (si/ei/startIndex)
+  // all missed and printed as empty objects
+  const bores = (g.track?._tunnels ?? []).map((t) => ({
+    mid: t.mid, s: t.s, e: t.e, ridgeH: t.h }));
   return { world: g.level?.name, N, samples, bores, shakeMax,
     boreKeys: Object.keys(g.track ?? {}).filter((k) => /tunnel|bore/i.test(k)) };
 });
@@ -67,5 +72,14 @@ console.log(`camera angular velocity deg/s — p50 ${pct(0.5).toFixed(0)}  p95 $
 // the worst 12 frames and where they happened
 const worst = S.map((s, k) => ({ ...s, k })).sort((a, b) => b.w - a.w).slice(0, 12);
 console.log('worst frames (deg/s @ station, camY, g.shake):');
-for (const x of worst) console.log(`   ${String(x.w).padStart(7)} @${String(x.i).padStart(4)}  camY ${x.camY}  shake ${x.shake}`);
+for (const x of worst) console.log(`   ${String(x.w).padStart(7)} @${String(x.i).padStart(4)}  camH ${String(x.camH).padStart(7)}  camDist ${String(x.camDist).padStart(7)}  shake ${x.shake}`);
+// what the camera does station by station across the flagged band
+const band = {};
+for (const s2 of S) { (band[s2.i] ??= []).push(s2); }
+console.log('\nstation: worst deg/s, camH range, camDist range');
+for (let i = 84; i <= 122; i++) {
+  const rows = band[i]; if (!rows) continue;
+  const ws = rows.map((r) => r.w), hs = rows.map((r) => r.camH), ds = rows.map((r) => r.camDist);
+  console.log(`  ${String(i).padStart(4)}  ${Math.max(...ws).toFixed(0).padStart(5)}  camH ${Math.min(...hs).toFixed(1)}..${Math.max(...hs).toFixed(1)}   camDist ${Math.min(...ds).toFixed(1)}..${Math.max(...ds).toFixed(1)}`);
+}
 if (errors.length) console.log('PAGE ERRORS:', errors.slice(0, 3));
