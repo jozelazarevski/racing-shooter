@@ -10826,28 +10826,55 @@ export class Track {
     if (!C || !C.a || !C.b || !this.center || !this.center.length) return;
     const gap = (typeof window !== 'undefined'
       && window.__DRIVING?.patch02b?.coastGapU) ?? 34;
+    const N = this.center.length;
     const [ax, az] = C.a, [bx, bz] = C.b;
-    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
-    if (L < 1) return;
-    const nx = -dz / L, nz = dx / L;          // unit normal of the coast line
-    let pos = 0, neg = 0, minEdge = Infinity;
-    for (let i = 0; i < this.center.length; i++) {
+    const L0 = Math.hypot(bx - ax, bz - az);
+    if (L0 < 1) return;
+
+    // ---- pick the straightest long run of the lap -----------------------
+    // A pure translation was not enough, and the measurement said so: it put
+    // every world's nearest water at the target 34 u but left only 1-3% of
+    // the lap within 40 u, because sliding a line cannot change how the lap
+    // CURVES against it. One brief pass is not "racing next to it". So the
+    // shore is laid ALONG the lap's straightest stretch instead.
+    const RUN = Math.max(12, Math.round(N * 0.18));
+    let best = null;
+    for (let st = 0; st < N; st += 2) {
+      let sx = 0, sz = 0;
+      for (let k = 0; k < RUN; k++) {
+        const a = this.center[(st + k) % N], b = this.center[(st + k + 1) % N];
+        const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+        sx += tx / tl; sz += tz / tl;
+      }
+      const straight = Math.hypot(sx, sz) / RUN;      // 1 = dead straight
+      if (!best || straight > best.straight) best = { st, straight, sx, sz };
+    }
+    if (!best) return;
+    const dl = Math.hypot(best.sx, best.sz) || 1;
+    const ux = best.sx / dl, uz = best.sz / dl;       // mean heading of the run
+    const nx = -uz, nz = ux;                          // its left normal
+
+    // ---- seat the line so the whole lap stays on land -------------------
+    // Translating by (min signed distance - gap) makes the CLOSEST station
+    // exactly `gap` out and every other one further, whatever the direction
+    // chosen — so no part of the lap can be left in the water. Signed, not
+    // absolute: that is what makes it safe after a rotation too.
+    let minSigned = Infinity;
+    for (let i = 0; i < N; i++) {
       const c = this.center[i];
-      const sd = (c.x - ax) * nx + (c.z - az) * nz;
-      if (sd >= 0) pos++; else neg++;
-      const edge = Math.abs(sd) - (this.widthAt ? Number(this.widthAt(i)) : 9);
-      if (edge < minEdge) minEdge = edge;
+      const sd = (c.x - ax) * nx + (c.z - az) * nz
+        - (this.widthAt ? Number(this.widthAt(i)) : 9);
+      if (sd < minSigned) minSigned = sd;
     }
-    if (pos && neg) { this._coastPulled = 'crosses'; return; }   // road both sides
-    if (!Number.isFinite(minEdge) || minEdge <= gap) {
-      this._coastPulled = 0; return;                              // already close
-    }
-    const d = (minEdge - gap) * (pos ? 1 : -1);
-    // CLONE — this.T may still reference the shared THEMES entry, and mutating
-    // it would move the sea on every other world that spreads the same theme
+    if (!Number.isFinite(minSigned)) return;
+    const d = minSigned - gap;
+    const cx = ax + nx * d, cz = az + nz * d;
+    // keep the drawn shore long enough to read as a coastline, centred on the
+    // straight run so the water sits beside the road for its whole length
+    const half = Math.max(L0, N * (this.segLen ?? 6) * 0.5) * 0.5;
     this.T = { ...T, coast: { ...C,
-      a: [ax + nx * d, az + nz * d], b: [bx + nx * d, bz + nz * d] } };
-    this._coastPulled = +(minEdge - gap).toFixed(1);
+      a: [cx - ux * half, cz - uz * half], b: [cx + ux * half, cz + uz * half] } };
+    this._coastPulled = { moved: +d.toFixed(1), straight: +best.straight.toFixed(3) };
   }
 
   _coastDepress(x, z, h, dRoad, roadY = null) {
