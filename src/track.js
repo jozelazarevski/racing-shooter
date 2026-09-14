@@ -3688,6 +3688,18 @@ const THEMES = {
   // wet surface, any cool colour temperature. Hence no `surface`, no puddles,
   // no fog banks and a warm hemisphere ground bounce.
   medterrace: {
+    // r430 (owner: "The olive and wine grows needs to be more dense where
+    // applies"). THE OLIVE FLAG LIVES ON THE THEME, NOT IN A LIST OF NAMES.
+    // CARPET_THEMES and the carpet's own `terrace` test both matched the
+    // theme NAME, and three themes DERIVE from this one by spreading it —
+    // riviera, and genova and sanremo through riviera. riviera's own comment
+    // says medterrace "already has olive hills right", and it inherited
+    // every one of those fields except membership of two string sets, so the
+    // whole ALBAROSA COAST grew no grove at all: measured 0 carpet instances
+    // and 185-593 solid trees against the terraces' 5,600 + 845. Spread a
+    // flag and the derives inherit it; spread a name and they do not. Third
+    // time this exact trap has cost a build (r414, r420, E-23).
+    grove: 'olive',
     stoneBridges: { count: 1 },
     // FogExp2 density 0.00060 ≈ 1600 u of visibility; the engine fog is linear,
     // so it is matched at the far end and pushed out at the near end — this is
@@ -6678,9 +6690,11 @@ const DESERT_THEMES = new Set(['dunes', 'desert', 'oasis', 'outback', 'savanna',
 // or a deliberately treeless moor would be wrong, not rich.
 const CARPET_THEMES = new Set(['forest', 'deepwood', 'autumnwood', 'harvestvale',
   'flume', 'alpine', 'pass', 'tremola', 'furka', 'dolomiti', 'avalanche',
-  'snow', 'glacial', 'jungle', 'redwood', 'mountainsea',
-  // r387 (owner's OLIVE COAST frame): the terrace slopes grow olive groves
-  'medterrace', 'olivecountry']);
+  'snow', 'glacial', 'jungle', 'redwood', 'mountainsea']);
+// r387 put 'medterrace' and 'olivecountry' in the set above. r430 took them
+// out again — not to remove them from the carpet but to stop naming them:
+// `T.grove` on the medterrace theme reaches every world that DERIVES from it,
+// which the two names never did. See the flag's note on the theme.
 const NEON_THEMES = new Set(['neon', 'undercity']);
 // r378 (owner): "Mountain passes need to have at least 1200m climbing
 // difference. Olive and vine yards at least 500m vertical difference."
@@ -13502,8 +13516,8 @@ export class Track {
     if (WINTER_THEMES.has(this.level && this.level.theme)) this._buildWinterDressing();   // r368
     if (SCREE_THEMES.has(this.level && this.level.theme)) this._buildScreeFans();   // r366
     if (DESERT_THEMES.has(this.level && this.level.theme)) this._buildDesertDressing();   // r369
-    if (this.T.forestCarpet
-      || CARPET_THEMES.has(this.level && this.level.theme)) this._buildForestCarpet();   // r372/r375
+    if (this.T.forestCarpet || this.T.grove
+      || CARPET_THEMES.has(this.level && this.level.theme)) this._buildForestCarpet();   // r372/r375, r430
     if (NEON_THEMES.has(this.level && this.level.theme)) this._buildNeonDressing();       // r369
     this._buildBanners();
     // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
@@ -18303,7 +18317,22 @@ export class Track {
       // r386 high-poly cone as a stray body in the carriageway.
       for (const m9 of meshes) m9.name = 'carpet-foliage';
       let n = 0;
-      for (let tries = 0; tries < count * 3 && n < count; tries++) {
+      // r430b: A REJECTED SPOT IS NOT RE-ROLLED INTO THE OPEN GROUND.
+      // The first cut of the solid test just `continue`d, and the loop made
+      // the shortfall up elsewhere — so a world with a lot of standing stuff
+      // ended up with the SAME tree count packed into less ground. Measured
+      // on GLACIER COL: 4,060 rejections (against PINE VALLEY's 610) pushed
+      // the carpet onto the open grass and took the world's last usable
+      // acceleration runway with it — F7 went from 1.18 s to 11.98 s, and
+      // the suite could find no brush-free corridor on either build.
+      //
+      // Road, water and slope rejections still retry: those throw out a BAD
+      // SAMPLE. A solid is different — it is ground that is occupied, and
+      // the honest answer is that the tree does not exist, so it comes off
+      // the budget. The grove's density is then per unit of PLANTABLE ground
+      // rather than per unit of band.
+      let budget = count;
+      for (let tries = 0; tries < count * 3 && n < budget; tries++) {
         const p2 = spot();
         if (!p2) continue;
         const x = p2.x, z = p2.z;
@@ -18323,6 +18352,18 @@ export class Track {
         }
         const sc = scMin + Math.random() * scRange;
         const fr = 1.9 * sc;
+        // SCOPED TO OLIVE COUNTRY, deliberately, and this is not timidity.
+        // The test is right everywhere — GLACIER COL alone had 3,763 grove
+        // spots standing inside solids against PINE VALLEY's 602 — but
+        // applying it roster-wide moves every carpet instance on every
+        // carpet world, and two suites went red on worlds this build has no
+        // business touching: F7 grass on GLACIER COL and a floating element
+        // box on GLACIAL PASS, both marginal cases that a reshuffled scatter
+        // flipped. That is HRD-7's roster sweep (#120), which deserves its
+        // own build with that fallout budgeted, not a side effect of a
+        // density change. Here it covers the worlds where the fault was
+        // found and photographed.
+        if (terrace && hitsSolid(x, z, fr)) { this._carpetSolidRejects++; budget--; continue; }
         // r378b: seat on the ground that is DRAWN, not the analytic field —
         // the vertical mandate's slopes bend faster than the 10 u mesh cell,
         // and the chord between vertices runs metres below the curve (the
@@ -18357,6 +18398,42 @@ export class Track {
       }
       for (const mesh of meshes) { mesh.count = n; this.group.add(mesh); }
     };
+    // r430, HRD-7 FOR THE CARPET. Turning the grove on for the derived
+    // themes put olive domes THROUGH the pantile roofs of ALBAROSA
+    // SEAFRONT — a seafront town, where the terraces this ring was written
+    // for are open hillside. The ring tested road, water and slope and had
+    // no idea that anything was standing there.
+    //
+    // Every hut, facade, wall, sign and stack registers a collider in
+    // `this.solids`, and all of them are built before this call, so one
+    // question covers the lot. A flat scan would be count*3 tries x every
+    // solid (~117M tests on a town world), so the solids go into a coarse
+    // grid once and each try reads nine cells. The cell is 48 u and the
+    // scan is +-1 cell, which covers any body up to 48 u of radius — larger
+    // than anything that registers here.
+    const SOLID_CELL = 48;
+    const solidGrid = new Map();
+    for (const s9 of (this.solids ?? [])) {
+      const k = `${Math.floor(s9.x / SOLID_CELL)},${Math.floor(s9.z / SOLID_CELL)}`;
+      let a9 = solidGrid.get(k);
+      if (!a9) solidGrid.set(k, a9 = []);
+      a9.push(s9);
+    }
+    const hitsSolid = (x, z, r) => {
+      const cx = Math.floor(x / SOLID_CELL), cz = Math.floor(z / SOLID_CELL);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const a9 = solidGrid.get(`${cx + dx},${cz + dz}`);
+          if (!a9) continue;
+          for (const s9 of a9) {
+            const rr = (s9.r ?? 1) + r, ex = x - s9.x, ez = z - s9.z;
+            if (ex * ex + ez * ez < rr * rr) return true;
+          }
+        }
+      }
+      return false;
+    };
+    this._carpetSolidRejects = 0;
     const trackSpot = (pad0, pad1) => () => {
       const i = (Math.random() * this.N) | 0;
       const c = this.center[i], nv = this.nrm[i];
@@ -18435,7 +18512,9 @@ export class Track {
     // themes carpet in OLIVES, not firs — a broad roughened dome on a short
     // trunk, planted as a grove rather than a wall. The trunk is the
     // column-bottom part the seat law grounds; the canopy rides it.
-    const terrace = theme === 'medterrace' || theme === 'olivecountry';
+    // r430: the flag, not the name — see THEMES.medterrace.grove. A derived
+    // theme that reached this line before got FIR CONES on its olive hills.
+    const terrace = this.T.grove === 'olive';
     const oliveDome = () => {
       const crown = roughenC(new THREE.SphereGeometry(1.7, 9, 6), 0.20);
       crown.scale(1, 0.72, 1); crown.translate(0, 2.7, 0);
@@ -18506,8 +18585,14 @@ export class Track {
     // already rolled — so the shared Math.random() stream is untouched and
     // no later world re-rolls. The camTrees cell hash is 24 u and this band
     // is far wider than the verge, so occupancy per cell barely moves.
+    // r430 DENSITY, and only here. Olive country was deliberately planted at
+    // roughly half woodland — 4,200 + 7,000 attempts against 9,000 + 14,000 —
+    // and the owner says that is too thin. The GROVE band goes to woodland
+    // density; the VERGE band (1-38 u) does NOT, because that is the wall
+    // r413 was asked to remove from the carriageway and the terraces already
+    // carry 700-1,070 instances inside 20 u. A grove is dense in its grove.
     ring(terrace ? oliveDome() : twoConeMid(),
-      spec.near ?? (terrace ? 7000 : 14000), trackSpot(38, 160), 20, 1.1, 1.6, paint, true);
+      spec.near ?? (terrace ? 13000 : 14000), trackSpot(38, 160), 20, 1.1, 1.6, paint, true);
     // horizon: one 5-sided open cone, scaled up so it still reads at 600 u —
     // margin 25 keeps an 18 u horizon-scale cone off the verge where the
     // radial scatter happens to cross the lap. r376: the radial extent
@@ -19965,6 +20050,21 @@ export class Track {
    *  calls for the whole wine country. */
   _buildVineRows() {
     const V = this.T.vineRows;
+    // r430 tuning handles, per-theme overridable. Defaults are the r367
+    // values so this change alone moves nothing until the numbers say where.
+    const VINE_BAND = V.band ?? [26, 95];        // parcel seed band off the road
+    const VINE_PARCEL_GAP = V.parcelGap ?? 52;   // min centre-to-centre spacing
+    // r430, MEASURED: the flatness gate was rejecting FOUR PARCELS IN FIVE.
+    // Instrumented, VINEYARD VELOCE planted 18 of 85 and BRIDGE RUN 14 of 85,
+    // with 67 and 71 thrown out here and none for any other reason — so the
+    // `count: 85` on the theme was never the density, the gate was, and
+    // raising the count would only have scaled a 17% yield. 3.4 u over 11 u
+    // is a 17 deg limit, and vine country is hill country by r378's own
+    // mandate ("Olive and vine yards at least 500m vertical difference"):
+    // the gate was refusing to plant on exactly the land the world is made
+    // of. 7.0 is ~32 deg, which is terraced-vineyard ground and still
+    // rejects the cut faces. The rows already pitch to the local grade.
+    const VINE_GRADE = V.maxGrade ?? 7.0;        // max |dh| over 11 u to plant
     const blocks = V.count ?? 20;
     const ROWS_MAX = 16, STEPS_MAX = 15, SEG = 2.7, SPACING = 2.9;
     const CLEAR = ROAD_HALF + 5.5;                 // no vine reaches the verge
@@ -20002,17 +20102,22 @@ export class Track {
     // _scatter counts a placer that bails as a parcel spent, so rejecting
     // overlaps there quietly thinned the wine country by two thirds.
     const seedPos = () => {
-      const q = this._trackSidePos(26, 95);
-      if (!q) return null;
+      const q = this._trackSidePos(VINE_BAND[0], VINE_BAND[1]);
+      if (!q) { this._vineStats.seedNull++; return null; }
       for (const c of planted) {
-        if (Math.hypot(c[0] - q.x, c[1] - q.z) < 52) return null;
+        if (Math.hypot(c[0] - q.x, c[1] - q.z) < VINE_PARCEL_GAP) { this._vineStats.seedNull++; return null; }
       }
       return q;
     };
+    // r430: WHERE THE WINE COUNTRY IS ACTUALLY LOST. The cap is
+    // blocks x 16 rows x 31 panels = 42,160 and the worlds draw 7,036 and
+    // 9,949 — under a quarter. Raising `count` against an unknown loss is a
+    // guess, so every rejection is counted and the tuning follows the number.
+    const VS = this._vineStats = { blocks, seedNull: 0, tooSteep: 0, shortPath: 0, planted: 0 };
     this._scatter(blocks, seedPos, (p) => {
       const h0 = this.terrainHeight(p.x, p.z);
       for (const [ox, oz] of [[11, 0], [-11, 0], [0, 11], [0, -11]]) {
-        if (Math.abs(this.terrainHeight(p.x + ox, p.z + oz) - h0) > 3.4) return;
+        if (Math.abs(this.terrainHeight(p.x + ox, p.z + oz) - h0) > VINE_GRADE) { VS.tooSteep++; return; }
       }
       const rows = 9 + (Math.random() * (ROWS_MAX - 8) | 0);
       const steps = 7 + (Math.random() * (STEPS_MAX - 8) | 0);
@@ -20047,7 +20152,8 @@ export class Track {
       };
       const back = walk(-1).reverse();
       const path = back.concat([[p.x, p.z]], walk(1));
-      if (path.length < 4) return;
+      if (path.length < 4) { VS.shortPath++; return; }
+      VS.planted++;
 
       // per-point normals, from the local tangent
       const nx = [], nz = [];

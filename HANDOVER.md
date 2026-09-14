@@ -4171,6 +4171,148 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r430 — THE GROVE WAS A LIST OF NAMES, AND IT WAS PLANTING THROUGH ROOFS
+
+Owner: *"The olive and wine grows needs to be more dense where applies."*
+Three separate things were wrong, and only the first was the one asked about.
+
+### 1. "Where applies" was four worlds short
+
+`CARPET_THEMES` and the carpet's own `terrace` test both matched the theme
+**name**. Three themes DERIVE from `medterrace` by spreading it — `riviera`,
+and `genova` and `sanremo` through `riviera` — and riviera's own comment says
+medterrace "already has olive hills right". They inherited every field of it
+except membership of two string sets, so the entire ALBAROSA COAST grew **no
+grove at all**: measured 0 carpet instances and 185–593 solid trees, against
+the terraces' 5,600 + 845.
+
+Spread a flag and the derives inherit it; spread a name and they do not. The
+olive flag now lives on the theme (`grove: 'olive'`) and both the eligibility
+test and the olive-vs-fir choice read it. **Third build this exact trap has
+cost** (r414, r420, E-23).
+
+### 2. The grove was planting inside the buildings
+
+Turning it on for the derived themes put olive domes straight through the
+pantile roofs of ALBAROSA SEAFRONT — it is a seafront town, and the ring this
+carpet was written for runs over open terrace. PORTO GRANDE now carries an
+8,250-instance grove at a 20 s lap p95 of 4.1 ms, against the suite's 8 ms
+half-budget. The ring tested road, water and
+slope and had no idea anything was standing there.
+
+Every hut, facade, wall, sign and stack registers a collider in `this.solids`
+and all of them are built before the carpet, so one question covers the lot.
+A flat scan would be `count*3` tries × every solid (~117M tests on a town
+world), so the solids go into a coarse 48 u grid once and each try reads nine
+cells.
+
+This was never a riviera problem. Measured rejections per world, i.e. grove
+spots that were standing in something solid: **OLIVE COAST 3,032, AUTODROMO
+4,005, CAPE OLIVETO 4,073, SALINE SPRINT 4,397, TERRAZZA ALTA 1,140, TOUR DES
+CAPS 1,243, OLIVE CROSSING 1,146, OLIVE PASS 2,221** — the terraces have been
+growing trees through their own huts the whole time.
+
+**The test is scoped to olive country, and that is a decision, not timidity.**
+It is right everywhere — measured off the olive roster, GLACIER COL alone has
+3,763 grove spots standing inside solids against PINE VALLEY's 602 — but
+applying it roster-wide moves every carpet instance on every carpet world, and
+the gate came back with two worlds red that this build has no business
+touching: F7 grass on GLACIER COL, and a floating element box on GLACIAL PASS
+at 8.83 u against an 8 u bar. Both are marginal cases that a reshuffled
+scatter flipped. That is HRD-7's roster sweep (#120), which deserves its own
+build with that fallout budgeted, not a side effect of a density change. With
+the guard scoped, every non-olive world is bit-identical to r429 and GLACIER
+COL reads exactly what it read there (67%, 1.18 s). HRD-7 is closed for the
+carpet **in olive country**; the rest of the roster, and the other tree
+systems, stay open.
+
+**And a rejected spot is not re-rolled into the open ground.** The first cut
+just skipped the sample and the loop made the shortfall up elsewhere, so a
+world with a lot of standing stuff kept the SAME tree count packed into less
+ground. It cost a gate: GLACIER COL's 3,763 rejections pushed the carpet onto
+its open grass and took the world's last usable acceleration runway with it —
+F7 grass 0-30 went from 1.18 s to **11.98 s**, a hard block. Road, water and
+slope rejections still retry, because those throw out a bad SAMPLE; a solid is
+ground that is occupied, so the tree simply does not exist and comes off the
+budget. Grove density is now per unit of PLANTABLE ground rather than per unit
+of band, and GLACIER COL's 0-30 is back to 1.7 s.
+
+### 3. The density, which is what was actually asked
+
+Olive country was deliberately planted at about half woodland — 4,200 + 7,000
+attempts against 9,000 + 14,000. The **grove band (38–160 u) goes to 13,000**;
+the **verge band (1–38 u) does not move**, because that is the wall r413 was
+asked to remove from the carriageway and the terraces already carry 700–1,070
+instances inside 20 u. A grove is dense in its grove.
+
+| | grove band 38–160 u | inside 20 u |
+|---|---|---|
+| OLIVE COAST | 3,726 → **6,327** | 790 → 779 |
+| AUTODROMO VELOCE | 3,743 → **6,192** | 723 → 683 |
+| TOUR DES CAPS | 3,817 → **6,430** | 759 → 726 |
+| CAPE OLIVETO | 3,399 → **5,936** | 938 → 896 |
+| TERRAZZA ALTA | 3,756 → **6,337** | 869 → 817 |
+| SALINE SPRINT | 3,774 → **6,035** | 706 → 683 |
+| OLIVE CROSSING | 3,547 → **6,212** | 1,052 → 1,043 |
+| OLIVE PASS | 3,418 → **5,982** | 1,071 → 1,044 |
+| ALBAROSA COAST (×4) | 0 → **5,988–6,502** | 0 → 305–441 |
+
+Grove **+65 to +75%**, and the near-road count moved *down* on every world
+(−1 to −6%, from the solid rejections coming off the budget). Moving one band
+and not the other is the whole point.
+
+### The wine, where `count: 85` was never the density
+
+The vineyard worlds draw 7,036 and 9,949 vine instances against a cap of
+42,160, and raising the parcel count against an unknown loss is a guess. So
+every rejection was counted first. The answer was not subtle: **four parcels
+in five were thrown out by the flatness gate** — VINEYARD VELOCE planted 18
+of 85 with 67 rejected there, BRIDGE RUN 14 of 85 with 71 — and nothing was
+rejected for any other reason.
+
+The gate was `|Δh| > 3.4 u over 11 u`, a 17° limit, on worlds that r378's own
+mandate requires to have *at least 500 m of vertical* ("Olive and vine yards
+at least 500m vertical difference"). It was refusing to plant on exactly the
+land the world is made of. At 7.0 (~32°, terraced-vineyard ground, still
+rejecting cut faces) parcels planted go 18 → 32 and 14 → 24, and the wine
+country goes **9,949 → 15,373 (+55%)** and **7,036 → 9,935 (+41%)**. The rows
+already pitch to the local grade, so nothing else had to change.
+
+Band, parcel gap and grade are now named per-theme handles rather than three
+literals buried in the builder.
+
+### Two harness bugs found trying to LOOK at it
+
+A density change is a visual change and counts are not eyes, so this was
+screenshotted — and the probe lied twice before it told the truth.
+
+- **The manual camera never survived.** Posing `g.camera` and calling
+  `render` puts a frame up that the game's own rAF loop overwrites before the
+  screenshot lands. Six frames of blurred dirt, which read exactly like "the
+  grove is missing".
+- **And one reading was my own fault.** PORTO GRANDE's frame p95 came back at
+  9.1 ms — a fail — because I ran the probe while a gate was still grinding
+  through another suite. Clean, it is 4.1 ms. Second time this session that
+  doctrine has been broken by the person who wrote it down.
+- **`placeAt` does not seat vertically.** On VINEYARD VELOCE it left the car
+  at y 9.4 with the terrain at 410 — 400 u underground — and the chase camera
+  then skimmed the surface. The rescue flag is what re-seats a car; the probe
+  now asks for it, waits, and **exits 1 rather than save a frame whose car is
+  not on the ground.**
+
+`tools-scratch/shot-grove-ALBAROSA-18.png` is the street AFTER the fix —
+roofs clear, an olive hillside standing behind the town. The before frame,
+with crowns lying across two of the roofs, was overwritten when the probe was
+re-run against the fix and is not kept; the rejection counts below are the
+evidence that survives.
+
+### Left alone on purpose
+
+The vineyard worlds get no olive carpet — they are vine country, and they
+already carry 4.3–7.8k solid trees plus the rows. Their solid-tree counts moved
+(5,533 → 7,836 and 4,281 → 5,516) purely because more vine parcels planting
+shifts the shared `Math.random()` stream; that is a side effect, not a result.
+
 ## r429 — THE SEA WAS ALREADY THERE ON TEN WORLDS; MY RULER WAS BROKEN
 
 The owner said "I don't see any racing next to a sea with boats in marina
