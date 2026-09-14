@@ -4171,6 +4171,76 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r434 — THE RED CROWNS WERE REAL, AND THE CENSUS THAT CLEARED THEM LOOKED AT THE WRONG THING
+
+Owner, at r406: *"Red crowns fill the frame at the camera"*, FALKEN RIDGE.
+It stayed open for twenty-seven builds because every look at it came back
+green.
+
+**It was there the whole time.** FALKEN RIDGE is `furka` — an alpine pass,
+carrying **no season at all** — and 30% of its carpet crowns were painted
+hue 0.075. That is 27°. Orange.
+
+```
+_buildForestCarpet, the SCREE/avalanche/dolomiti branch
+  roll < 0.7 → setHSL(0.33…, 0.45, 0.10…)   dark spruce green
+  else       → setHSL(0.075…, 0.65, 0.30…)   ORANGE, on 30% of instances
+```
+
+and the trees on that branch are `twoCone` — the **spruce silhouette**. §7.14
+is unambiguous: *"no theme band, season, or altitude paint may tint a pine's
+needles off green"*, with the larch the single exemption. This broke it on
+**all fourteen** alpine/pass/canyon worlds: SUMMIT CLIMB, AVALANCHE ALLEY,
+ROCKFALL RAVINE, KARVEN CLIMB, SERPENTINA DESCENT, FALKEN RIDGE, COL DE
+SARANNE, HIGHCROWN PEAK, CORNICHE, CRESTRING, DRY LAGOON, CAMPANILE RUN,
+GRANITE NARROWS, GLACIER COL.
+
+### Why twenty-seven builds of looking found nothing
+
+r398's evergreen census concluded *"pines/firs were ALREADY green on every
+palette — the law holds"*, and it was reading **materials**. The carpet's
+material is `#ffffff`. Every scrap of its colour lives in per-instance
+`setColorAt`, so a census of materials sees white and reports nothing to
+answer for. The same is true of reading the source: the theme's foliage
+colours really are green — they are simply not what tints these crowns.
+
+Colour has to be asked of the **instances**. Measured on FALKEN RIDGE
+before: 4,102 orange of 13,733 on one carpet mesh, 6,624 of 22,638 on
+another. After, across all carpet meshes on the world: **80,047 instances,
+100% green, zero orange.** GLACIER COL, the other `furka` world: 77,873,
+100% green.
+
+The accent is kept, because a wood of one green is flat — it becomes the
+lighter green that the default conifer branch in the same function already
+uses, so this invents no new colour.
+
+### The autumn worlds are left alone, with their numbers
+
+The same function paints autumn themes off-green too, and they are **not**
+touched here:
+
+| world | green | orange | red | deep crimson |
+|---|---|---|---|---|
+| LARCH GOLD (autumnwood) | 57% | 19% | 17% | 7% |
+| HARVEST RUN (harvestvale) | 58% | 18% | 16% | 7% |
+
+Both declare `season: 'AUTUMN'`, both are r365's autumn enrichment which the
+owner asked for and signed off, and LARCH GOLD is named for the one conifer
+§7.14 explicitly exempts. Turning 43% of an autumn wood green is a design
+decision, not a bug fix, so it is raised rather than taken.
+
+(That last column is deep crimson, not purple: the paint wraps hue through
+`(0.985 + …) % 1` ≈ 355°, and my banding files anything past 260° as purple.
+The trees are not purple. Saying so would have been a fabricated finding.)
+
+### What is NOT claimed
+
+I tried twice to photograph the result and both probes **refused** — the
+seat guard added in r430 would not certify the car was on the ground, so
+neither frame was saved. No visual confirmation is claimed. The evidence is
+the instance-colour census, which reads the exact values the GPU uses to
+tint these crowns; it is stronger than a screenshot, not weaker.
+
 ## r433 — HRD-7 ACROSS THE ROSTER, AND A NUMBER THAT WAS NEVER ABOUT THE GRASS
 
 r430 gave the carpet a test against everything already standing — no olive

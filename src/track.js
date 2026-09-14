@@ -18275,8 +18275,27 @@ export class Track {
       } else if (theme === 'jungle' || theme === 'redwood') {
         col.setHSL(0.30 + Math.random() * 0.09, 0.5, 0.13 + Math.random() * 0.14);
       } else if (SCREE_THEMES.has(theme) || theme === 'avalanche' || theme === 'dolomiti') {
+        // #127 (owner, r406): "Red crowns fill the frame at the camera",
+        // FALKEN RIDGE. The accent here was hue 0.075 — 27 deg, ORANGE — on
+        // 30% of instances, and the trees on this branch are `twoCone`: the
+        // SPRUCE silhouette. Measured on FALKEN RIDGE before the fix: 4,102
+        // orange of 13,733 on one carpet mesh and 6,624 of 22,638 on
+        // another, on an alpine pass carrying no season at all. That is
+        // §7.14 ("pines are evergreen ... no theme band, season, or altitude
+        // paint may tint a pine's needles off green") broken on all 14
+        // alpine/pass/canyon worlds.
+        //
+        // WHY IT SURVIVED 27 BUILDS: r398's evergreen census concluded
+        // "pines/firs were ALREADY green on every palette" — it read the
+        // TREE SYSTEM's materials. The carpet's material is #ffffff and all
+        // of its colour lives in per-instance `setColorAt`, so a census of
+        // materials sees white and reports nothing. Colour has to be asked
+        // of the instances.
+        //
+        // The accent stays, because a wood of one green is flat — it becomes
+        // the lighter green the default conifer branch below already uses.
         if (roll < 0.7) col.setHSL(0.33 + Math.random() * 0.035, 0.45, 0.10 + Math.random() * 0.07);
-        else col.setHSL(0.075 + Math.random() * 0.035, 0.65, 0.30 + Math.random() * 0.09);
+        else col.setHSL(0.24 + Math.random() * 0.05, 0.42, 0.22 + Math.random() * 0.09);
       } else if (theme === 'medterrace' || theme === 'olivecountry') {
         // r387: olives — silvery sage, sun-bleached, never fir-dark
         col.setHSL(0.21 + Math.random() * 0.05, 0.24 + Math.random() * 0.14,
