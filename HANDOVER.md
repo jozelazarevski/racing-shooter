@@ -4171,6 +4171,79 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r433 — HRD-7 ACROSS THE ROSTER, AND A NUMBER THAT WAS NEVER ABOUT THE GRASS
+
+r430 gave the carpet a test against everything already standing — no olive
+dome through a pantile roof — and then **scoped it to olive country**, because
+roster-wide it turned two suites red on worlds that build had no business
+touching. That was the right call for a density build. This build is HRD-7's
+sweep (#120), so the fallout is the work rather than a side effect. The scope
+comes off.
+
+### GLACIER COL's F7, which four theories got wrong
+
+The symptom: with the guard roster-wide, GLACIER COL's grass read **25% of
+road top speed** against a 55–75% bar. Scoped, the same world read 67%. Same
+build otherwise, same world, same day.
+
+Wrong, in order, each killed by measurement rather than argument:
+
+1. **Trunk threshing.** The suite prices trunks at 0.03 each and only
+   disqualifies for brush, so a runway through trees can win the sort. Both
+   runways have **zero** trunks.
+2. **The ground.** Both are flat — 1.0 and 1.1 u of total rise over 60 u.
+3. **Solids.** Rocks, barriers, stacks — the runway search reads `camTrees`
+   and never `this.solids`. **Zero** solid hits on both.
+4. **The surface.** I printed `surf: '?'` for thirteen samples and did not
+   stop to look at it — guessed method names, measured nothing. Surface is
+   per-WORLD here (`T.surface`), so both runways are the same surface anyway.
+
+**What it actually was.** `runOne` only records top speed on frames where the
+ground 4 u ahead is within 3% grade, and the car is re-seated at its station
+every 90 frames, so a run replays about the first 24 u over and over. The
+candidate search ranks on a coarse 20 u `runwayGrade` and on brush, and
+**never on the fraction of that stretch its own vTop filter will keep**.
+
+| runway | flat by the filter's own test | reads |
+|---|---|---|
+| 5@12 | **100%** | 128 km/h — 67% of road |
+| 885@-12 | **55%** | 47 km/h — 25% |
+
+Nothing about the grass differs. Half the frames were thrown away and the
+surviving maximum was reported as "the surface". Any change that moves the
+scatter re-rolls which of those wins the sort — which is exactly what the
+GLACIER COL waiver has always said ("the corridor pick is load-dependent")
+without anyone pinning down why.
+
+The fix is the suite's own doctrine — *"a runway the car cannot drive is a
+failed measurement, not a slow surface"* — applied to the measurement window
+instead of to the car: candidates are ranked by the flat-frame fraction the
+vTop filter will accept, and one below 90% is only used if nothing better
+exists, with the shortfall said out loud in the verdict line. GLACIER COL now
+reads **69%**, inside the band. PINE VALLEY is untouched at 59% on the same
+runway it always picked, which is the check that this selects a measurable
+corridor rather than a flattering one.
+
+This is also the honest answer to K-15's old "GLACIER COL F7 35%".
+
+### The GLACIAL PASS floater
+
+The other red was an `element-box` 8.83 u over the drawn ground against an
+8 u bar. Chased to the same standard:
+
+- My probe's worst unit box is 12.08 u up — but it has **13 element parts
+  within 6 u descending to 5.35 u below grade**. It is a building with a
+  12 u roof. The suite never reported it, because LAW 4 measures each part's
+  **base** and then **raycasts down**, so a roof with a wall under it scores
+  a small gap. The suite is the finer instrument; my probe was the crude one.
+- At the location the suite *did* report, the current build has **zero**
+  element parts within 14 u.
+
+That red came from r430's **first** cut, before solid rejections were charged
+to the budget. The suite is the authority on whether it survives, so it is
+left to the gate rather than pre-emptively pinned — pinning a number I have
+not reproduced through the suite is how a waiver gets written for a bug.
+
 ## r432 — THE FULL SWEEP, AND THE TEST THAT PROVES IT BY FAILING
 
 Owner: *"Full sweep on the track names."* §7.10 says no real circuit, city,

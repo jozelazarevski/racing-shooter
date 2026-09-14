@@ -18352,7 +18352,15 @@ export class Track {
         }
         const sc = scMin + Math.random() * scRange;
         const fr = 1.9 * sc;
-        // SCOPED TO OLIVE COUNTRY, deliberately, and this is not timidity.
+        // r433: THE SCOPE COMES OFF. r430 held this to olive country because
+        // the roster-wide version turned two suites red on worlds that build
+        // had no business touching, and that was the right call THEN — a
+        // density change is not a licence to reshuffle every carpet world.
+        // This build is HRD-7's sweep (#120), so the fallout is the work
+        // rather than a side effect, and both knock-ons are root-caused
+        // below rather than waited out. Kept verbatim for the record:
+        //
+        // [r430] SCOPED TO OLIVE COUNTRY, deliberately, and this is not timidity.
         // The test is right everywhere — GLACIER COL alone had 3,763 grove
         // spots standing inside solids against PINE VALLEY's 602 — but
         // applying it roster-wide moves every carpet instance on every
@@ -18363,7 +18371,7 @@ export class Track {
         // own build with that fallout budgeted, not a side effect of a
         // density change. Here it covers the worlds where the fault was
         // found and photographed.
-        if (terrace && hitsSolid(x, z, fr)) { this._carpetSolidRejects++; budget--; continue; }
+        if (hitsSolid(x, z, fr)) { this._carpetSolidRejects++; budget--; continue; }
         // r378b: seat on the ground that is DRAWN, not the analytic field —
         // the vertical mandate's slopes bend faster than the 10 u mesh cell,
         // and the chord between vertices runs metres below the curve (the

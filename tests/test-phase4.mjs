@@ -126,6 +126,38 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         return n;
       });
     };
+    // ...AND THE RUNWAY MUST BE ONE THE vTop FILTER WILL ACCEPT (r433).
+    // runOne only records top speed on frames where the ground 4 u AHEAD is
+    // within 3% grade, and the car is re-seated at the same station every
+    // 90 frames, so a run replays roughly the first 24 u over and over. The
+    // candidate search ranked on `runwayGrade` (a coarse 20 u walk) and on
+    // brush, and never on the fraction of THAT stretch the filter will
+    // actually keep — so it could hand runOne a corridor where half the
+    // frames are discarded and then report the surviving maximum as "the
+    // surface".
+    //
+    // MEASURED, GLACIER COL, two flat trunk-free solid-free grass runways
+    // on the same world and the same surface: 5@12 is 100% flat by this
+    // test and reads 128 km/h (67% of road); 885@-12 is 55% and reads
+    // 47 km/h (25%). Nothing about the grass differs — only how much of the
+    // run the filter kept. That is the suite's own doctrine ("a runway the
+    // car cannot drive is a failed measurement, not a slow surface")
+    // applied to the measurement window instead of to the car, and it is
+    // why the GLACIER COL waiver has always said the corridor pick is
+    // load-dependent: any change that moves the scatter re-rolls the sort.
+    const flatFrac = (i, lat) => {
+      if (lat === 0) return 1;
+      const h = t.headingAt(i), pt = t.pointAt(i, lat);
+      const dx = Math.sin(h), dz = Math.cos(h);
+      let flat = 0, n = 0;
+      for (let s = 0; s <= 24; s += 0.5) {
+        const x = pt.x + dx * s, z = pt.z + dz * s;
+        const h0 = t.terrainHeight(x, z);
+        if (Math.abs((t.terrainHeight(x + dx * 4, z + dz * 4) - h0) / 4) < 0.03) flat++;
+        n++;
+      }
+      return n ? flat / n : 0;
+    };
     const brushOn = (i, lat) => {
       if (lat === 0 || !t.camTreesNear) return 0;
       return sample(i, lat, (x, z) => {
@@ -162,14 +194,21 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [66, 'GLACIER COL']]) {
         for (const lat of [9, 12, 16, 20, -9, -12, -16, -20]) {
           if (Math.abs(lat) < wHere + 3) continue;
           const grade = runwayGrade(i, lat);
-          cands.push({ idx: i, lat, grade,
+          cands.push({ idx: i, lat, grade, flatF: flatFrac(i, lat),
             score: grade + treesOn(i, lat) * 0.03, brush: brushOn(i, lat) });
         }
       }
       if (!cands.length) return [{ idx: 220, lat: latAsk, brush: 0 }];
       const flat = cands.filter((c) => c.grade < 0.03);
-      const pool = flat.length ? flat : cands;
-      pool.sort((a, b) => (a.brush - b.brush) || (a.score - b.score));
+      let pool = flat.length ? flat : cands;
+      // measurable first: a corridor the filter keeps >= 90% of. Fall back
+      // rather than fail outright, and SAY SO in the verdict line, the same
+      // way the brush shortfall is reported.
+      const measurable = pool.filter((c) => c.flatF >= 0.9);
+      const thin = !measurable.length;
+      if (!thin) pool = measurable;
+      pool.sort((a, b) => (a.brush - b.brush) || (b.flatF - a.flatF) || (a.score - b.score));
+      pool.forEach((c) => { c.thin = thin; });
       // A RANKED LIST, NOT ONE ANSWER (r406). Geometry says a corridor is
       // flat and clear; it cannot say the car will actually go down it. On
       // this load GLACIER COL's best-scoring runway read 4% of road top and
