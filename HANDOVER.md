@@ -4171,6 +4171,87 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r431 — NOTHING PUTS THE PLAYER BACK BUT THE BUTTON
+
+Owner: *"Don't auto reset unless I press sos."*
+
+This is the end of a road the owner has been walking for three builds. r345
+deleted the missed-gate return ("don't reset the car when I go off route").
+r364 deleted the cliff-top one ("don't reset me when I am off-road"). Both
+kept the *physical* traps — under the terrain, wedged, upside down — on the
+grounds that those were the world's fault rather than the driver's choice.
+This sentence deletes those too. **The player has no automatic return at
+all.** UNSTUCK is the only thing that puts them back.
+
+It also settles the one question that was sitting open for the owner:
+RALLY_RACE_INTEGRITY's R-RECOVER-01 trigger 2 (auto-reset when off-road and
+more than 15 m off the spline) was held rather than shipped because it
+reversed r345 and r364. The answer turns out to be broader than the
+question — not just no off-spline reset, no reset of any kind.
+
+### Surveyed before anything was written
+
+The player had exactly three automatic returns, in two files:
+
+1. `main.js` — the §3.2 **void watchdog**: chassis below `belowTerrainM`,
+   sustained past `voidConfirmS`, `returnToGate` reason `void`.
+2. `vehicles.js` — **`_lostT > 2.5`**: more than 6 u under the drawn ground,
+   or a non-finite coordinate.
+3. `vehicles.js` — **`_wedgeT > stuckDetectS`**: wedged with the throttle
+   held.
+
+There is no upside-down auto-return in the player path — it survives only in
+comments — and `_deepStuckT` is the *rivals'* pit-lift, not the player's. All
+three are now gone for the player. Rivals keep every one of them: §3.6c's "a
+parked rival is a bug" stands, and the owner's sentence is about themselves.
+
+**Wrecks are not resets and are untouched.** The bog rule ("car gets wrecked
+after no successful trial of 5s"), drowning, and fatal falls (§3.4b) are
+deaths the owner asked for, each with its own hull economy. Deleting them
+would have quietly undone three separate directives.
+
+### The one thing that could have gone badly
+
+Removing the void net only works if the button reaches the player *down
+there*. Read rather than assumed: UNSTUCK is gated on `controlsLive =
+g.state === 'race'` and never on position, so it is pressable under the
+terrain, airborne and submerged alike. Measured, with the car held 30 u below
+the ground for six seconds: **0 automatic returns, and one press brings it
+back to −0.6 u of the surface.** Without that this change would have been a
+soft-lock, not a feature.
+
+### One recorded deviation
+
+The **non-finite coordinate** half of trigger 2 is kept. A NaN position is
+not a place the player chose to go — the car does not render and there is
+nothing to make a decision about — so it is treated as state corruption
+rather than as an auto-reset. Being 6 u under a mountain, by contrast, is now
+theirs to sit in for as long as they like. Recorded in RALLY_RULES E-25 so
+the owner can overrule it.
+
+### Two things the change broke, both fixed
+
+**The void log started spamming.** The rival path clears itself by returning;
+the player's no longer does, so the same burial re-armed every half second —
+**282 `void` records in six seconds**, which buries the exact signal §3.2
+keeps that log for. It now latches: one record per burial, cleared when the
+car is back above ground.
+
+**A gate suite encoded the old law.** `test-killspos` P2 asserted that a
+wedged player *is* rescued at ~2.5 s — precisely what this deletes. It is
+rewritten to the new law rather than worked around: five seconds wedged and
+nothing happens, then the button recovers the car from that same state.
+Measured: 0 automatic rescues having slid 21 m sideways, 0 → 1 after the
+press.
+
+### And the probe was wrong first
+
+The first run of the verification reported **282 automatic returns** and read
+like a total failure of the change. It was counting `void` telemetry records
+— the very thing that was deliberately kept — instead of counting calls to
+`returnToGate`. Count the action, not the log. The corrected probe
+(`tools-scratch/dbg-noautoreset.mjs`) wraps the function that moves the car.
+
 ## r430 — THE GROVE WAS A LIST OF NAMES, AND IT WAS PLANTING THROUGH ROOFS
 
 Owner: *"The olive and wine grows needs to be more dense where applies."*

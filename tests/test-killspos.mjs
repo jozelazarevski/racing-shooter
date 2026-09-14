@@ -111,8 +111,18 @@ const S = await p.evaluate(async () => {
     g._frameBody();
     if (firedAt < 0 && rescues > 0) firedAt = f / 60;
   }
+  // E-25 (r431), owner: "Don't auto reset unless I press sos." This case
+  // used to assert that the wedge net RESCUED the player at ~2.5 s. It must
+  // now assert the opposite — five seconds wedged and nothing happens — and
+  // then that the BUTTON still works from the same state, because a law
+  // that strands the player without a way out is the one real risk in
+  // deleting the automatic net.
+  const autoRescues = rescues;
+  pl._unstuckReq = true; pl.unstuckCool = 0;
+  for (let f = 0; f < 120; f++) g._frameBody();
+  const afterButton = rescues;
   pl.step = orig;
-  const p2 = { firedAt: +firedAt.toFixed(2), slid: +lat.toFixed(1) };
+  const p2 = { autoRescues, afterButton, slid: +lat.toFixed(1) };
   // P3: an honest 2 m/s crawl ALONG the course, throttle held, never
   // touched by the 2.5 s zero-progress wedge. The old rig snapped pos to
   // the CENTER SAMPLE each frame, so the fractional-progress meter (r358)
@@ -140,11 +150,14 @@ const S = await p.evaluate(async () => {
   g.input.analog.throttle = 0;
   return { p2, p3: { rescues } };
 });
-ok(S.p2.firedAt > 0 && S.p2.firedAt <= 3.5,
-  'P2 zero course-progress with throttle held is STUCK at ~2.5 s — sideways metres do not defeat it',
-  `rescued at ${S.p2.firedAt}s having slid ${S.p2.slid} m sideways (the old anchor never fired here)`);
+ok(S.p2.autoRescues === 0,
+  'P2 wedged with the throttle held for 5 s is NOT auto-rescued (E-25: only SOS resets the player)',
+  `${S.p2.autoRescues} automatic rescues having slid ${S.p2.slid} m sideways`);
+ok(S.p2.afterButton > S.p2.autoRescues,
+  'P2b ...and the SOS button still recovers the car from that same wedged state',
+  `rescues ${S.p2.autoRescues} -> ${S.p2.afterButton} after the press`);
 ok(S.p3.rescues === 0,
-  'P3 an honest 2 m/s crawl that IS progressing is never touched by the wedge',
+  'P3 an honest 2 m/s crawl is never touched either (kept as a guard: E-25 makes this trivially true today, and it is what would break first if any automatic net came back)',
   `${S.p3.rescues} rescues in 6 s`);
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 

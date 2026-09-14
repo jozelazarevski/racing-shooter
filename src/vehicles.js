@@ -6512,8 +6512,22 @@ export class PlayerCar extends Car {
       this._unstuckReq = false;
       const spend = called && this.unstuckCool <= 0;
       const RT4 = DRIVING.route ?? {};
-      if (this._lostT > 2.5
-          || this._wedgeT > (RT4.stuckDetectS ?? 2.5) || spend) {
+      // E-25 OWNER OVERRIDE (r431): "Don't auto reset unless I press sos."
+      // The two free automatic rescues that survived r345 and r364 — under
+      // the terrain (`_lostT`) and wedged under held throttle (`_wedgeT`) —
+      // are DELETED for the player. Both timers are left running — they
+      // self-clear the moment their condition does, and several suites zero
+      // them to suppress the old rescue — but nothing decides anything on
+      // them now: `spend` is the only way back, and `spend` is the button.
+      //
+      // ONE THING IS NOT A CHOICE. A non-finite coordinate is not a place
+      // the player decided to go; the car does not render and there is
+      // nothing to press SOS about, so state corruption is still caught.
+      // Being 6 u under a mountain, by contrast, is now the player's to sit
+      // in for as long as they like. Recorded in RALLY_RULES E-25 as a
+      // deviation so the owner can overrule it.
+      const corrupt = !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
+      if (corrupt || spend) {
         this._lostT = 0;
         this._wedgeT = 0;
         this._bogT = 0;      // a rescue is a successful trial: the clock resets

@@ -11509,12 +11509,28 @@ class Game {
           if ((!car.airborne && depth > (PH.voidDeepM ?? 4.0))
               || car._voidT > (PH.voidConfirmS ?? 0.5)) {
             car._voidT = 0;
-            this.telemetry?.log('void', {
-              car: car === this.player ? 'player' : car.persona ?? car.name ?? 'rival',
-              depthM: +depth.toFixed(1) });
-            this.returnToGate(car, car._nextGate ?? 0, 'void');
+            // ONCE PER BURIAL, not once per confirm. The rival path clears
+            // itself by returning; the player's (E-25) no longer does, so
+            // without a latch the same burial re-armed every half second —
+            // measured 282 `void` records in six seconds, which buries the
+            // signal §3.2 wants this log for. The latch lifts below.
+            if (!car._voidLogged) {
+              car._voidLogged = true;
+              this.telemetry?.log('void', {
+                car: car === this.player ? 'player' : car.persona ?? car.name ?? 'rival',
+                depthM: +depth.toFixed(1) });
+            }
+            // E-25 OWNER OVERRIDE (r431): "Don't auto reset unless I press
+            // sos." The player is no longer pulled out of the void for free
+            // — §3.2's watchdog is a RIVAL rule now. The event is still
+            // logged for the player, because a car under the terrain is
+            // still a failure of §3.1 and the log is how that gets found;
+            // what changed is that the game no longer decides for them.
+            // UNSTUCK is pressable from down there (it is gated on the race
+            // state, never on position), so this is a choice, not a trap.
+            if (car !== this.player) this.returnToGate(car, car._nextGate ?? 0, 'void');
           }
-        } else car._voidT = 0;
+        } else { car._voidT = 0; car._voidLogged = false; }
       }
     }
     // §5.2 (r313): THE PRESSURE RIVAL — the honest rubber band. At GO+15,
