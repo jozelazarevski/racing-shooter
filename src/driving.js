@@ -196,6 +196,10 @@ export const DRIVING = {
   //                          Col: lateral 3.6 u, heading offset 0°)
   //   stuckDetectS / lowSpeedTorqueMul -> fix 14, next build per rollout
   patch02b: {
+    // r429 (E-23): how far from the road EDGE the waterline is pulled in on a
+    // coast world, u. Measured before: medians ran 314 to 1145 u and ten of
+    // sixteen coast worlds had 0% of the lap within 40 u of their own sea.
+    coastGapU: 34,
     // r428 (#116): how fast the chase eye may CLIMB inside a bore's approach
     // and exit window, u/s. Measured at the portal: the target sits ~50 u
     // above the eye (the lift clearing the ridge the road tunnels under), the

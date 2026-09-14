@@ -7410,6 +7410,7 @@ export class Track {
 
     // ---- width-variation: per-sample drivable half-width (pinch sections) ----
     this._buildWidthProfile();
+    this._pullCoastToLap();       // r429 (E-23): bring the sea to the race
     // ---- W-CURVE-01.7 (r400): superelevation on gradient sharp curves ----
     this._buildBanking();
 
@@ -10801,6 +10802,54 @@ export class Track {
   /** Seaward of the coastline the land sinks to the sea floor over a beach
    *  band. The road corridor is exempt exactly the way the river carve
    *  exempts it, so the seafront straight keeps its shoulder. */
+  /** r429 (E-23, owner: "I want to race NEXT TO it").
+   *
+   *  MEASURED FIRST, all 16 coast worlds, road edge to waterline: median 314
+   *  to 1145 u, and 0% of the lap within 40 u on TEN of them. MOUNTAIN TO SEA
+   *  never came within 697 u of the sea it is named for; ALBAROSA SEAFRONT
+   *  270; HARBOR QUAY built its marina 63 u away at closest, median 314. The
+   *  quays and boats were being built correctly — out where nobody drives.
+   *
+   *  The sea is a HALF-PLANE behind the line T.coast.a->b, and translating a
+   *  line shifts EVERY station's signed distance by the same amount. So
+   *  moving it until the closest road edge sits `coastGapU` out leaves every
+   *  other station at least that far away: no part of the lap can end up in
+   *  the water by construction, which is why this is a translation and not a
+   *  re-route. The authored orientation and the side the sea sits on are both
+   *  preserved; only the gap closes.
+   *
+   *  Bails out rather than guessing when the lap already crosses the line
+   *  (mixed signs — road on both sides, so a shift would drown some of it),
+   *  and when the sea is already inside the target gap. */
+  _pullCoastToLap() {
+    const T = this.T, C = T && T.coast;
+    if (!C || !C.a || !C.b || !this.center || !this.center.length) return;
+    const gap = (typeof window !== 'undefined'
+      && window.__DRIVING?.patch02b?.coastGapU) ?? 34;
+    const [ax, az] = C.a, [bx, bz] = C.b;
+    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+    if (L < 1) return;
+    const nx = -dz / L, nz = dx / L;          // unit normal of the coast line
+    let pos = 0, neg = 0, minEdge = Infinity;
+    for (let i = 0; i < this.center.length; i++) {
+      const c = this.center[i];
+      const sd = (c.x - ax) * nx + (c.z - az) * nz;
+      if (sd >= 0) pos++; else neg++;
+      const edge = Math.abs(sd) - (this.widthAt ? Number(this.widthAt(i)) : 9);
+      if (edge < minEdge) minEdge = edge;
+    }
+    if (pos && neg) { this._coastPulled = 'crosses'; return; }   // road both sides
+    if (!Number.isFinite(minEdge) || minEdge <= gap) {
+      this._coastPulled = 0; return;                              // already close
+    }
+    const d = (minEdge - gap) * (pos ? 1 : -1);
+    // CLONE — this.T may still reference the shared THEMES entry, and mutating
+    // it would move the sea on every other world that spreads the same theme
+    this.T = { ...T, coast: { ...C,
+      a: [ax + nx * d, az + nz * d], b: [bx + nx * d, bz + nz * d] } };
+    this._coastPulled = +(minEdge - gap).toFixed(1);
+  }
+
   _coastDepress(x, z, h, dRoad, roadY = null) {
     const C = this.T.coast;
     const sd = this._coastSide(x, z);
