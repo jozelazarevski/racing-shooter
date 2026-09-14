@@ -200,6 +200,7 @@ export const DRIVING = {
     // coast world, u. Measured before: medians ran 314 to 1145 u and ten of
     // sixteen coast worlds had 0% of the lap within 40 u of their own sea.
     coastGapU: 34,
+    coastBandU: 40,      // the band r429 maximises: 'racing next to it'
     // r428 (#116): how fast the chase eye may CLIMB inside a bore's approach
     // and exit window, u/s. Measured at the portal: the target sits ~50 u
     // above the eye (the lift clearing the ridge the road tunnels under), the

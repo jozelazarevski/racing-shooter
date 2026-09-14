@@ -46,7 +46,7 @@ for (const id of IDS) {
       }
       const sorted = [...dists].sort((a, b2) => a - b2);
       return { name: g.level?.name, theme: g.level?.theme, quay: !!T.quay,
-        hasCoast: true, seaLevel: C.level, sampled: N,
+        hasCoast: true, seaLevel: C.level, sampled: N, pulled: tk._coastPulled ?? null,
         near40: dists.filter((d) => d <= 40).length,
         near80: dists.filter((d) => d <= 80).length,
         min: +sorted[0].toFixed(1),
@@ -61,5 +61,5 @@ console.log('world                 theme        marina  sea?     min     med   %
 for (const w of out) {
   if (!w.name || w.name === '(load failed)') { console.log(`${String(w.id).padStart(3)} LOAD FAILED  ${w.err}`); continue; }
   const pct = (n) => w.sampled ? String(Math.round(100 * n / w.sampled)).padStart(3) + '%' : '  --';
-  console.log(`${w.name.padEnd(20)} ${String(w.theme).padEnd(12)} ${(w.quay ? 'YES' : ' no').padEnd(6)} ${(w.hasCoast ? 'yes' : 'NONE').padEnd(5)} ${String(w.min ?? '--').padStart(6)} ${String(w.med ?? '--').padStart(7)}  ${pct(w.near40)}       ${pct(w.near80)}`);
+  console.log(`${w.name.padEnd(20)} ${String(w.theme).padEnd(12)} ${(w.quay ? 'YES' : ' no').padEnd(6)} ${(w.hasCoast ? 'yes' : 'NONE').padEnd(5)} ${String(w.min ?? '--').padStart(6)} ${String(w.med ?? '--').padStart(7)}  ${pct(w.near40)}       ${pct(w.near80)}   ${w.pulled ? (w.pulled.moved ? `moved ${w.pulled.authored}->${w.pulled.pctInBand} gap${w.pulled.gapEff}` : `KEPT authored ${w.pulled.authored}`) : ''}`);
 }

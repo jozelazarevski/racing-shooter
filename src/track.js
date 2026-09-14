@@ -10821,60 +10821,116 @@ export class Track {
    *  Bails out rather than guessing when the lap already crosses the line
    *  (mixed signs — road on both sides, so a shift would drown some of it),
    *  and when the sea is already inside the target gap. */
+  /** E-23, "I want to race NEXT TO it."
+   *
+   *  T.coast is a LINE a->b with the sea on one side, so the only freedom
+   *  here is where that line sits and which way it points. Three cuts before
+   *  this one, each measured against the authored coast on all 15 worlds
+   *  that have one (%% of the lap whose road EDGE is within 40 u of water):
+   *
+   *    v1 translated the authored line inward. Nearest water hit 34 u
+   *       everywhere and the band barely moved (0 -> 1-3%% on most) — sliding
+   *       a line cannot change how the lap curves against it.
+   *    v2 rotated to the lap's straightest run. Measured WORSE (SAPPHIRE
+   *       SHORE 12 -> 1, LIMESTONE 5 -> 0): the heading came from the run
+   *       but the seating came from the GLOBAL nearest station, usually
+   *       elsewhere on the lap, which shoved the straight run off its shore.
+   *    v3 scored candidate headings by the band itself — the right target —
+   *       but drew its candidates from lap tangents only and never scored
+   *       the AUTHORED line. So on the three worlds the author had already
+   *       placed well it returned something worse than its own input
+   *       (SAPPHIRE 12 -> 2, LIMESTONE 5 -> 4, WHITEWASH 4 -> 3).
+   *
+   *  v4 fixes the class, not the three worlds: sweep every heading at 1 deg,
+   *  score each on the band it actually produces, and enter the authored
+   *  line UNCHANGED as candidate zero. An optimiser that can return worse
+   *  than its input is not an optimiser, and this one now cannot.
+   *
+   *  The seat is bounded the same way: `gap` is a target, never a shove.
+   *  Where the author already ran the road closer to the water than `gap`
+   *  (the quay worlds do — SAPPHIRE's road edge touches it), the sweep
+   *  inherits that closeness instead of pushing the sea back out to 34. */
   _pullCoastToLap() {
+    // A/B SWITCH, kept deliberately. This is the only thing in this file
+    // that cannot be measured against its own baseline any other way: the
+    // authored coast is overwritten in place at build time, so without a way
+    // to skip the fit there is nothing left to compare the fit TO. Every
+    // number in the r429 HANDOVER table is a pair of runs across this line.
+    if (typeof window !== 'undefined' && window.__NOCOASTPULL) return;
     const T = this.T, C = T && T.coast;
     if (!C || !C.a || !C.b || !this.center || !this.center.length) return;
-    const gap = (typeof window !== 'undefined'
-      && window.__DRIVING?.patch02b?.coastGapU) ?? 34;
+    const D = (typeof window !== 'undefined' && window.__DRIVING?.patch02b) || {};
+    const gap  = D.coastGapU  ?? 34;          // target gap, road edge to water
+    const band = D.coastBandU ?? 40;          // the "next to it" band
+    const wide = band * 2;                    // tie-break band
     const N = this.center.length;
     const [ax, az] = C.a, [bx, bz] = C.b;
     const L0 = Math.hypot(bx - ax, bz - az);
     if (L0 < 1) return;
 
-    // ---- pick the straightest long run of the lap -----------------------
-    // A pure translation was not enough, and the measurement said so: it put
-    // every world's nearest water at the target 34 u but left only 1-3% of
-    // the lap within 40 u, because sliding a line cannot change how the lap
-    // CURVES against it. One brief pass is not "racing next to it". So the
-    // shore is laid ALONG the lap's straightest stretch instead.
-    const RUN = Math.max(12, Math.round(N * 0.18));
-    let best = null;
-    for (let st = 0; st < N; st += 2) {
-      let sx = 0, sz = 0;
-      for (let k = 0; k < RUN; k++) {
-        const a = this.center[(st + k) % N], b = this.center[(st + k + 1) % N];
-        const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
-        sx += tx / tl; sz += tz / tl;
-      }
-      const straight = Math.hypot(sx, sz) / RUN;      // 1 = dead straight
-      if (!best || straight > best.straight) best = { st, straight, sx, sz };
-    }
-    if (!best) return;
-    const dl = Math.hypot(best.sx, best.sz) || 1;
-    const ux = best.sx / dl, uz = best.sz / dl;       // mean heading of the run
-    const nx = -uz, nz = ux;                          // its left normal
+    const w = new Float32Array(N);
+    for (let i = 0; i < N; i++) w[i] = this.widthAt ? Number(this.widthAt(i)) : 9;
 
-    // ---- seat the line so the whole lap stays on land -------------------
-    // Translating by (min signed distance - gap) makes the CLOSEST station
-    // exactly `gap` out and every other one further, whatever the direction
-    // chosen — so no part of the lap can be left in the water. Signed, not
-    // absolute: that is what makes it safe after a rotation too.
-    let minSigned = Infinity;
-    for (let i = 0; i < N; i++) {
-      const c = this.center[i];
-      const sd = (c.x - ax) * nx + (c.z - az) * nz
-        - (this.widthAt ? Number(this.widthAt(i)) : 9);
-      if (sd < minSigned) minSigned = sd;
+    // landward normal for a heading: _coastSide's gradient points SEAWARD,
+    // so this is its negation and `sd > 0` means the station is on land
+    const clearances = (nx, nz) => {
+      const out = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        const c = this.center[i];
+        out[i] = (c.x - ax) * nx + (c.z - az) * nz - w[i];
+      }
+      return out;
+    };
+    // near40 dominates; near80 only separates ties. Integer, so no drift.
+    const score = (sd, d) => {
+      let a = 0, b = 0;
+      for (let i = 0; i < N; i++) {
+        const v = sd[i] - d;
+        if (v <= band) a++;
+        if (v <= wide) b++;
+      }
+      return { key: a * 100000 + b, near: a };
+    };
+
+    // CANDIDATE ZERO: the authored line, untouched. Every sweep result is
+    // measured against this and the world is left alone unless one beats it.
+    const aux = (bx - ax) / L0, auz = (bz - az) / L0;
+    const sd0 = clearances(-auz, aux);
+    let minAuth = Infinity;
+    for (let i = 0; i < N; i++) if (sd0[i] < minAuth) minAuth = sd0[i];
+    const base = score(sd0, 0);
+    let best = { key: base.key, near: base.near, d: 0,
+                 ux: aux, uz: auz, nx: -auz, nz: aux, moved: false };
+
+    // a gap is a target, not a shove: never seat the sea further out than
+    // the author already had it (the quay worlds run the road to the water)
+    const gapEff = Math.max(0, Math.min(gap, Number.isFinite(minAuth) ? minAuth : gap));
+
+    for (let k = 0; k < 360; k++) {
+      const th = k * Math.PI / 180;
+      const ux = Math.cos(th), uz = Math.sin(th);
+      const nx = -uz, nz = ux;
+      const sd = clearances(nx, nz);
+      let minS = Infinity;
+      for (let i = 0; i < N; i++) if (sd[i] < minS) minS = sd[i];
+      if (!Number.isFinite(minS)) continue;
+      const d = minS - gapEff;                 // seat the closest station at gapEff
+      const s = score(sd, d);
+      if (s.key > best.key) best = { key: s.key, near: s.near, d, ux, uz, nx, nz, moved: true };
     }
-    if (!Number.isFinite(minSigned)) return;
-    const d = minSigned - gap;
-    const cx = ax + nx * d, cz = az + nz * d;
-    // keep the drawn shore long enough to read as a coastline, centred on the
-    // straight run so the water sits beside the road for its whole length
-    const half = Math.max(L0, N * (this.segLen ?? 6) * 0.5) * 0.5;
+
+    this._coastPulled = { authored: +(100 * base.near / N).toFixed(1),
+                          pctInBand: +(100 * best.near / N).toFixed(1),
+                          moved: best.moved, gapEff: +gapEff.toFixed(1) };
+    if (!best.moved) return;                   // the author had it right
+
+    const cx = ax + best.nx * best.d, cz = az + best.nz * best.d;
+    const half = Math.max(L0, N * (this.segLen ?? 6) * 0.6) * 0.5;
+    // CLONE: this.T can still reference the shared THEMES entry, and mutating
+    // it would move the sea on every world that spreads the same theme
     this.T = { ...T, coast: { ...C,
-      a: [cx - ux * half, cz - uz * half], b: [cx + ux * half, cz + uz * half] } };
-    this._coastPulled = { moved: +d.toFixed(1), straight: +best.straight.toFixed(3) };
+      a: [cx - best.ux * half, cz - best.uz * half],
+      b: [cx + best.ux * half, cz + best.uz * half] } };
   }
 
   _coastDepress(x, z, h, dRoad, roadY = null) {

@@ -61,7 +61,8 @@
     "propShoveRadiusU": 1.15,
     "camClearanceM": 2.2,
     "boreRiseCapUPerS": 22,
-    "coastGapU": 34
+    "coastGapU": 34,
+    "coastBandU": 40
   },
   "route": {
     "streetPadM": 2,

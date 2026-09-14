@@ -4171,6 +4171,112 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r429 — THE SEA WAS ALREADY THERE ON TEN WORLDS; MY RULER WAS BROKEN
+
+The owner said "I don't see any racing next to a sea with boats in marina
+etc", then "I want to race next to it". I measured, reported that ten of
+sixteen coast worlds never come within 40 u of their own water, built three
+fixes against that number, and only on the fourth did I measure the thing
+the sentence is actually about. **The number was wrong.** Ten of fifteen
+worlds with a sea already race beside it. Five did not. This section is the
+correction and the fix, in that order, because the correction is the more
+useful half.
+
+### Three rulers, two of them broken
+
+`T.coast` is `{ a:[x,z], b:[x,z], level, floor, beach }` — a LINE, with the
+sea on one side of it.
+
+**Ruler 1, the distance to the segment a→b.** What the first census used,
+and what every number I gave the owner came from. The authored segments run
+about 2.5 km; the laps are longer than that and run off their ends, so the
+clamp charged those stations the distance to an ENDPOINT instead of the
+distance to the water. It reported HILLTOWN STACK at 1% of the lap within
+40 u. The game's own model says 39.9%.
+
+**Ruler 2, the half-plane** (`_coastSide`, which is what the game actually
+asks). Right about the line, wrong about the water: the sea is a flat plane
+at `level` and water is only where the ground is *below* it. Inside 15 u of
+the road `_blendHeight` holds the ground at road datum, so the real shore
+always stands off the line by however far the ground takes to fall.
+
+**Ruler 3, the one that answers the question.** March out from the road edge
+and find the first point that is actually underwater — `terrainHeight <
+level + 0.6`, which is what gets drawn blue and what drowns a car. No model.
+This is `tools-scratch/dbg-seawater.mjs`, and it is the only one of the
+three whose numbers mean what their column heading says.
+
+Read against ruler 3, the roster looked like this before this build:
+PORTO GRANDE 50% of the lap within 40 u of real water, ALBAROSA SEAFRONT
+48%, PORTO MOLO 45%, WINDWARD COVES 43%, HILLTOWN STACK 37%, WHITEWASH BAY
+30%, CITADEL BAY 29%, SAPPHIRE SHORE 28%, LIMESTONE COAST 22%, HARBOR QUAY
+18%. Those ten were never the complaint. **Five were:** MOUNTAIN TO SEA 0%
+with no water within 600 u of ANY station on the lap, CAPO VELA 0%, OLIVE
+COAST 4%, SEA CLIFF RUN 4%, CLIFF KNOT 6%.
+
+A world called MOUNTAIN TO SEA where the sea cannot be reached from the road
+is the whole of the owner's sentence, and it was sitting inside a census
+that said nine other worlds were equally broken.
+
+### The fix, and the three cuts before it
+
+The sea is a line, so the only freedom is where it sits and which way it
+points. Fitting it to the lap costs nothing that is hand-authored: the
+route, the gates, the props and the AI never move.
+
+- **v1** translated the authored line inward. Nearest water hit the 34 u
+  target everywhere and the band barely moved — sliding a line cannot change
+  how the lap curves against it.
+- **v2** rotated to the lap's straightest run, which sounds right and
+  measured *worse* (SAPPHIRE SHORE 12 → 1 on ruler 2, LIMESTONE 5 → 0): the
+  heading came from the straight run but the seating came from the GLOBAL
+  nearest station, usually elsewhere on the lap, which shoved the straight
+  run off its own shore.
+- **v3** scored candidate headings by the band they actually produce — the
+  right target at last — but drew candidates from lap tangents only and
+  never scored the authored line. On the three worlds the author had already
+  placed well it returned something worse than its own input.
+
+**v4 fixes the class rather than the three worlds.** Sweep every heading at
+one degree, score each on the band it produces, and enter the authored line
+UNCHANGED as candidate zero. An optimiser that can return worse than its
+input is not an optimiser, and this one now cannot. The seat is bounded the
+same way — `coastGapU` is a target, never a shove — so where the author
+already ran the road closer to the water than 34 u (the quay worlds do), the
+sweep inherits that closeness instead of pushing the sea back out.
+
+Six worlds beat every candidate with their own authored coast and were left
+untouched. Nine moved. Measured on ruler 3, % of lap within 40 u of real
+water, authored → fitted:
+
+| world | before | after | | world | before | after |
+|---|---|---|---|---|---|---|
+| HARBOR QUAY | 18% | **42%** | | OLIVE COAST | 4% | **11%** |
+| SEA CLIFF RUN | 4% | **18%** | | PORTO GRANDE | 50% | **57%** |
+| PORTO MOLO | 45% | **56%** | | CAPO VELA | 0% | **8%** |
+| ALBAROSA SEAFRONT | 48% | **58%** | | MOUNTAIN TO SEA | 0% | **6%** |
+| CLIFF KNOT | 6% | **11%** | | six others | — | untouched |
+
+MOUNTAIN TO SEA now has water within 600 u on 59% of its lap where it had
+none anywhere. Nothing regressed on any world, on either ruler.
+
+`_pullCoastToLap` keeps a `__NOCOASTPULL` A/B switch on purpose: the
+authored coast is overwritten in place at build time, so without a way to
+skip the fit there is nothing left to compare the fit to. Every number in
+that table is a pair of runs across that one line.
+
+CAPE OLIVETO shows "no coast" and that is correct, not a gap: the owner
+asked for it to "run inside mountains", its tune sets `coast: undefined`,
+and its scenery tags were corrected to MOUNTAIN + FARMLAND at the same time.
+
+### What this build is really about
+
+Three fixes were built and measured against a number that a clamp had
+invented. The code was never the thing that was wrong; the ruler was, twice,
+and the second broken ruler was the one I'd built to replace the first. The
+question "what does this column actually measure" is cheaper to ask before
+the third rewrite than after it.
+
 ## r428 — THE CEILING CAPPED HEIGHT; NOTHING CAPPED RATE
 
 The half r427 left open: the snap just past the portal, which is the half the
