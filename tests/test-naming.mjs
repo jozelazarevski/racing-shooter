@@ -21,6 +21,21 @@ const PROTECTED = [
   'PRINCIPALITY', 'ARDENNES', 'CINQUE BORGHI', 'AEGEAN', 'DALMATIA',
   'COTE D AZUR', 'LIGURIA', 'RIVIERA', 'GENOVA', 'SANREMO',
   'AMAZON', 'KYOTO', 'MEDITERRANEAN', 'COSTA BRAVA',
+  // r432 — the owner's full sweep. Each of these was a real circuit, city,
+  // mountain, region or BRAND sitting in a display name. ADDED, never
+  // substituted: an earlier sweep of mine overwrote CINQUE TERRE in this
+  // list with one of its own new names, which is how a guard list quietly
+  // stops guarding.
+  'PENEDO',          // a real city, twice over (Alagoas; Portugal)
+  'SAFARI PLAINS',   // carries the real WRC Safari Rally
+  'RED CENTRE',      // the real name for central Australia
+  'ALPENRING',       // Alpen is the Alps; -ring is the Nurburgring's
+  'WALDSCHLEIFE',    // a near-copy of Nordschleife
+  'RAZORBACK',       // Mount Razorback, and Razorback NSW
+  'TOUR DES CAPS',   // the Tour de X pattern is the Tour de Corse's
+  'TORRI CORSA',     // Corsa is a car model, i.e. a brand
+  'VERNAY',          // a real French commune
+  'OUTBACK',         // the Australian region, and also a car model
 ];
 
 const browser = await chromium.launch({

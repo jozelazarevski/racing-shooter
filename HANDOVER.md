@@ -4171,6 +4171,77 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r432 — THE FULL SWEEP, AND THE TEST THAT PROVES IT BY FAILING
+
+Owner: *"Full sweep on the track names."* §7.10 says no real circuit, city,
+mountain, brand or driver names in stage data. r422 retired seven; this goes
+through the other seventy and the region labels with them.
+
+### The rule I applied, so the calls are checkable
+
+Rename when the exact string is a **proper noun** naming a real circuit,
+settlement, mountain, region, brand or driver. Keep when it is a common noun
+or a plain descriptor, even where some real place happens to use it — the
+alternative is renaming the language itself and ending up with a roster of
+mush.
+
+**Nine worlds and one region went:**
+
+| was | is | why |
+|---|---|---|
+| PENEDO LEAP | **KESTREL LEAP** | a real city twice over (Alagoas; Portugal) |
+| SAFARI PLAINS | **LONGGRASS PLAINS** | carries the real WRC Safari Rally |
+| RED CENTRE RUN | **OCHRE HEART RUN** | the Red Centre is central Australia |
+| ALPENRING | **CRESTRING** | Alpen is the Alps; -ring is the Nürburgring's |
+| WALDSCHLEIFE | **GREENSPUR CIRCUIT** | a near-copy of Nordschleife |
+| RAZORBACK MOUNTAIN | **RAZOR SPINE** | Mount Razorback, and Razorback NSW |
+| TOUR DES CAPS | **THE HEADLANDS** | the Tour de X pattern is Tour de Corse's |
+| TORRI CORSA | **CAMPANILE RUN** | Corsa is a car model — a brand |
+| COL DE VERNAY | **COL DE SARANNE** | Vernay is a real French commune |
+| region OUTBACK | **BACKCOUNTRY** | the Australian region, and also a car model |
+
+**Four were considered and kept, on the record so the reasoning can be
+argued with:** CORNICHE (a common noun for a coastal road — the Grande
+Corniche borrowed it, not the other way round), AUTODROMO VELOCE and
+VINEYARD VELOCE (two ordinary Italian words), CAPO VELA and IL VICOLO
+(cape, sail, alley). *Col* and *autodromo* are common nouns; *Vernay* and
+*Corsa* were not, which is the whole distinction.
+
+Nothing on the list was named by the owner. SERPENT PASS, which was, is
+untouched.
+
+### The proof the sweep landed
+
+The nine retired names went into `test-naming`'s PROTECTED list, so the
+suite now scans the live roster for exactly the strings this build removed.
+It passes — **91 roster entries, zero protected names** — and that pass is
+only reachable if every rename actually took. A green here would have been
+impossible on the old data.
+
+They were **added** to that list, never substituted. An earlier sweep of
+mine overwrote CINQUE TERRE in it with one of its own new names, which is
+how a guard list quietly stops guarding; the comment now says so next to
+the entries.
+
+### And there is a second roster in the repository
+
+`src/world/levels.js` holds a full copy of the roster with *different ids* —
+COL DE VERNAY is 22 there and 21 in the live table. Asked before assumed:
+nothing imports it. `src/world/` is ~355 KB across eight files, last touched
+a week ago, and reachable from nothing; the live roster is `LEVELS` in
+`src/track.js`, which is what this build edited.
+
+The renames were mirrored into the dead copy so a grep of the repository
+does not still turn up the retired names, and it now carries a header saying
+what it is. **That is a stopgap, not a fix** — renaming inside dead code
+makes dead code look alive. `src/world/` wants deleting in its own change,
+where "delete means delete" can be applied properly and the deletion gated
+on its own. Raised rather than done here, because a naming sweep is not a
+licence to remove a third of a megabyte of someone's abandoned refactor.
+
+(`V2/` was checked too: it carries none of the roster names and is
+referenced from neither `index.html` nor `sw.js`.)
+
 ## r431 — NOTHING PUTS THE PLAYER BACK BUT THE BUTTON
 
 Owner: *"Don't auto reset unless I press sos."*

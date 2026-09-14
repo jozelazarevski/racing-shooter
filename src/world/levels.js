@@ -1,3 +1,9 @@
+/* NOTE (r432): this file is DEAD CODE — nothing imports it (the live
+ * roster is LEVELS in src/track.js). The r432 name sweep was mirrored
+ * here anyway so a grep of the repository does not still turn up the
+ * retired names, but that is a stopgap: src/world/ is ~355 KB of an
+ * abandoned refactor and wants deleting in its own change, not as a
+ * side effect of a naming pass. Raised with the owner. */
 // DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
 // (and friends); this directory is an abandoned split that has already
 // drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
@@ -49,18 +55,18 @@ export const LEVELS = [
   // own `tune`. `tune` is layered over the theme object, so anything a theme
   // sets can be overridden per level — elevation, jump count, cliff walls, the
   // hero bridge. Career order is this array; ids are stable and never reused.
-  { id: 22, name: 'COL DE VERNAY', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
+  { id: 22, name: 'COL DE SARANNE', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
     // relentless short hairpins, and jumps would be absurd on a tarmac col
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
     tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
-  { id: 24, name: 'PENEDO LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
+  { id: 24, name: 'KESTREL LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'HIGHCROWN PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
     tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
-  { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
+  { id: 26, name: 'LONGGRASS PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
@@ -96,14 +102,14 @@ export const LEVELS = [
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
-  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true,
+  { id: 32, name: 'OCHRE HEART RUN', theme: 'outback', region: 'BACKCOUNTRY', cost: 12, fresh: true,
     tune: { gorgeJump: { count: 1 } } },
 
   // ---- GRAND CIRCUITS: the reference sheet of twelve real layouts, each a
   // route over an existing theme (art is the theme's; the geometry is the
   // circuit's). Appended, priced with explicit `cost` like every fresh
   // region, laddered so the collection spans a career.
-  { id: 33, name: 'ALPENRING', theme: 'alpine', route: 'alpenring', region: 'GRAND CIRCUITS',
+  { id: 33, name: 'CRESTRING', theme: 'alpine', route: 'alpenring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
   { id: 34, name: 'PRINCIPALITY STREETS', theme: 'principality', route: 'principality', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
@@ -115,13 +121,13 @@ export const LEVELS = [
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'CROSSOVER RING', theme: 'redwood', route: 'crossover', region: 'GRAND CIRCUITS',
     cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
-  { id: 38, name: 'WALDSCHLEIFE', theme: 'forest', route: 'waldschleife', region: 'GRAND CIRCUITS',
+  { id: 38, name: 'GREENSPUR CIRCUIT', theme: 'forest', route: 'waldschleife', region: 'GRAND CIRCUITS',
     cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
   { id: 39, name: 'AUTODROMO VELOCE', theme: 'medterrace', route: 'autodromo', region: 'GRAND CIRCUITS',
     cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 40, name: 'NEON MARINA', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
     cost: 12, fresh: true, tune: { rampCount: 0 } },
-  { id: 41, name: 'RAZORBACK MOUNTAIN', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
+  { id: 41, name: 'RAZOR SPINE', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
       skyTop: '#3a3564', skyHorizon: '#ff9a58', fogColor: 0xc8a090, hemiIntensity: 0.78, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
@@ -139,13 +145,13 @@ export const LEVELS = [
     cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
   // hairpin over hairpin, on the Mediterranean island theme
-  { id: 45, name: 'TOUR DES CAPS', theme: 'medterrace', route: 'caps', region: 'GRAND CIRCUITS',
+  { id: 45, name: 'THE HEADLANDS', theme: 'medterrace', route: 'caps', region: 'GRAND CIRCUITS',
     cost: 17, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
   // wine country, deep forest, and the Dolomites - the player's three asks,
   // the vineyard lap tracing their third hand-drawn loop
   { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
-  { id: 48, name: 'TORRI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
+  { id: 48, name: 'CAMPANILE RUN', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
   // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
   // crosses itself and tunnels where a headland gets in the way.
