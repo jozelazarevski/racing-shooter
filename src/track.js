@@ -13873,7 +13873,29 @@ export class Track {
         // 0.9 deep) - so the bare heading pointed every block radially out of
         // the road edge and a hairpin came out as a comb of piano keys.
         q.setFromAxisAngle(up, this.headingAt(i) + Math.PI / 2);
-        m4.compose(new THREE.Vector3(p.x, p.y - 0.55, p.z), q, new THREE.Vector3(1, 1, 1));
+        // r437 (HRD-8, owner: "Floating fence again??"). A RETAINING WALL
+        // RETAINS SOMETHING. This block was seated at the ROAD's height and
+        // built ONLY where `p.y - ground >= S.drop`, i.e. only where the
+        // shelf falls away -- so its float was exactly the drop it was meant
+        // to hold up. Measured on SALINE SPRINT: 460 of 460 instances off the
+        // ground, mean 7.32 u, worst 18.38 u, and the owner photographed the
+        // same blocks hanging over open water on THE HEADLANDS.
+        //
+        // The crest stays exactly where it was -- that is the parapet the
+        // driver sees and the collider below is untouched, so nothing about
+        // driving changes -- and the body now reaches DOWN to the ground it
+        // is holding. The geometry's origin is its base (translate(0, H/2))
+        // so this is one scale and one seat, no new triangles.
+        //
+        // And where the drop is deeper than masonry plausibly goes, the wall
+        // is NOT BUILT rather than floated: a cliff edge is a cliff edge, 7.9
+        // and 7.11 govern how it reads, and HRD-8 forbids the alternative.
+        const crest = p.y - 0.55 + H;
+        const need = crest - ground;
+        if (!(need > 0)) continue;
+        if (need > (window.__DRIVING?.patch02b?.retainMaxDepthU ?? 26)) continue;
+        m4.compose(new THREE.Vector3(p.x, ground, p.z), q,
+          new THREE.Vector3(1, need / H, 1));
         mesh.setMatrixAt(k, m4);
         col.setScalar(0.86 + Math.random() * 0.28);
         mesh.setColorAt(k++, col);

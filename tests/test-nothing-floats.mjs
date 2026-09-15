@@ -215,7 +215,7 @@ await page.evaluate(() => {
     // and every structure that SPANS something — a bridge deck, an overpass,
     // a tunnel crown, a gantry, a lamp arm, a cable. Named, so the exemption
     // is auditable rather than an accident of some size threshold.
-    const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge|tyre-stack|retaining-wall|oldtown-strings|hedge-bank|hedge-top|frontage-balconies|vine-soil|.*-strings|.*-balconies|heroBridge|hero-bridge)/i;
+    const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge|tyre-stack|oldtown-strings|hedge-bank|hedge-top|frontage-balconies|vine-soil|.*-strings|.*-balconies|heroBridge|hero-bridge)/i;
 
     // ---- held up by something the 2 u column grid cannot see, BY MEMBERSHIP -
     //   foliage  parts[1..] of a `track.trees` entry. A TREE'S COLLIDER IS ITS

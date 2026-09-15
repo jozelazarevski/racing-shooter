@@ -68,7 +68,8 @@
     "coastProfSlopeMax": 0.5,
     "coastProfFadeU": 320,
     "coastProfReachU": 900,
-    "coastProfSmoothPasses": 4
+    "coastProfSmoothPasses": 4,
+    "retainMaxDepthU": 26
   },
   "route": {
     "streetPadM": 2,
