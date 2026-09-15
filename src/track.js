@@ -10779,11 +10779,150 @@ export class Track {
    *  meadow rises to meet the climbing road; the strand cap (_roadClampY)
    *  keeps it under any OTHER ribbon passing close by. */
   /** Signed distance to the theme's coastline, positive on the SEA side. */
+  /** SIGNED DISTANCE TO THE WATERLINE, positive to seaward.
+   *
+   *  r437 (E-31, the owner's SECOND report that the sea is not next to the
+   *  race). This used to be one cross product against the line through
+   *  `coast.a` and `coast.b` — an INFINITE STRAIGHT SHORE. A lap is a closed
+   *  loop, and a straight line is tangent to a loop at one point, which is
+   *  exactly what the census read: minimum 34 u where the tangent touches and
+   *  a median of 390-1198 u for the rest of the loop curving away from it.
+   *  r429 swept that line's heading and offset for the best possible fit, so
+   *  it was fitting a straight line to a closed curve and no amount of tuning
+   *  could have closed the gap. Hence working rule 3: the second code path is
+   *  the MODEL, not the solver.
+   *
+   *  The a-b line is kept as the AXIS. `_coastProf.push` then carries the
+   *  waterline's landward displacement at each point along that axis, so the
+   *  shore can follow the lap in and out instead of running dead straight.
+   *  Still O(1) — project, one array read, one lerp — because the drowning
+   *  rule asks this question every tick for every car, and with an empty
+   *  profile it returns the old value bit for bit. */
   _coastSide(x, z) {
     const C = this.T.coast;
     const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
-    return ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
+    const base = ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
+    const P = this._coastProf;
+    if (!P) return base;
+    return base + this._coastPushAt((x - P.mx) * P.ux + (z - P.mz) * P.uz);
   }
+
+  /** The waterline's landward displacement at axis coordinate `t`, measured
+   *  from the MIDPOINT of the coast line (the same origin `_buildSea` lays its
+   *  grid from, so the drawn water and the logical waterline cannot drift
+   *  apart — that pair going out of step would drown the car on dry land). */
+  _coastPushAt(t) {
+    const P = this._coastProf;
+    if (!P) return 0;
+    const f = (t - P.t0) / P.step;
+    if (f <= 0) return P.push[0];
+    const n = P.push.length;
+    if (f >= n - 1) return P.push[n - 1];
+    const i = f | 0, a = P.push[i];
+    return a + (P.push[i + 1] - a) * (f - i);
+  }
+
+  /** Build the offset profile that makes the shore follow the lap.
+   *
+   *  THE MINIMUM IS WHAT MAKES A CLOSED LOOP WORK, and it is the one choice
+   *  here that is easy to get backwards. At most positions along the coast
+   *  axis the lap has TWO branches: a seaward leg and an inland one. Each
+   *  station asks for the push that would seat the water `coastGapU` off ITS
+   *  edge, and taking the MINIMUM of those requests seats the water against
+   *  the seaward-most leg. Taking the maximum would seat it against the
+   *  INLAND leg and flood the seaward one — and the minimum is safe by
+   *  construction, since push <= need for every station means every station
+   *  keeps at least the gap of dry land. */
+  _buildCoastProfile() {
+    const C = this.T && this.T.coast;
+    if (!C || !C.a || !C.b || !this.center || !this.center.length) return;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz);
+    if (L < 1) return;
+    const D = (typeof window !== 'undefined' && window.__DRIVING?.patch02b) || {};
+    const gap    = D.coastGapU ?? 34;
+    const STEP   = D.coastProfStepU ?? 8;
+    const MAXP   = D.coastProfMaxPushU ?? 900;
+    const SLOPE  = D.coastProfSlopeMax ?? 0.5;
+    const FADE   = D.coastProfFadeU ?? 320;
+    const REACH  = D.coastProfReachU ?? 900;
+    const PASSES = D.coastProfSmoothPasses ?? 4;
+
+    const ux = abx / L, uz = abz / L;              // along the shore
+    const nx = abz / L, nz = -abx / L;             // seaward: grad of the base term
+    const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
+    const N = this.center.length;
+
+    // span the line AND the lap, so a route running past either end still
+    // shapes the water it drives along
+    let tMin = -L / 2, tMax = L / 2;
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      const t = (c.x - mx) * ux + (c.z - mz) * uz;
+      if (t < tMin) tMin = t;
+      if (t > tMax) tMax = t;
+    }
+    const t0 = tMin - FADE * 2, t1 = tMax + FADE * 2;
+    const M = Math.max(4, Math.ceil((t1 - t0) / STEP) + 1);
+    const need = new Float64Array(M).fill(Infinity);
+
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      const sd = (c.x - mx) * nx + (c.z - mz) * nz;     // seaward of the axis
+      const w = this.widthAt ? Number(this.widthAt(i)) : ROAD_HALF;
+      const edge = sd + w;                             // the road's seaward edge
+      const want = -edge - gap;                        // >0: water must come landward
+      // A station on the far side of the world does not get to drag the sea
+      // across the map to reach it.
+      if (!(want > 0) || want > REACH) continue;
+      const t = (c.x - mx) * ux + (c.z - mz) * uz;
+      const k = Math.round((t - t0) / STEP);
+      if (k < 0 || k >= M) continue;
+      if (want < need[k]) need[k] = want;
+    }
+
+    // fill the bins no station spoke for: interpolate between known ones, and
+    // past the outermost known bin fade back to the authored waterline over
+    // FADE so the shore has no step in it
+    const known = [];
+    for (let k = 0; k < M; k++) if (Number.isFinite(need[k])) known.push(k);
+    const push = new Float32Array(M);
+    if (!known.length) { this._coastProf = null; return; }
+    for (let k = 0; k < M; k++) {
+      if (Number.isFinite(need[k])) { push[k] = need[k]; continue; }
+      if (k < known[0] || k > known[known.length - 1]) {
+        const edgeK = k < known[0] ? known[0] : known[known.length - 1];
+        const away = Math.abs(k - edgeK) * STEP;
+        push[k] = need[edgeK] * Math.max(0, 1 - away / FADE);
+        continue;
+      }
+      let lo = 0, hi = known.length - 1;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (known[mid] <= k) lo = mid; else hi = mid; }
+      const a = known[lo], b = known[hi];
+      const f = (k - a) / Math.max(1, b - a);
+      push[k] = need[a] + (need[b] - need[a]) * f;
+    }
+
+    for (let k = 0; k < M; k++) push[k] = Math.max(0, Math.min(MAXP, push[k]));
+
+    // smooth, then RATE-LIMIT. Smoothing alone still allows a shore steeper
+    // than land ever is; the two-pass limiter caps how fast the waterline can
+    // swing so it cannot kink back on itself into a fold.
+    const tmpB = new Float32Array(M);
+    for (let pass = 0; pass < PASSES; pass++) {
+      for (let k = 0; k < M; k++) {
+        const a = push[Math.max(0, k - 1)], b = push[k], c2 = push[Math.min(M - 1, k + 1)];
+        tmpB[k] = (a + 2 * b + c2) * 0.25;
+      }
+      push.set(tmpB);
+    }
+    const lim = SLOPE * STEP;
+    for (let k = 1; k < M; k++) if (push[k] > push[k - 1] + lim) push[k] = push[k - 1] + lim;
+    for (let k = M - 2; k >= 0; k--) if (push[k] > push[k + 1] + lim) push[k] = push[k + 1] + lim;
+
+    this._coastProf = { mx, mz, ux, uz, nx, nz, t0, step: STEP, push };
+  }
+
 
   /** THE HIGHEST WATER SURFACE AT A POINT, or -Infinity where there is none.
    *
@@ -10936,7 +11075,12 @@ export class Track {
     this._coastPulled = { authored: +(100 * base.near / N).toFixed(1),
                           pctInBand: +(100 * best.near / N).toFixed(1),
                           moved: best.moved, gapEff: +gapEff.toFixed(1) };
-    if (!best.moved) return;                   // the author had it right
+    // r437: the profile is built whether or not the sweep moved the line. On a
+    // world the author already aimed well the sweep declines to move it, and
+    // that world needs the shore to FOLLOW the lap just as much as one that
+    // was mis-aimed — returning early here would have left exactly the worlds
+    // with the best authored line still fronting a dead straight sea.
+    if (!best.moved) { this._buildCoastProfile(); return; }
 
     const cx = ax + best.nx * best.d, cz = az + best.nz * best.d;
     const half = Math.max(L0, N * (this.segLen ?? 6) * 0.6) * 0.5;
@@ -10945,6 +11089,7 @@ export class Track {
     this.T = { ...T, coast: { ...C,
       a: [cx - best.ux * half, cz - best.uz * half],
       b: [cx + best.ux * half, cz + best.uz * half] } };
+    this._buildCoastProfile();                 // r437: shape the shore to the lap
   }
 
   _coastDepress(x, z, h, dRoad, roadY = null) {
@@ -14733,7 +14878,13 @@ export class Track {
         // the beach. Uniform columns were 190 u wide — near-shore triangles
         // that big shade as one flat gradient, which is exactly the "flat
         // water" the reference forbids. Centre columns now land ~15-40 u.
-        const du = us[c], dn = dns[r];
+        // r437: the grid's seaward coordinate is shifted LANDWARD by the
+        // profile, because `_coastSide` is `base + push` and water is where
+        // that is positive — so the waterline sits at dn = -push, not at 0.
+        // The drawn sea and the logical one read the SAME array from the SAME
+        // origin; if these two ever disagreed the car would drown on dry land
+        // or drive on open water.
+        const du = us[c], dn = dns[r] - this._coastPushAt(du);
         const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
         // FACETED WATER, per the player's reference: every vertex bobs a
         // little (deterministic hash - rebuild-stable), damped to nothing at

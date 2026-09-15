@@ -62,7 +62,13 @@
     "camClearanceM": 2.2,
     "boreRiseCapUPerS": 22,
     "coastGapU": 34,
-    "coastBandU": 40
+    "coastBandU": 40,
+    "coastProfStepU": 8,
+    "coastProfMaxPushU": 900,
+    "coastProfSlopeMax": 0.5,
+    "coastProfFadeU": 320,
+    "coastProfReachU": 900,
+    "coastProfSmoothPasses": 4
   },
   "route": {
     "streetPadM": 2,
