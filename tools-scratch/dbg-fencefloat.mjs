@@ -34,6 +34,7 @@ for (const id of IDS) {
         let v = 0; for (let k = 0; k < 4; k++) v += A[k*4+r] * B[c*4+k];
         o[c*4+r] = v; } return o; };
     const byClass = {};
+    const byAnalytic = {};
     const worst = [];
     g.scene.traverse((o) => {
       if (!o.isMesh && !o.isInstancedMesh) return;
@@ -54,9 +55,23 @@ for (const id of IDS) {
           if (w.y < lowY) { lowY = w.y; lx = w.x; lz = w.z; }
         }
         if (!Number.isFinite(lowY)) continue;
+        // TWO SURFACES, AND THEY ARE NOT THE SAME FUNCTION. `terrainHeight` is
+        // the analytic field the physics uses; `_terrainMeshHeight` is the
+        // ground actually DRAWN. HRD-8 is a rule about what the eye sees, so
+        // the drawn mesh is the one that judges it -- and the r437 retaining
+        // wall seats to the drawn mesh. Reporting both keeps the two rulers
+        // from being confused for each other again.
         const gh = tk.terrainHeight ? tk.terrainHeight(lx, lz) : null;
+        const gm = tk._terrainMeshHeight ? tk._terrainMeshHeight(lx, lz) : null;
         if (gh === null || !Number.isFinite(gh)) continue;
-        const gap = lowY - gh;
+        const gap = lowY - (Number.isFinite(gm) ? gm : gh);
+        const gapAnalytic = lowY - gh;
+        {
+          const kk = (o.name || o.geometry?.name || '?').replace(/\d+$/, '');
+          const bb = (byAnalytic[kk] ??= { n: 0, float: 0, max: -Infinity });
+          bb.n++; if (gapAnalytic > 0.15) bb.float++;
+          if (gapAnalytic > bb.max) bb.max = gapAnalytic;
+        }
         const key = (o.name || o.geometry?.name || '?').replace(/\d+$/, '');
         const b = (byClass[key] ??= { n: 0, float: 0, max: -Infinity, sum: 0 });
         b.n++; b.sum += gap;
@@ -66,7 +81,7 @@ for (const id of IDS) {
       }
     });
     worst.sort((a, b) => b.gap - a.gap);
-    return { world: g.level?.name, byClass, worst: worst.slice(0, 8),
+    return { world: g.level?.name, byClass, byAnalytic, worst: worst.slice(0, 8),
       hasTerrainFn: typeof tk.terrainHeight === 'function' };
   });
   console.log(`\n${R.world}   terrainHeight available: ${R.hasTerrainFn}`);
@@ -75,6 +90,9 @@ for (const id of IDS) {
     console.log(`  ${k.padEnd(26)} ${String(b.n).padStart(5)} ${String(b.float).padStart(13)} `
       + `${b.max.toFixed(2).padStart(8)} ${(b.sum / b.n).toFixed(2).padStart(9)}`);
   }
+  console.log('  same classes judged against the ANALYTIC field instead:');
+  for (const [k, b] of Object.entries(R.byAnalytic).sort((a, b) => b[1].float - a[1].float))
+    console.log(`    ${k.padEnd(24)} ${String(b.n).padStart(5)} float ${String(b.float).padStart(5)}  max ${b.max.toFixed(2)}`);
   console.log('worst bodies:', JSON.stringify(R.worst.map((w) => [w.key, +w.gap.toFixed(2)])));
   if (errs.length) console.log('PAGE ERRORS:', errs.slice(0, 2));
   await p.close();
