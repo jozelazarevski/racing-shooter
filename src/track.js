@@ -13865,7 +13865,7 @@ export class Track {
         // over 3 u inside your own lane, as an 85-hull stone. Skip any block
         // that cannot clear the carriageway.
         if (!this._clearsRoad(p.x, p.z, 1.2, 1.0)) continue;
-        const ground = this._terrainMeshHeight(p.x, p.z);
+        let ground = this._terrainMeshHeight(p.x, p.z);
         // wall it where the shelf falls away, and always around tight bends
         if (p.y - ground < S.drop && !(tight && side === outside)) continue;
         // A parapet runs ALONG the road. headingAt() maps local +Z to the
@@ -13890,6 +13890,23 @@ export class Track {
         // And where the drop is deeper than masonry plausibly goes, the wall
         // is NOT BUILT rather than floated: a cliff edge is a cliff edge, 7.9
         // and 7.11 govern how it reads, and HRD-8 forbids the alternative.
+        // SEATING THE CENTRE LEAVES THE DOWNHILL CORNER IN THE AIR. The first
+        // r437 cut seated each block to the ground under its CENTRE, and took
+        // SALINE SPRINT from 460 of 460 floating (mean 7.32 u) to 232 at mean
+        // 0.76 -- the 232 being exactly this residue: the block is 3.4 u wide,
+        // so on a steep face its downhill corner sits up to 1.7*tan(slope)
+        // below the centre, 3 u at 60 degrees, matching the 5.65 u worst case.
+        // Seat to the LOWEST ground under the block's own footprint.
+        //
+        // The two ground functions were checked against each other before this
+        // was blamed on them: _terrainMeshHeight and terrainHeight return
+        // identical values here, max difference 0 over 25 samples.
+        const hdF = this.headingAt(i);
+        const fxF = Math.cos(hdF) * 1.7, fzF = -Math.sin(hdF) * 1.7;
+        for (const [ox, oz] of [[fxF, fzF], [-fxF, -fzF]]) {
+          const g2 = this._terrainMeshHeight(p.x + ox, p.z + oz);
+          if (Number.isFinite(g2) && g2 < ground) ground = g2;
+        }
         const crest = p.y - 0.55 + H;
         const need = crest - ground;
         if (!(need > 0)) continue;
