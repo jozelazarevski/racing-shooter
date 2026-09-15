@@ -14691,7 +14691,37 @@ export class Track {
     const dns = ladder(400, DEEP);
     const COLS = us.length - 1, ROWS = dns.length - 1;
     const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
-    const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
+    // E-27 (owner, with a coast frame): "Make the sea look more imposing."
+    //
+    // THE FAR WATER WAS BORROWING THE SKY'S HUE. `cFar` was
+    // `seaColor.lerp(skyHorizon, 0.8)` — 80% of the way to whatever colour
+    // that world's sky happens to be at the horizon — and on a warm
+    // Mediterranean palette the sky horizon IS a cream. r387 replaced "the
+    // sea fades into the land's fog cream" with "the sea fades to the sky
+    // horizon tone"; on these worlds those are the same colour, so the fix
+    // moved the source of the cream rather than the cream.
+    //
+    // MEASURED IN THE OWNER'S OWN FRAME: the water at the horizon is
+    // rgb(203,192,163) — hue 43, CREAM — and the whole body runs 4-18%
+    // saturation, less colour than the road at 27%. Across the roster the
+    // computed far water was below 25% saturation on EIGHT of fifteen coast
+    // worlds, and outright yellow on two: CAPO VELA hue 67 at 15%, SEA CLIFF
+    // RUN hue 58 at 21%, HILLTOWN STACK 9%, WINDWARD COVES 10%.
+    //
+    // A sea looks vast because it HOLDS ITS COLOUR to the horizon. So the far
+    // tone is now built from the sea and borrows only the sky's LIGHTNESS:
+    // the hue never moves off the water, saturation keeps most of itself with
+    // a floor under it, and only the lift toward the sky's brightness carries
+    // it up to meet the dome. That keeps r387/r403's requirement — it still
+    // lightens INTO the sky, so there is no wall, cream or otherwise — while
+    // the bay stays blue all the way out. No world's palette is touched.
+    const _hN = {}, _hS = {};
+    cNear.getHSL(_hN);
+    new THREE.Color(this.T.skyHorizon ?? '#dce8f0').getHSL(_hS);
+    const cFar = new THREE.Color().setHSL(
+      _hN.h,                                   // the sea's own hue, always
+      Math.max(0.40, _hN.s * 0.72),            // keeps most of it, floored
+      _hN.l + (_hS.l - _hN.l) * 0.72);         // only the brightness is the sky's
     const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
     const cols = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
     const tmp = new THREE.Color();
@@ -14795,11 +14825,47 @@ export class Track {
       }
     }
     geo.computeVertexNormals();
-    const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      // matte enough that the depth gradient READS - at 0.14 the sun's
-      // specular washed the whole bay to one flat cyan
-      vertexColors: true, roughness: 0.7, metalness: 0.02,
-      side: THREE.DoubleSide, fog: false, flatShading: true,
+    // E-27, THE SECOND HALF, and the half that actually decides it. Fixing
+    // `cFar` above made the AUTHORED colour blue on every world, but the
+    // authored colour is not what reaches the screen: this was a
+    // MeshStandardMaterial, so every vertex colour was multiplied by a warm
+    // sun at intensity 2.6 plus a hemisphere, and the result blew out. The
+    // note that used to sit here — matte at 0.7 because 0.14 "washed the
+    // whole bay to one flat cyan" — was fighting the same fire from inside
+    // the fire: both ends of the roughness range wash, because the problem
+    // is the diffuse multiply, not the specular lobe.
+    //
+    // MEASURED IN PIXELS, rendered from the coast road, sea band against the
+    // sky band in the same frame:
+    //    OLIVE COAST      sea sat 13% vs sky 67%,  sea LIGHTER by 31 points
+    //    CAPO VELA        sea sat 19% vs sky 62%,  lighter by 28
+    //    SEA CLIFF RUN    sea hue 44 — warm cream — lighter by 23
+    //    LIMESTONE COAST  sea sat 36% vs sky 70%,  lighter by 14
+    // The sea was the palest, brightest thing in frame. That is haze, not
+    // water, and it is why it did not impose.
+    //
+    // The water is AUTHORED, not lit: the shallow/deep gradient, the haze by
+    // distance, the per-face tone and luminance jitter and the vertex bob are
+    // all baked into the colour attribute already. Diffuse lighting on top
+    // only washes that work away. So the sea is drawn UNLIT and the world's
+    // hour is baked in instead — a tint mixed from the sun and sky colours
+    // and normalised to unit luminance, so it carries the world's light
+    // WITHOUT brightening the water. Dusk stays dusk; the bay stays blue.
+    const _sun = new THREE.Color(this.T.sunColor ?? 0xffffff);
+    const _hemi = new THREE.Color(this.T.hemiSky ?? 0xffffff);
+    const _tint = _sun.clone().multiplyScalar(0.55).add(_hemi.clone().multiplyScalar(0.45));
+    const _tl = 0.2126 * _tint.r + 0.7152 * _tint.g + 0.0722 * _tint.b;
+    if (_tl > 1e-3) _tint.multiplyScalar(1 / _tl);       // hue only, never gain
+    {
+      const ca = geo.getAttribute('color');
+      for (let i = 0; i < ca.count; i++) {
+        ca.setXYZ(i, Math.min(1, ca.getX(i) * _tint.r),
+          Math.min(1, ca.getY(i) * _tint.g), Math.min(1, ca.getZ(i) * _tint.b));
+      }
+      ca.needsUpdate = true;
+    }
+    const sea = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      vertexColors: true, side: THREE.DoubleSide, fog: false,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;

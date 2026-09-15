@@ -4171,6 +4171,79 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r435 — THE SEA WAS THE PALEST THING ON SCREEN
+
+Owner, with a coast frame: *"Make the sea look more imposing."*
+
+Two faults, and the second one is the one that mattered. The first was found
+by reading the code and measured to be real; the second was invisible to the
+code entirely and only showed up in pixels.
+
+### One: the far water was borrowing the sky's hue
+
+`cFar` was `seaColor.lerp(skyHorizon, 0.8)` — 80% of the way to whatever
+colour that world's sky happens to be at the horizon. On a warm Mediterranean
+palette **the sky horizon IS a cream**. r387 replaced *"the sea fades into
+the land's fog cream"* with *"the sea fades to the sky horizon tone"*; on
+these worlds those are the same colour, so the fix moved the source of the
+cream rather than the cream.
+
+Computed across the roster, the far water was **below 25% saturation on eight
+of fifteen** coast worlds and outright yellow on two: CAPO VELA hue 67 at
+15%, SEA CLIFF RUN hue 58 at 21%, HILLTOWN STACK 9%, WINDWARD COVES 10%.
+
+The far tone is now built from the sea and borrows only the sky's
+**lightness** — the hue never leaves the water, saturation keeps most of
+itself over a floor, and only the lift toward the sky's brightness carries it
+up to meet the dome. r387/r403's requirement still holds: it lightens *into*
+the sky, so there is no wall, cream or otherwise. Sampled from the built
+geometry afterwards: every one of the fifteen worlds now reads hue 196–216 at
+42–66% saturation in the far field.
+
+### Two: none of that was reaching the screen
+
+The sea was a `MeshStandardMaterial`, so every authored vertex colour was
+multiplied by a warm sun at intensity 2.6 plus a hemisphere light — and blew
+out. The note that used to sit on that material (matte at 0.7, because 0.14
+*"washed the whole bay to one flat cyan"*) was fighting the same fire from
+inside it: **both ends of the roughness range wash, because the problem is
+the diffuse multiply, not the specular lobe.**
+
+Measured in pixels, rendered from the coast road, sea band against the sky
+band in the same frame:
+
+| | sea sat → | vs sky sat | sea lum → | verdict |
+|---|---|---|---|---|
+| OLIVE COAST | 13% → **55%** | 67% | 60% → **37%** | was 31 points *brighter* than the sky |
+| CAPO VELA | 19% → **66%** | 62% | 55% → **36%** | was 28 brighter |
+| LIMESTONE COAST | 36% → **88%** | 70% | 43% → **30%** | was 14 brighter |
+
+The sea was the palest, brightest thing in the frame. That is haze, not
+water, and it is exactly why it did not impose.
+
+The water is **authored, not lit**: the shallow-to-deep gradient, the haze by
+distance from the road, the per-face tone and luminance jitter and the vertex
+bob are all already baked into the colour attribute. Diffuse lighting on top
+only washed that work away. So the sea is drawn **unlit**, and the world's
+hour is baked in instead — a tint mixed from the sun and sky colours and
+normalised to unit luminance, so it carries each world's light *without
+brightening the water*. Dusk stays dusk; the bay stays blue. It is also
+cheaper: a huge mesh stops being lit per pixel.
+
+### What the numbers do not cover
+
+The fourth world in the probe, SEA CLIFF RUN, returned **identical numbers to
+the decimal** before and after — which is never a result, it is a signal that
+nothing under the sample ran. It didn't: on that world the camera faces a
+cliff, and the fixed sample rectangle sits on rock. Its sea is the strip at
+the right edge of the frame. Three worlds were measured; the fourth was not,
+and is reported as not measured rather than folded into the win.
+
+The warm band at the horizon in these frames is the **sky dome**, not the
+water — each world's authored hour, and left alone. My first reading of the
+owner's own frame put that band down as sea and blamed `cFar` for all of it;
+the pixels say the sky owns it.
+
 ## r434 — THE RED CROWNS WERE REAL, AND THE CENSUS THAT CLEARED THEM LOOKED AT THE WRONG THING
 
 Owner, at r406: *"Red crowns fill the frame at the camera"*, FALKEN RIDGE.
