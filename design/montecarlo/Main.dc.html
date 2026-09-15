@@ -1,0 +1,506 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #efe9de; }
+    a { color: #b4562f; } a:hover { color: #8e4223; }
+    .ser { font-family: "Bodoni Moda", Didot, "Bodoni MT", Georgia, serif; }
+    .san { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; background: #efe9de; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: baseline; gap: 18px; padding: 26px 34px 16px;">
+    <div class="ser" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; color: #26221e; line-height: 1;">Monte&nbsp;Carlo, overcast</div>
+    <div class="san" style="font-size: 13px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: #8a7f70;">Reference read as a depth stack</div>
+    <div style="flex-grow: 1;"></div>
+    <div class="mono" style="font-size: 12px; color: #8a7f70;">six planes · two values each · no gradients</div>
+  </div>
+
+  <div style="padding: 0 34px;">
+    <svg viewBox="0 0 1212 620" width="1212" height="620" style="display: block; border: 1px solid #d6cdbd;">
+      <!-- ============ 1. SKY: faceted overcast, darkest top-left ============ -->
+      <rect x="0" y="0" width="1212" height="620" fill="#c2cad1"></rect>
+      <polygon points="0,0 300,0 168,104 0,132" fill="#5f6d7c"></polygon>
+      <polygon points="300,0 606,0 492,122 168,104" fill="#6b7887"></polygon>
+      <polygon points="606,0 928,0 852,96 492,122" fill="#78848f"></polygon>
+      <polygon points="928,0 1212,0 1212,78 852,96" fill="#8b95a0"></polygon>
+      <polygon points="0,132 168,104 226,218 0,252" fill="#6a7885"></polygon>
+      <polygon points="168,104 492,122 444,210 226,218" fill="#7b8794"></polygon>
+      <polygon points="492,122 852,96 834,202 444,210" fill="#8a949f"></polygon>
+      <polygon points="852,96 1212,78 1212,184 834,202" fill="#9aa3ac"></polygon>
+      <polygon points="0,252 226,218 406,262 0,288" fill="#8e98a2"></polygon>
+      <polygon points="226,218 444,210 664,254 406,262" fill="#a3acb4"></polygon>
+      <polygon points="444,210 834,202 994,236 664,254" fill="#b4bcc3"></polygon>
+      <polygon points="834,202 1212,184 1212,246 994,236" fill="#c6ccd1"></polygon>
+      <polygon points="0,288 406,262 664,254 994,236 1212,246 1212,290 0,318" fill="#d3dae0"></polygon>
+
+      <!-- ============ 2. RIDGES: three bands, each paler than the last ====== -->
+      <polygon points="1212,246 1050,258 940,290 812,268 700,292 560,276 430,300 300,282 150,306 0,290 0,318 1212,300" fill="#9aa8b4"></polygon>
+      <polygon points="1212,286 1080,300 960,326 830,306 690,330 540,314 380,336 210,320 60,340 0,332 0,352 1212,330" fill="#82919e"></polygon>
+      <polygon points="1212,320 1090,336 966,356 850,340 1212,352" fill="#6e7e8b"></polygon>
+
+      <!-- ============ 3. SEA + MARINA (right) ============================== -->
+      <polygon points="880,348 1212,336 1212,432 934,420" fill="#93aebd"></polygon>
+      <polygon points="880,348 1212,336 1212,362 890,372" fill="#a4bcc8"></polygon>
+      <g fill="#f0ece2">
+        <polygon points="1108,378 1146,378 1140,388 1112,388"></polygon>
+        <rect x="1120" y="370" width="4" height="8"></rect>
+        <polygon points="1052,394 1084,394 1079,403 1056,403"></polygon>
+        <polygon points="1160,400 1196,400 1190,410 1164,410"></polygon>
+      </g>
+
+      <!-- ============ 4. HILLSIDE: wooded mass, villas, campanile ========== -->
+      <polygon points="0,262 120,232 236,250 352,224 470,252 560,286 620,330 0,352" fill="#4f6a44"></polygon>
+      <polygon points="0,262 120,232 236,250 352,224 470,252 470,286 236,282 0,296" fill="#5c7a4d"></polygon>
+      <!-- villas scattered on the slope -->
+      <g>
+        <rect x="36" y="240" width="44" height="30" fill="#e7dcc2"></rect>
+        <polygon points="30,240 86,240 58,226" fill="#b4562f"></polygon>
+        <rect x="108" y="256" width="52" height="26" fill="#dcd2ba"></rect>
+        <polygon points="102,256 166,256 134,244" fill="#a74a2c"></polygon>
+        <rect x="272" y="242" width="46" height="28" fill="#efe7d6"></rect>
+        <polygon points="266,242 324,242 295,230" fill="#b4562f"></polygon>
+        <rect x="386" y="262" width="58" height="30" fill="#e7dcc2"></rect>
+        <polygon points="380,262 450,262 415,250" fill="#c06238"></polygon>
+        <rect x="196" y="274" width="40" height="24" fill="#dcd2ba"></rect>
+        <polygon points="190,274 242,274 216,264" fill="#a74a2c"></polygon>
+      </g>
+      <!-- campanile -->
+      <g>
+        <rect x="150" y="186" width="26" height="74" fill="#e7dcc2"></rect>
+        <rect x="150" y="186" width="9" height="74" fill="#cfc3a8"></rect>
+        <rect x="155" y="204" width="7" height="14" fill="#3a3630"></rect>
+        <rect x="166" y="204" width="7" height="14" fill="#3a3630"></rect>
+        <polygon points="144,186 182,186 163,152" fill="#7f8f9c"></polygon>
+        <rect x="161" y="140" width="3" height="14" fill="#3a3630"></rect>
+      </g>
+      <!-- tree clumps: dark mass, one lighter top plane, cypress spikes -->
+      <g>
+        <g fill="#2f4a33">
+          <ellipse cx="96" cy="292" rx="46" ry="24"></ellipse>
+          <ellipse cx="186" cy="308" rx="40" ry="21"></ellipse>
+          <ellipse cx="286" cy="296" rx="52" ry="25"></ellipse>
+          <ellipse cx="392" cy="312" rx="44" ry="22"></ellipse>
+          <ellipse cx="486" cy="300" rx="48" ry="24"></ellipse>
+          <ellipse cx="566" cy="322" rx="42" ry="21"></ellipse>
+          <ellipse cx="30" cy="308" rx="40" ry="22"></ellipse>
+        </g>
+        <g fill="#456a45">
+          <ellipse cx="88" cy="282" rx="34" ry="13"></ellipse>
+          <ellipse cx="278" cy="286" rx="38" ry="13"></ellipse>
+          <ellipse cx="478" cy="290" rx="35" ry="12"></ellipse>
+          <ellipse cx="180" cy="299" rx="28" ry="10"></ellipse>
+          <ellipse cx="560" cy="313" rx="30" ry="10"></ellipse>
+        </g>
+        <g fill="#27402c">
+          <polygon points="232,258 240,258 238,306 234,306"></polygon>
+          <ellipse cx="236" cy="272" rx="9" ry="22"></ellipse>
+          <ellipse cx="336" cy="278" rx="8" ry="20"></ellipse>
+          <ellipse cx="432" cy="284" rx="9" ry="21"></ellipse>
+        </g>
+      </g>
+
+      <!-- ============ 5. MID-TOWN: the modern slab and stacked blocks ====== -->
+      <g>
+        <!-- tower slab -->
+        <rect x="700" y="150" width="112" height="200" fill="#e2d8c4"></rect>
+        <rect x="700" y="150" width="34" height="200" fill="#cabfa8"></rect>
+        <rect x="700" y="150" width="112" height="10" fill="#4f6a44"></rect>
+        <g fill="#3d4650">
+          <rect x="742" y="168" width="58" height="9"></rect>
+          <rect x="742" y="190" width="58" height="9"></rect>
+          <rect x="742" y="212" width="58" height="9"></rect>
+          <rect x="742" y="234" width="58" height="9"></rect>
+          <rect x="742" y="256" width="58" height="9"></rect>
+          <rect x="742" y="278" width="58" height="9"></rect>
+          <rect x="742" y="300" width="58" height="9"></rect>
+          <rect x="742" y="322" width="58" height="9"></rect>
+          <rect x="708" y="170" width="20" height="8"></rect>
+          <rect x="708" y="196" width="20" height="8"></rect>
+          <rect x="708" y="222" width="20" height="8"></rect>
+          <rect x="708" y="248" width="20" height="8"></rect>
+          <rect x="708" y="274" width="20" height="8"></rect>
+          <rect x="708" y="300" width="20" height="8"></rect>
+        </g>
+        <!-- stacked pastel blocks behind -->
+        <rect x="556" y="234" width="74" height="118" fill="#efe7d6"></rect>
+        <rect x="556" y="234" width="24" height="118" fill="#d8cdb6"></rect>
+        <rect x="624" y="256" width="66" height="96" fill="#dcc0aa"></rect>
+        <rect x="624" y="256" width="20" height="96" fill="#c3a691"></rect>
+        <rect x="820" y="222" width="80" height="130" fill="#e7dcc2"></rect>
+        <rect x="820" y="222" width="26" height="130" fill="#cfc3a8"></rect>
+        <rect x="898" y="262" width="62" height="90" fill="#cbd0b4"></rect>
+        <rect x="898" y="262" width="20" height="90" fill="#b2b89a"></rect>
+        <g fill="#3d4650">
+          <rect x="586" y="250" width="9" height="13"></rect><rect x="602" y="250" width="9" height="13"></rect>
+          <rect x="586" y="274" width="9" height="13"></rect><rect x="602" y="274" width="9" height="13"></rect>
+          <rect x="586" y="298" width="9" height="13"></rect><rect x="602" y="298" width="9" height="13"></rect>
+          <rect x="586" y="322" width="9" height="13"></rect><rect x="602" y="322" width="9" height="13"></rect>
+          <rect x="652" y="272" width="9" height="13"></rect><rect x="668" y="272" width="9" height="13"></rect>
+          <rect x="652" y="298" width="9" height="13"></rect><rect x="668" y="298" width="9" height="13"></rect>
+          <rect x="652" y="324" width="9" height="13"></rect><rect x="668" y="324" width="9" height="13"></rect>
+          <rect x="854" y="238" width="10" height="14"></rect><rect x="872" y="238" width="10" height="14"></rect>
+          <rect x="854" y="264" width="10" height="14"></rect><rect x="872" y="264" width="10" height="14"></rect>
+          <rect x="854" y="290" width="10" height="14"></rect><rect x="872" y="290" width="10" height="14"></rect>
+          <rect x="854" y="316" width="10" height="14"></rect><rect x="872" y="316" width="10" height="14"></rect>
+          <rect x="926" y="278" width="9" height="13"></rect><rect x="942" y="278" width="9" height="13"></rect>
+          <rect x="926" y="304" width="9" height="13"></rect><rect x="942" y="304" width="9" height="13"></rect>
+        </g>
+      </g>
+
+      <!-- ============ 6. RAMPART TERRACE: stone, balustrade, palms, plaza == -->
+      <!-- plaza deck -->
+      <polygon points="612,392 1212,432 1212,620 560,620" fill="#b09a97"></polygon>
+      <polygon points="612,392 1212,432 1212,452 606,414" fill="#c0aba7"></polygon>
+      <g stroke="#9a8583" stroke-width="1.5" opacity="0.55">
+        <line x1="640" y1="620" x2="700" y2="404"></line>
+        <line x1="760" y1="620" x2="800" y2="414"></line>
+        <line x1="880" y1="620" x2="900" y2="424"></line>
+        <line x1="1000" y1="620" x2="1000" y2="434"></line>
+        <line x1="1120" y1="620" x2="1100" y2="444"></line>
+      </g>
+      <!-- rampart wall face, rusticated -->
+      <polygon points="612,392 1212,432 1212,540 612,486" fill="#cabfa8"></polygon>
+      <polygon points="612,486 1212,540 1212,566 612,510" fill="#a89c85"></polygon>
+      <g fill="#bdb2a1">
+        <rect x="640" y="404" width="52" height="20"></rect>
+        <rect x="712" y="410" width="46" height="20"></rect>
+        <rect x="800" y="416" width="56" height="20"></rect>
+        <rect x="900" y="424" width="48" height="20"></rect>
+        <rect x="990" y="432" width="58" height="20"></rect>
+        <rect x="1090" y="440" width="50" height="20"></rect>
+        <rect x="672" y="440" width="46" height="20"></rect>
+        <rect x="780" y="450" width="56" height="20"></rect>
+        <rect x="920" y="462" width="50" height="20"></rect>
+        <rect x="1040" y="474" width="54" height="20"></rect>
+      </g>
+      <!-- arched doorway -->
+      <path d="M 856 486 L 856 448 A 20 22 0 0 1 896 450 L 896 490 Z" fill="#3a3630"></path>
+      <!-- balustrade along the top -->
+      <rect x="612" y="376" width="600" height="8" fill="#d6ccb6" transform="rotate(3.8 612 376)"></rect>
+      <g fill="#cabfa8" transform="rotate(3.8 612 384)">
+        <rect x="626" y="384" width="7" height="16"></rect><rect x="650" y="384" width="7" height="16"></rect>
+        <rect x="674" y="384" width="7" height="16"></rect><rect x="698" y="384" width="7" height="16"></rect>
+        <rect x="722" y="384" width="7" height="16"></rect><rect x="746" y="384" width="7" height="16"></rect>
+        <rect x="770" y="384" width="7" height="16"></rect><rect x="794" y="384" width="7" height="16"></rect>
+        <rect x="818" y="384" width="7" height="16"></rect><rect x="842" y="384" width="7" height="16"></rect>
+        <rect x="866" y="384" width="7" height="16"></rect><rect x="890" y="384" width="7" height="16"></rect>
+        <rect x="914" y="384" width="7" height="16"></rect><rect x="938" y="384" width="7" height="16"></rect>
+        <rect x="962" y="384" width="7" height="16"></rect><rect x="986" y="384" width="7" height="16"></rect>
+      </g>
+      <!-- garden mass on the terrace top -->
+      <g fill="#2f4a33">
+        <ellipse cx="700" cy="374" rx="46" ry="18"></ellipse>
+        <ellipse cx="800" cy="382" rx="40" ry="16"></ellipse>
+        <ellipse cx="1050" cy="404" rx="52" ry="18"></ellipse>
+      </g>
+      <!-- palms -->
+      <g>
+        <g transform="translate(742, 300)">
+          <rect x="-4" y="0" width="8" height="96" fill="#7a6a52"></rect>
+          <g fill="#3d5c40">
+            <ellipse cx="0" cy="-2" rx="42" ry="9" transform="rotate(-18)"></ellipse>
+            <ellipse cx="0" cy="-2" rx="42" ry="9" transform="rotate(16)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="30" ry="8" transform="rotate(-58)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="30" ry="8" transform="rotate(58)"></ellipse>
+          </g>
+        </g>
+        <g transform="translate(928, 322)">
+          <rect x="-4" y="0" width="8" height="104" fill="#7a6a52"></rect>
+          <g fill="#456a45">
+            <ellipse cx="0" cy="-2" rx="46" ry="10" transform="rotate(-14)"></ellipse>
+            <ellipse cx="0" cy="-2" rx="46" ry="10" transform="rotate(18)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="32" ry="8" transform="rotate(-62)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="32" ry="8" transform="rotate(62)"></ellipse>
+          </g>
+        </g>
+        <g transform="translate(1130, 344)">
+          <rect x="-4" y="0" width="8" height="98" fill="#7a6a52"></rect>
+          <g fill="#3d5c40">
+            <ellipse cx="0" cy="-2" rx="44" ry="9" transform="rotate(-20)"></ellipse>
+            <ellipse cx="0" cy="-2" rx="44" ry="9" transform="rotate(14)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="30" ry="8" transform="rotate(-60)"></ellipse>
+            <ellipse cx="0" cy="-6" rx="30" ry="8" transform="rotate(60)"></ellipse>
+          </g>
+        </g>
+      </g>
+      <!-- fountain in its basin -->
+      <g transform="translate(694, 528)">
+        <ellipse cx="0" cy="0" rx="66" ry="22" fill="#cabfa8"></ellipse>
+        <ellipse cx="0" cy="-4" rx="54" ry="17" fill="#8fa6ad"></ellipse>
+        <rect x="-9" y="-58" width="18" height="54" fill="#d6ccb6"></rect>
+        <rect x="-9" y="-58" width="6" height="54" fill="#b7ab93"></rect>
+        <ellipse cx="0" cy="-58" rx="20" ry="7" fill="#e0d7c2"></ellipse>
+        <rect x="-3" y="-72" width="6" height="14" fill="#cabfa8"></rect>
+      </g>
+      <!-- twin-globe lamps -->
+      <g>
+        <g transform="translate(600, 470)">
+          <rect x="-3" y="-84" width="6" height="84" fill="#2a2724"></rect>
+          <rect x="-9" y="0" width="18" height="7" fill="#2a2724"></rect>
+          <circle cx="-14" cy="-88" r="8" fill="#f2ead6"></circle>
+          <circle cx="14" cy="-88" r="8" fill="#f2ead6"></circle>
+          <rect x="-16" y="-84" width="32" height="4" fill="#2a2724"></rect>
+        </g>
+        <g transform="translate(880, 556)">
+          <rect x="-4" y="-104" width="8" height="104" fill="#2a2724"></rect>
+          <rect x="-11" y="0" width="22" height="8" fill="#2a2724"></rect>
+          <circle cx="-17" cy="-109" r="10" fill="#f2ead6"></circle>
+          <circle cx="17" cy="-109" r="10" fill="#f2ead6"></circle>
+          <rect x="-19" y="-104" width="38" height="5" fill="#2a2724"></rect>
+        </g>
+      </g>
+      <!-- figures on the plaza: flat, two values, no faces -->
+      <g>
+        <g transform="translate(940, 584)">
+          <rect x="-6" y="-34" width="12" height="20" fill="#c0392b"></rect>
+          <rect x="-6" y="-14" width="12" height="16" fill="#3d4650"></rect>
+          <circle cx="0" cy="-39" r="5" fill="#c8a184"></circle>
+        </g>
+        <g transform="translate(972, 590)">
+          <rect x="-6" y="-36" width="12" height="21" fill="#3f6f9e"></rect>
+          <rect x="-6" y="-15" width="12" height="17" fill="#4a4a52"></rect>
+          <circle cx="0" cy="-41" r="5" fill="#c8a184"></circle>
+        </g>
+        <g transform="translate(958, 596)">
+          <rect x="-4" y="-21" width="9" height="12" fill="#e0b13a"></rect>
+          <rect x="-4" y="-9" width="9" height="10" fill="#3d4650"></rect>
+          <circle cx="0" cy="-25" r="4" fill="#c8a184"></circle>
+        </g>
+        <g transform="translate(1058, 604)">
+          <rect x="-6" y="-36" width="12" height="21" fill="#4f6a44"></rect>
+          <rect x="-6" y="-15" width="12" height="17" fill="#3d4650"></rect>
+          <circle cx="0" cy="-41" r="5" fill="#a87a58"></circle>
+        </g>
+      </g>
+
+      <!-- ============ 7. FOREGROUND: the townhouse run and the street ====== -->
+      <!-- road -->
+      <polygon points="196,620 372,392 560,392 560,620" fill="#4c4d54"></polygon>
+      <polygon points="372,392 386,392 240,620 196,620" fill="#5a5b62"></polygon>
+      <g fill="#e8e6de">
+        <polygon points="466,404 472,404 486,440 478,440"></polygon>
+        <polygon points="490,466 500,466 518,516 506,516"></polygon>
+        <polygon points="524,550 538,550 560,614 544,614"></polygon>
+      </g>
+      <!-- crossing -->
+      <g fill="#e8e6de" opacity="0.9">
+        <polygon points="396,438 412,438 404,452 388,452"></polygon>
+        <polygon points="424,438 440,438 434,452 418,452"></polygon>
+        <polygon points="452,438 468,438 463,452 447,452"></polygon>
+        <polygon points="480,438 496,438 492,452 476,452"></polygon>
+      </g>
+      <!-- pavement + kerb strip beside the houses -->
+      <polygon points="196,620 372,392 386,392 240,620" fill="#947e6e" opacity="0"></polygon>
+      <polygon points="120,620 356,392 372,392 196,620" fill="#a08b7a"></polygon>
+      <polygon points="352,392 372,392 196,620 168,620" fill="#8a7565"></polygon>
+      <!-- circuit kerbing on the far side -->
+      <g>
+        <polygon points="560,392 596,392 596,620 560,620" fill="#ece7dd"></polygon>
+        <g fill="#c8382e">
+          <rect x="560" y="392" width="36" height="26"></rect>
+          <rect x="560" y="444" width="36" height="26"></rect>
+          <rect x="560" y="496" width="36" height="26"></rect>
+          <rect x="560" y="548" width="36" height="26"></rect>
+          <rect x="560" y="600" width="36" height="20"></rect>
+        </g>
+      </g>
+      <!-- Armco -->
+      <g>
+        <rect x="596" y="392" width="7" height="228" fill="#8f9497"></rect>
+        <polygon points="603,392 620,392 620,620 603,620" fill="#b9bcbe"></polygon>
+        <g fill="#8f9497">
+          <rect x="603" y="392" width="17" height="4"></rect>
+          <rect x="603" y="470" width="17" height="4"></rect>
+          <rect x="603" y="548" width="17" height="4"></rect>
+        </g>
+      </g>
+      <!-- parked cars, low-poly: body, glasshouse, shade flank, wheels -->
+      <g transform="translate(300, 556) scale(1.18)">
+        <polygon points="-56,0 56,0 56,-18 40,-30 -24,-32 -56,-16" fill="#2f6b45"></polygon>
+        <polygon points="-24,-32 40,-30 30,-44 -14,-45" fill="#3d4650"></polygon>
+        <polygon points="-56,0 56,0 56,-7 -56,-7" fill="#245235"></polygon>
+        <circle cx="-34" cy="2" r="10" fill="#26221e"></circle>
+        <circle cx="34" cy="2" r="10" fill="#26221e"></circle>
+        <circle cx="-34" cy="2" r="4" fill="#a8aaad"></circle>
+        <circle cx="34" cy="2" r="4" fill="#a8aaad"></circle>
+      </g>
+      <g transform="translate(392, 480) scale(0.94)">
+        <polygon points="-52,0 52,0 52,-17 36,-29 -22,-31 -52,-15" fill="#c0392b"></polygon>
+        <polygon points="-22,-31 36,-29 27,-42 -13,-43" fill="#3d4650"></polygon>
+        <polygon points="-52,0 52,0 52,-6 -52,-6" fill="#9c2c20"></polygon>
+        <circle cx="-31" cy="2" r="9" fill="#26221e"></circle>
+        <circle cx="31" cy="2" r="9" fill="#26221e"></circle>
+      </g>
+      <g transform="translate(452, 438) scale(0.76)">
+        <polygon points="-50,0 50,0 50,-17 34,-28 -20,-30 -50,-14" fill="#3f6f9e"></polygon>
+        <polygon points="-20,-30 34,-28 26,-41 -12,-42" fill="#3d4650"></polygon>
+        <circle cx="-30" cy="2" r="9" fill="#26221e"></circle>
+        <circle cx="30" cy="2" r="9" fill="#26221e"></circle>
+      </g>
+      <!-- cone -->
+      <g transform="translate(596, 596)">
+        <polygon points="-9,0 9,0 3,-24 -3,-24" fill="#e2732c"></polygon>
+        <rect x="-12" y="0" width="24" height="5" fill="#c85f1e"></rect>
+        <rect x="-6" y="-15" width="12" height="4" fill="#f0e6d8"></rect>
+      </g>
+
+      <!-- townhouse run, left: two blocks, eaves to the street -->
+      <g>
+        <!-- rear block -->
+        <polygon points="228,196 356,238 356,468 228,404" fill="#e7dcc2"></polygon>
+        <polygon points="228,196 356,238 356,258 228,216" fill="#b4562f"></polygon>
+        <polygon points="228,216 356,258 356,268 228,226" fill="#8e4223"></polygon>
+        <!-- front block, ochre -->
+        <polygon points="0,150 228,196 228,560 0,620" fill="#d8ab5e"></polygon>
+        <polygon points="0,124 228,178 228,206 0,158" fill="#b4562f"></polygon>
+        <polygon points="0,158 228,206 228,220 0,172" fill="#8e4223"></polygon>
+        <!-- chimneys -->
+        <rect x="46" y="96" width="26" height="34" fill="#c9705a"></rect>
+        <rect x="46" y="90" width="26" height="8" fill="#8e4223"></rect>
+        <rect x="150" y="118" width="24" height="32" fill="#c9705a"></rect>
+        <rect x="150" y="112" width="24" height="8" fill="#8e4223"></rect>
+        <!-- quoins up the corner -->
+        <g fill="#efe7d6">
+          <rect x="212" y="200" width="16" height="22"></rect>
+          <rect x="212" y="244" width="16" height="22"></rect>
+          <rect x="212" y="288" width="16" height="22"></rect>
+          <rect x="212" y="332" width="16" height="22"></rect>
+          <rect x="212" y="376" width="16" height="22"></rect>
+          <rect x="212" y="420" width="16" height="22"></rect>
+          <rect x="212" y="464" width="16" height="22"></rect>
+          <rect x="212" y="508" width="16" height="22"></rect>
+        </g>
+        <!-- windows: architrave, shutter, pane, iron balcony -->
+        <g>
+          <g transform="translate(28, 214)">
+            <rect x="-2" y="-4" width="52" height="70" fill="#efe7d6"></rect>
+            <rect x="2" y="0" width="44" height="62" fill="#333c46"></rect>
+            <rect x="2" y="0" width="14" height="62" fill="#40684a"></rect>
+            <rect x="32" y="0" width="14" height="62" fill="#40684a"></rect>
+            <g fill="#2a2724">
+              <rect x="-6" y="62" width="60" height="4"></rect>
+              <rect x="-6" y="80" width="60" height="4"></rect>
+              <rect x="-6" y="62" width="4" height="22"></rect>
+              <rect x="50" y="62" width="4" height="22"></rect>
+              <rect x="6" y="64" width="2" height="18"></rect><rect x="16" y="64" width="2" height="18"></rect>
+              <rect x="26" y="64" width="2" height="18"></rect><rect x="36" y="64" width="2" height="18"></rect>
+              <rect x="46" y="64" width="2" height="18"></rect>
+            </g>
+          </g>
+          <g transform="translate(118, 238)">
+            <rect x="-2" y="-4" width="52" height="70" fill="#efe7d6"></rect>
+            <rect x="2" y="0" width="44" height="62" fill="#333c46"></rect>
+            <rect x="2" y="0" width="14" height="62" fill="#40684a"></rect>
+            <g fill="#2a2724">
+              <rect x="-6" y="62" width="60" height="4"></rect>
+              <rect x="-6" y="80" width="60" height="4"></rect>
+              <rect x="-6" y="62" width="4" height="22"></rect>
+              <rect x="50" y="62" width="4" height="22"></rect>
+              <rect x="6" y="64" width="2" height="18"></rect><rect x="16" y="64" width="2" height="18"></rect>
+              <rect x="26" y="64" width="2" height="18"></rect><rect x="36" y="64" width="2" height="18"></rect>
+              <rect x="46" y="64" width="2" height="18"></rect>
+            </g>
+          </g>
+          <g transform="translate(28, 356)">
+            <rect x="-2" y="-4" width="52" height="70" fill="#efe7d6"></rect>
+            <rect x="2" y="0" width="44" height="62" fill="#333c46"></rect>
+            <rect x="32" y="0" width="14" height="62" fill="#40684a"></rect>
+            <g fill="#2a2724">
+              <rect x="-6" y="62" width="60" height="4"></rect>
+              <rect x="-6" y="80" width="60" height="4"></rect>
+              <rect x="-6" y="62" width="4" height="22"></rect>
+              <rect x="50" y="62" width="4" height="22"></rect>
+              <rect x="6" y="64" width="2" height="18"></rect><rect x="16" y="64" width="2" height="18"></rect>
+              <rect x="26" y="64" width="2" height="18"></rect><rect x="36" y="64" width="2" height="18"></rect>
+              <rect x="46" y="64" width="2" height="18"></rect>
+            </g>
+          </g>
+          <g transform="translate(118, 380)">
+            <rect x="-2" y="-4" width="52" height="70" fill="#efe7d6"></rect>
+            <rect x="2" y="0" width="44" height="62" fill="#333c46"></rect>
+            <rect x="2" y="0" width="14" height="62" fill="#40684a"></rect>
+            <rect x="32" y="0" width="14" height="62" fill="#40684a"></rect>
+            <g fill="#2a2724">
+              <rect x="-6" y="62" width="60" height="4"></rect>
+              <rect x="-6" y="80" width="60" height="4"></rect>
+              <rect x="-6" y="62" width="4" height="22"></rect>
+              <rect x="50" y="62" width="4" height="22"></rect>
+              <rect x="6" y="64" width="2" height="18"></rect><rect x="16" y="64" width="2" height="18"></rect>
+              <rect x="26" y="64" width="2" height="18"></rect><rect x="36" y="64" width="2" height="18"></rect>
+              <rect x="46" y="64" width="2" height="18"></rect>
+            </g>
+          </g>
+          <!-- ground floor: shopfront and the red awning -->
+          <rect x="24" y="496" width="58" height="96" fill="#3a3630"></rect>
+          <polygon points="14,486 92,486 100,510 6,516" fill="#b83028"></polygon>
+          <rect x="118" y="486" width="52" height="90" fill="#4a3a2a"></rect>
+          <rect x="118" y="486" width="52" height="8" fill="#efe7d6"></rect>
+        </g>
+        <!-- rear-block windows, smaller -->
+        <g>
+          <rect x="252" y="272" width="30" height="44" fill="#333c46"></rect>
+          <rect x="252" y="272" width="10" height="44" fill="#40684a"></rect>
+          <rect x="304" y="288" width="30" height="44" fill="#333c46"></rect>
+          <rect x="322" y="288" width="12" height="44" fill="#40684a"></rect>
+          <rect x="252" y="352" width="30" height="44" fill="#333c46"></rect>
+          <rect x="304" y="368" width="30" height="44" fill="#333c46"></rect>
+          <rect x="304" y="368" width="10" height="44" fill="#40684a"></rect>
+        </g>
+      </g>
+
+      <!-- pedestrian by the kerb, for scale -->
+      <g transform="translate(238, 500) scale(1.25)">
+        <rect x="-6" y="-36" width="12" height="21" fill="#3d4650"></rect>
+        <rect x="-6" y="-15" width="12" height="17" fill="#2a2724"></rect>
+        <circle cx="0" cy="-41" r="5" fill="#a87a58"></circle>
+      </g>
+    </svg>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; padding: 18px 34px 0;">
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 1</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Overcast sky</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">Big flat facets, darkest top-left, paling to the horizon. No blue anywhere.</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 2</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Ridges &amp; sea</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">Three ridge bands, each paler than the one in front. Sea borrows the sky's grey.</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 3</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Wooded slope</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">Near-black clumps with one lighter top plane; villas and a campanile scattered through.</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 4</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Mid-town stack</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">One modern slab against pastel blocks — the height break that says Monaco, not village.</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 5</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Rampart terrace</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">Rusticated stone, balustrade, palms, a fountain on mauve paving, twin-globe lamps.</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.1em; color: #a2988a;">PLANE 6</div>
+      <div class="san" style="font-size: 13px; font-weight: 600; color: #26221e; margin-top: 3px;">Street &amp; circuit</div>
+      <div class="san" style="font-size: 12px; line-height: 1.45; color: #6f665b; margin-top: 4px;">Dark asphalt, red/white kerbing, Armco — the race furniture sits inside the town, not beside it.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

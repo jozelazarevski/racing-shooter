@@ -1,0 +1,39 @@
+{
+  "lookAheadFactor": 0.35,
+  "lookAheadMin": 6,
+  "lookAheadMax": 30,
+  "steerKp": 2.1,
+  "steerYawDamp": 0.22,
+  "speedNodeAhead": 3,
+  "throttleBand": 1.0,
+  "brakeBand": 2.0,
+  "brakeGain": 0.14,
+  "avoidRange": 11,
+  "avoidLateral": 2.6,
+  "avoidOffset": 2.4,
+  "stuckSpeed": 2.0,
+  "stuckAfterSec": 4.0,
+  "drivers": [
+    {
+      "name": "KESKI",
+      "color": 3900118,
+      "accent": 15658734,
+      "speedScale": 0.98,
+      "lane": 1.7
+    },
+    {
+      "name": "MORROW",
+      "color": 15577129,
+      "accent": 2236962,
+      "speedScale": 0.95,
+      "lane": -1.7
+    },
+    {
+      "name": "ONYX",
+      "color": 5088858,
+      "accent": 15658734,
+      "speedScale": 0.92,
+      "lane": 0.0
+    }
+  ]
+}

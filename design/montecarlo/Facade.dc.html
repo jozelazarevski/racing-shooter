@@ -1,0 +1,358 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #efe9de; }
+    a { color: #b4562f; } a:hover { color: #8e4223; }
+    .ser { font-family: "Bodoni Moda", Didot, "Bodoni MT", Georgia, serif; }
+    .san { font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1040px; height: 1210px; background: #efe9de; padding: 26px 30px 24px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <div class="ser" style="font-size: 34px; font-weight: 700; color: #26221e; line-height: 1;">Townhouse elevation</div>
+    <div class="san" style="font-size: 12px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: #8a7f70;">Three bays · eaves to the street</div>
+  </div>
+  <div class="san" style="font-size: 12.5px; line-height: 1.5; color: #6f665b; margin-top: 8px; max-width: 700px;">
+    The anatomy the reference's foreground block is built from, dimensioned in world units. Every part here already exists in <span class="mono">townhouseTexture</span> and <span class="mono">_buildOldTown</span> — this fixes the proportions and the order they stack in.
+  </div>
+
+  <svg viewBox="0 0 980 1046" width="980" height="1046" style="display: block; margin-top: 10px;">
+    <!-- ============ dimension ladder ============ -->
+    <g stroke="#bdb2a1" stroke-width="1">
+      <line x1="196" y1="90" x2="196" y2="760"></line>
+      <line x1="190" y1="90" x2="236" y2="90"></line>
+      <line x1="190" y1="150" x2="236" y2="150"></line>
+      <line x1="190" y1="164" x2="236" y2="164"></line>
+      <line x1="190" y1="286" x2="236" y2="286"></line>
+      <line x1="190" y1="418" x2="236" y2="418"></line>
+      <line x1="190" y1="566" x2="236" y2="566"></line>
+      <line x1="190" y1="730" x2="236" y2="730"></line>
+      <line x1="190" y1="760" x2="236" y2="760"></line>
+    </g>
+    <g class="mono" fill="#8a7f70" font-size="10.5" text-anchor="end">
+      <text x="186" y="124">1.6 m</text>
+      <text x="186" y="229">3.2 m</text>
+      <text x="186" y="356">3.5 m</text>
+      <text x="186" y="496">3.9 m</text>
+      <text x="186" y="652">4.3 m</text>
+      <text x="186" y="750">0.8 m</text>
+    </g>
+    <g class="mono" fill="#a2988a" font-size="9.5" text-anchor="end">
+      <text x="186" y="138">roof</text>
+      <text x="186" y="243">2nd</text>
+      <text x="186" y="370">1st</text>
+      <text x="186" y="510">piano nobile</text>
+      <text x="186" y="666">ground</text>
+    </g>
+
+    <!-- ============ the building ============ -->
+    <!-- pavement -->
+    <rect x="200" y="760" width="440" height="26" fill="#a08b7a"></rect>
+    <rect x="200" y="760" width="440" height="4" fill="#b09a97"></rect>
+    <rect x="200" y="782" width="440" height="6" fill="#8a7565"></rect>
+
+    <!-- body -->
+    <rect x="240" y="150" width="360" height="610" fill="#d8ab5e"></rect>
+    <!-- plinth -->
+    <rect x="240" y="730" width="360" height="30" fill="#a89c85"></rect>
+    <rect x="240" y="730" width="360" height="4" fill="#bdb2a1"></rect>
+    <!-- string courses -->
+    <rect x="240" y="282" width="360" height="6" fill="#efe7d6"></rect>
+    <rect x="240" y="414" width="360" height="7" fill="#efe7d6"></rect>
+    <rect x="240" y="562" width="360" height="7" fill="#efe7d6"></rect>
+
+    <!-- roof: pantile plane, ridge along the street -->
+    <polygon points="228,150 612,150 596,96 244,96" fill="#b4562f"></polygon>
+    <rect x="244" y="90" width="352" height="8" fill="#c9705a"></rect>
+    <!-- pantile ribs -->
+    <g stroke="#9c4526" stroke-width="2" opacity="0.55">
+      <line x1="262" y1="150" x2="272" y2="98"></line>
+      <line x1="298" y1="150" x2="306" y2="98"></line>
+      <line x1="334" y1="150" x2="340" y2="98"></line>
+      <line x1="370" y1="150" x2="374" y2="98"></line>
+      <line x1="406" y1="150" x2="408" y2="98"></line>
+      <line x1="442" y1="150" x2="442" y2="98"></line>
+      <line x1="478" y1="150" x2="476" y2="98"></line>
+      <line x1="514" y1="150" x2="510" y2="98"></line>
+      <line x1="550" y1="150" x2="544" y2="98"></line>
+      <line x1="586" y1="150" x2="578" y2="98"></line>
+    </g>
+    <!-- dentil course under the eaves -->
+    <rect x="234" y="150" width="372" height="14" fill="#8e4223"></rect>
+    <g fill="#efe7d6">
+      <rect x="242" y="153" width="8" height="8"></rect><rect x="258" y="153" width="8" height="8"></rect>
+      <rect x="274" y="153" width="8" height="8"></rect><rect x="290" y="153" width="8" height="8"></rect>
+      <rect x="306" y="153" width="8" height="8"></rect><rect x="322" y="153" width="8" height="8"></rect>
+      <rect x="338" y="153" width="8" height="8"></rect><rect x="354" y="153" width="8" height="8"></rect>
+      <rect x="370" y="153" width="8" height="8"></rect><rect x="386" y="153" width="8" height="8"></rect>
+      <rect x="402" y="153" width="8" height="8"></rect><rect x="418" y="153" width="8" height="8"></rect>
+      <rect x="434" y="153" width="8" height="8"></rect><rect x="450" y="153" width="8" height="8"></rect>
+      <rect x="466" y="153" width="8" height="8"></rect><rect x="482" y="153" width="8" height="8"></rect>
+      <rect x="498" y="153" width="8" height="8"></rect><rect x="514" y="153" width="8" height="8"></rect>
+      <rect x="530" y="153" width="8" height="8"></rect><rect x="546" y="153" width="8" height="8"></rect>
+      <rect x="562" y="153" width="8" height="8"></rect><rect x="578" y="153" width="8" height="8"></rect>
+      <rect x="594" y="153" width="8" height="8"></rect>
+    </g>
+
+    <!-- chimney -->
+    <rect x="300" y="30" width="34" height="66" fill="#c9705a"></rect>
+    <rect x="300" y="30" width="12" height="66" fill="#a85a44"></rect>
+    <rect x="294" y="22" width="46" height="10" fill="#8e4223"></rect>
+    <rect x="306" y="10" width="10" height="12" fill="#6f665b"></rect>
+    <rect x="320" y="10" width="10" height="12" fill="#6f665b"></rect>
+
+    <!-- quoins up both corners -->
+    <g fill="#efe7d6">
+      <rect x="240" y="170" width="22" height="26"></rect><rect x="578" y="170" width="22" height="26"></rect>
+      <rect x="240" y="214" width="22" height="26"></rect><rect x="578" y="214" width="22" height="26"></rect>
+      <rect x="240" y="258" width="22" height="26"></rect><rect x="578" y="258" width="22" height="26"></rect>
+      <rect x="240" y="302" width="22" height="26"></rect><rect x="578" y="302" width="22" height="26"></rect>
+      <rect x="240" y="346" width="22" height="26"></rect><rect x="578" y="346" width="22" height="26"></rect>
+      <rect x="240" y="390" width="22" height="26"></rect><rect x="578" y="390" width="22" height="26"></rect>
+      <rect x="240" y="434" width="22" height="26"></rect><rect x="578" y="434" width="22" height="26"></rect>
+      <rect x="240" y="478" width="22" height="26"></rect><rect x="578" y="478" width="22" height="26"></rect>
+      <rect x="240" y="522" width="22" height="26"></rect><rect x="578" y="522" width="22" height="26"></rect>
+      <rect x="240" y="588" width="22" height="26"></rect><rect x="578" y="588" width="22" height="26"></rect>
+      <rect x="240" y="632" width="22" height="26"></rect><rect x="578" y="632" width="22" height="26"></rect>
+      <rect x="240" y="676" width="22" height="26"></rect><rect x="578" y="676" width="22" height="26"></rect>
+    </g>
+
+    <!-- SECOND FLOOR: small openings, shutters shut -->
+    <g>
+      <g transform="translate(292, 186)">
+        <rect x="-7" y="-6" width="70" height="80" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="68" fill="#333c46"></rect>
+        <rect x="0" y="0" width="27" height="68" fill="#40684a"></rect>
+        <rect x="29" y="0" width="27" height="68" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="3" y="6" width="21" height="3"></rect><rect x="3" y="14" width="21" height="3"></rect><rect x="3" y="22" width="21" height="3"></rect><rect x="3" y="30" width="21" height="3"></rect><rect x="3" y="38" width="21" height="3"></rect><rect x="3" y="46" width="21" height="3"></rect><rect x="3" y="54" width="21" height="3"></rect><rect x="32" y="6" width="21" height="3"></rect><rect x="32" y="14" width="21" height="3"></rect><rect x="32" y="22" width="21" height="3"></rect><rect x="32" y="30" width="21" height="3"></rect><rect x="32" y="38" width="21" height="3"></rect><rect x="32" y="46" width="21" height="3"></rect><rect x="32" y="54" width="21" height="3"></rect></g>
+      </g>
+      <g transform="translate(392, 186)">
+        <rect x="-7" y="-6" width="70" height="80" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="68" fill="#333c46"></rect>
+        <rect x="0" y="0" width="27" height="68" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="3" y="6" width="21" height="3"></rect><rect x="3" y="14" width="21" height="3"></rect><rect x="3" y="22" width="21" height="3"></rect><rect x="3" y="30" width="21" height="3"></rect><rect x="3" y="38" width="21" height="3"></rect><rect x="3" y="46" width="21" height="3"></rect><rect x="3" y="54" width="21" height="3"></rect></g>
+      </g>
+      <g transform="translate(492, 186)">
+        <rect x="-7" y="-6" width="70" height="80" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="68" fill="#333c46"></rect>
+        <rect x="29" y="0" width="27" height="68" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="32" y="6" width="21" height="3"></rect><rect x="32" y="14" width="21" height="3"></rect><rect x="32" y="22" width="21" height="3"></rect><rect x="32" y="30" width="21" height="3"></rect><rect x="32" y="38" width="21" height="3"></rect><rect x="32" y="46" width="21" height="3"></rect><rect x="32" y="54" width="21" height="3"></rect></g>
+      </g>
+    </g>
+
+    <!-- FIRST FLOOR -->
+    <g>
+      <g transform="translate(292, 316)">
+        <rect x="-7" y="-6" width="70" height="86" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="74" fill="#333c46"></rect>
+        <rect x="0" y="0" width="27" height="74" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="3" y="6" width="21" height="3"></rect><rect x="3" y="16" width="21" height="3"></rect><rect x="3" y="26" width="21" height="3"></rect><rect x="3" y="36" width="21" height="3"></rect><rect x="3" y="46" width="21" height="3"></rect><rect x="3" y="56" width="21" height="3"></rect><rect x="3" y="66" width="21" height="3"></rect></g>
+      </g>
+      <g transform="translate(392, 316)">
+        <rect x="-7" y="-6" width="70" height="86" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="74" fill="#333c46"></rect>
+        <rect x="29" y="0" width="27" height="74" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="32" y="6" width="21" height="3"></rect><rect x="32" y="16" width="21" height="3"></rect><rect x="32" y="26" width="21" height="3"></rect><rect x="32" y="36" width="21" height="3"></rect><rect x="32" y="46" width="21" height="3"></rect><rect x="32" y="56" width="21" height="3"></rect><rect x="32" y="66" width="21" height="3"></rect></g>
+      </g>
+      <g transform="translate(492, 316)">
+        <rect x="-7" y="-6" width="70" height="86" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="74" fill="#333c46"></rect>
+      </g>
+    </g>
+
+    <!-- PIANO NOBILE: tall doors, iron balconies -->
+    <g>
+      <g transform="translate(292, 444)">
+        <rect x="-7" y="-6" width="70" height="102" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="90" fill="#333c46"></rect>
+        <rect x="0" y="0" width="27" height="90" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="3" y="7" width="21" height="3"></rect><rect x="3" y="19" width="21" height="3"></rect><rect x="3" y="31" width="21" height="3"></rect><rect x="3" y="43" width="21" height="3"></rect><rect x="3" y="55" width="21" height="3"></rect><rect x="3" y="67" width="21" height="3"></rect><rect x="3" y="79" width="21" height="3"></rect></g>
+      </g>
+      <g transform="translate(392, 444)">
+        <rect x="-7" y="-6" width="70" height="102" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="90" fill="#333c46"></rect>
+      </g>
+      <g transform="translate(492, 444)">
+        <rect x="-7" y="-6" width="70" height="102" fill="#efe7d6"></rect>
+        <rect x="0" y="0" width="56" height="90" fill="#333c46"></rect>
+        <rect x="29" y="0" width="27" height="90" fill="#40684a"></rect>
+        <g fill="#365c40"><rect x="32" y="7" width="21" height="3"></rect><rect x="32" y="19" width="21" height="3"></rect><rect x="32" y="31" width="21" height="3"></rect><rect x="32" y="43" width="21" height="3"></rect><rect x="32" y="55" width="21" height="3"></rect><rect x="32" y="67" width="21" height="3"></rect><rect x="32" y="79" width="21" height="3"></rect></g>
+      </g>
+      <!-- balconies: stone corbel, iron rail, slim balusters, cast top rail -->
+      <g fill="#2a2724">
+        <g transform="translate(276, 534)">
+          <rect x="0" y="-2" width="88" height="5" fill="#bdb2a1"></rect>
+          <rect x="4" y="3" width="80" height="4"></rect>
+          <rect x="4" y="34" width="80" height="5"></rect>
+          <rect x="4" y="3" width="4" height="36"></rect>
+          <rect x="80" y="3" width="4" height="36"></rect>
+          <rect x="14" y="7" width="2.5" height="27"></rect><rect x="24" y="7" width="2.5" height="27"></rect>
+          <rect x="34" y="7" width="2.5" height="27"></rect><rect x="44" y="7" width="2.5" height="27"></rect>
+          <rect x="54" y="7" width="2.5" height="27"></rect><rect x="64" y="7" width="2.5" height="27"></rect>
+          <rect x="74" y="7" width="2.5" height="27"></rect>
+          <rect x="20" y="16" width="48" height="2.5"></rect>
+        </g>
+        <g transform="translate(376, 534)">
+          <rect x="0" y="-2" width="88" height="5" fill="#bdb2a1"></rect>
+          <rect x="4" y="3" width="80" height="4"></rect>
+          <rect x="4" y="34" width="80" height="5"></rect>
+          <rect x="4" y="3" width="4" height="36"></rect>
+          <rect x="80" y="3" width="4" height="36"></rect>
+          <rect x="14" y="7" width="2.5" height="27"></rect><rect x="24" y="7" width="2.5" height="27"></rect>
+          <rect x="34" y="7" width="2.5" height="27"></rect><rect x="44" y="7" width="2.5" height="27"></rect>
+          <rect x="54" y="7" width="2.5" height="27"></rect><rect x="64" y="7" width="2.5" height="27"></rect>
+          <rect x="74" y="7" width="2.5" height="27"></rect>
+          <rect x="20" y="16" width="48" height="2.5"></rect>
+        </g>
+        <g transform="translate(476, 534)">
+          <rect x="0" y="-2" width="88" height="5" fill="#bdb2a1"></rect>
+          <rect x="4" y="3" width="80" height="4"></rect>
+          <rect x="4" y="34" width="80" height="5"></rect>
+          <rect x="4" y="3" width="4" height="36"></rect>
+          <rect x="80" y="3" width="4" height="36"></rect>
+          <rect x="14" y="7" width="2.5" height="27"></rect><rect x="24" y="7" width="2.5" height="27"></rect>
+          <rect x="34" y="7" width="2.5" height="27"></rect><rect x="44" y="7" width="2.5" height="27"></rect>
+          <rect x="54" y="7" width="2.5" height="27"></rect><rect x="64" y="7" width="2.5" height="27"></rect>
+          <rect x="74" y="7" width="2.5" height="27"></rect>
+          <rect x="20" y="16" width="48" height="2.5"></rect>
+        </g>
+      </g>
+    </g>
+
+    <!-- GROUND: shopfront under an awning, and a door -->
+    <g>
+      <rect x="278" y="620" width="120" height="110" fill="#3a3630"></rect>
+      <rect x="278" y="620" width="120" height="7" fill="#4a3a2a"></rect>
+      <rect x="334" y="620" width="6" height="110" fill="#4a3a2a"></rect>
+      <polygon points="266,606 410,606 424,644 254,644" fill="#b83028"></polygon>
+      <polygon points="266,606 410,606 412,618 264,618" fill="#9c2820"></polygon>
+      <g fill="#e8ddc8">
+        <rect x="254" y="640" width="18" height="8"></rect><rect x="288" y="642" width="18" height="8"></rect>
+        <rect x="322" y="643" width="18" height="8"></rect><rect x="356" y="643" width="18" height="8"></rect>
+        <rect x="390" y="642" width="18" height="8"></rect>
+      </g>
+      <rect x="440" y="628" width="66" height="102" fill="#4a3a2a"></rect>
+      <rect x="440" y="628" width="66" height="8" fill="#efe7d6"></rect>
+      <rect x="448" y="642" width="22" height="34" fill="#333c46"></rect>
+      <rect x="476" y="642" width="22" height="34" fill="#333c46"></rect>
+      <rect x="530" y="646" width="46" height="84" fill="#333c46"></rect>
+      <rect x="530" y="646" width="46" height="6" fill="#efe7d6"></rect>
+    </g>
+
+    <!-- downpipe on the party line -->
+    <rect x="604" y="164" width="9" height="566" fill="#a89c85"></rect>
+    <g fill="#8a7f70">
+      <rect x="601" y="290" width="15" height="7"></rect>
+      <rect x="601" y="470" width="15" height="7"></rect>
+      <rect x="601" y="650" width="15" height="7"></rect>
+    </g>
+
+    <!-- ============ callouts ============ -->
+    <g stroke="#b4a894" stroke-width="1" fill="none">
+      <polyline points="320,58 660,58 682,74"></polyline>
+      <polyline points="470,120 660,120 682,132"></polyline>
+      <polyline points="560,157 660,180 682,180"></polyline>
+      <polyline points="589,258 660,252 682,252"></polyline>
+      <polyline points="560,330 660,330 682,330"></polyline>
+      <polyline points="596,417 660,408 682,408"></polyline>
+      <polyline points="613,470 660,478 682,478"></polyline>
+      <polyline points="520,470 660,548 682,548"></polyline>
+      <polyline points="520,552 660,618 682,618"></polyline>
+      <polyline points="424,644 660,688 682,688"></polyline>
+      <polyline points="560,745 660,758 682,758"></polyline>
+    </g>
+    <g fill="#a2988a" class="mono" font-size="10">
+      <text x="692" y="66">01</text><text x="692" y="124">02</text><text x="692" y="172">03</text>
+      <text x="692" y="244">04</text><text x="692" y="322">05</text><text x="692" y="400">06</text>
+      <text x="692" y="470">07</text><text x="692" y="540">08</text><text x="692" y="610">09</text>
+      <text x="692" y="680">10</text><text x="692" y="750">11</text>
+    </g>
+    <g fill="#26221e" class="san" font-size="13.5" font-weight="600">
+      <text x="722" y="66">Chimney stack</text>
+      <text x="722" y="124">Pantile roof, ridge along</text>
+      <text x="722" y="172">Dentil eaves course</text>
+      <text x="722" y="244">Corner quoins</text>
+      <text x="722" y="322">Architrave surround</text>
+      <text x="722" y="400">Louvred shutter</text>
+      <text x="722" y="470">String course</text>
+      <text x="722" y="540">Iron balcony</text>
+      <text x="722" y="610">Cill band</text>
+      <text x="722" y="680">Shopfront + awning</text>
+      <text x="722" y="750">Stone plinth</text>
+    </g>
+    <g fill="#6f665b" class="san" font-size="11.5">
+      <text x="722" y="84">Terracotta, capped, two pots.</text>
+      <text x="722" y="142">Ribs read at distance; the eave</text>
+      <text x="722" y="156">line is the strongest horizontal.</text>
+      <text x="722" y="190">Chalk teeth on a dark ground —</text>
+      <text x="722" y="204">the shadow line under the roof.</text>
+      <text x="722" y="262">Chalk blocks, both corners, every</text>
+      <text x="722" y="276">other course. Not on whitewash.</text>
+      <text x="722" y="340">Chalk band around every opening,</text>
+      <text x="722" y="354">wider at the head than the jamb.</text>
+      <text x="722" y="418">Two leaves. Shut, half or open —</text>
+      <text x="722" y="432">never the same on two neighbours.</text>
+      <text x="722" y="488">Chalk, full width, one per storey.</text>
+      <text x="722" y="558">Piano nobile only. Stone corbel,</text>
+      <text x="722" y="572">slim balusters, one mid rail.</text>
+      <text x="722" y="628">Cast lead, party line, three straps.</text>
+      <text x="722" y="698">Ground floor only, awning red,</text>
+      <text x="722" y="712">scalloped valance.</text>
+      <text x="722" y="768">Stone, to the pavement flag.</text>
+    </g>
+
+    <!-- ============ shutter state strip ============ -->
+    <g transform="translate(200, 852)">
+      <rect x="0" y="0" width="780" height="1" fill="#ddd4c4"></rect>
+      <text x="0" y="26" class="san" font-size="13" font-weight="600" fill="#26221e">Shutter states</text>
+      <text x="120" y="26" class="san" font-size="11.5" fill="#6f665b">Mixed along a run — a street where every leaf matches reads as wallpaper.</text>
+      <g transform="translate(0, 42)">
+        <g transform="translate(0, 0)">
+          <rect x="-6" y="-5" width="80" height="90" fill="#efe7d6"></rect>
+          <rect x="0" y="0" width="68" height="80" fill="#333c46"></rect>
+          <rect x="0" y="0" width="33" height="80" fill="#40684a"></rect>
+          <rect x="35" y="0" width="33" height="80" fill="#40684a"></rect>
+          <g fill="#365c40"><rect x="4" y="7" width="25" height="3.5"></rect><rect x="4" y="19" width="25" height="3.5"></rect><rect x="4" y="31" width="25" height="3.5"></rect><rect x="4" y="43" width="25" height="3.5"></rect><rect x="4" y="55" width="25" height="3.5"></rect><rect x="4" y="67" width="25" height="3.5"></rect><rect x="39" y="7" width="25" height="3.5"></rect><rect x="39" y="19" width="25" height="3.5"></rect><rect x="39" y="31" width="25" height="3.5"></rect><rect x="39" y="43" width="25" height="3.5"></rect><rect x="39" y="55" width="25" height="3.5"></rect><rect x="39" y="67" width="25" height="3.5"></rect></g>
+          <text x="0" y="102" class="mono" font-size="10.5" fill="#6f665b">shut · 38%</text>
+        </g>
+        <g transform="translate(150, 0)">
+          <rect x="-6" y="-5" width="80" height="90" fill="#efe7d6"></rect>
+          <rect x="0" y="0" width="68" height="80" fill="#333c46"></rect>
+          <rect x="0" y="0" width="33" height="80" fill="#40684a"></rect>
+          <g fill="#365c40"><rect x="4" y="7" width="25" height="3.5"></rect><rect x="4" y="19" width="25" height="3.5"></rect><rect x="4" y="31" width="25" height="3.5"></rect><rect x="4" y="43" width="25" height="3.5"></rect><rect x="4" y="55" width="25" height="3.5"></rect><rect x="4" y="67" width="25" height="3.5"></rect></g>
+          <text x="0" y="102" class="mono" font-size="10.5" fill="#6f665b">half · 34%</text>
+        </g>
+        <g transform="translate(300, 0)">
+          <rect x="-6" y="-5" width="80" height="90" fill="#efe7d6"></rect>
+          <rect x="0" y="0" width="68" height="80" fill="#333c46"></rect>
+          <text x="0" y="102" class="mono" font-size="10.5" fill="#6f665b">open · 28%</text>
+        </g>
+        <g transform="translate(450, 0)">
+          <rect x="-6" y="-5" width="80" height="90" fill="#efe7d6"></rect>
+          <rect x="0" y="0" width="68" height="80" fill="#333c46"></rect>
+          <rect x="0" y="0" width="68" height="80" fill="#2a2724" opacity="0.0"></rect>
+          <rect x="-6" y="80" width="80" height="4" fill="#2a2724"></rect>
+          <rect x="-6" y="104" width="80" height="5" fill="#2a2724"></rect>
+          <rect x="-6" y="80" width="4" height="29" fill="#2a2724"></rect>
+          <rect x="70" y="80" width="4" height="29" fill="#2a2724"></rect>
+          <g fill="#2a2724"><rect x="6" y="84" width="2.5" height="21"></rect><rect x="18" y="84" width="2.5" height="21"></rect><rect x="30" y="84" width="2.5" height="21"></rect><rect x="42" y="84" width="2.5" height="21"></rect><rect x="54" y="84" width="2.5" height="21"></rect><rect x="66" y="84" width="2.5" height="21"></rect></g>
+          <text x="0" y="128" class="mono" font-size="10.5" fill="#6f665b">open + balcony</text>
+        </g>
+      </g>
+    </g>
+  </svg>
+</div>
+</x-dc>
+</body>
+</html>
