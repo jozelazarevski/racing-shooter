@@ -15169,16 +15169,25 @@ export class Track {
       // it, and a day boat berthed on the numbers stands in a meadow with
       // its rig up. Slide seaward to the first berth with a wet swing
       // circle; a boat with no water within 80 u stays ashore (unbuilt).
+      // r437: the authored (du, dn) pairs are distances from the WATERLINE,
+      // and the waterline is no longer the a-b line -- it is that line plus
+      // the coast profile. Without this term the whole flotilla stays moored
+      // on the old straight line while the shore it belongs to has come in to
+      // the lap, which is exactly what the first r437 acceptance run measured:
+      // the sea moved and not one of the boats came with it.
+      const pushK = this._coastPushAt(du);
       let dn = BOATS[k][1], okB = false;
       for (; dn <= BOATS[k][1] + 80 && !okB; dn += 3) {
         okB = true;
-        for (const [so, no] of [[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]])
-          if (this.terrainHeight(mx + ux * (du + so) + nx * (dn + no),
-            mz + uz * (du + so) + nz * (dn + no)) > y - 0.6) { okB = false; break; }
+        for (const [so, no] of [[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]]) {
+          const q = dn + no - this._coastPushAt(du + so);
+          if (this.terrainHeight(mx + ux * (du + so) + nx * q,
+            mz + uz * (du + so) + nz * q) > y - 0.6) { okB = false; break; }
+        }
         if (okB) break;
       }
       if (!okB) continue;
-      const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
+      const bx = mx + ux * du + nx * (dn - pushK), bz = mz + uz * du + nz * (dn - pushK);
       // a rowing boat is smaller and carries no rig
       const bs = hasSail ? 0.62 + ((k * 7) % 3) * 0.05 : 0.42;
       iq.setFromAxisAngle(iup, k * 2.3);
@@ -17602,7 +17611,14 @@ export class Track {
     const nx = abz / L, nz = -abx / L;                // seaward
     const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
     const y = C.level ?? -2;
-    const P = (du, dn) => [mx + ux * du + nx * dn, mz + uz * du + nz * dn];
+    // r437: dn is measured from the WATERLINE, not from the a-b line. This
+    // function's own comments already assume that ("dn = 0 is where the sea
+    // MESH lays its first row"), and since the sea mesh now carries the coast
+    // profile, dn = 0 only stays on the water if this carries it too --
+    // otherwise the whole basin moors out on the old straight line while the
+    // shore it belongs to has moved in to the lap.
+    const P = (du, dn) => { const q = dn - this._coastPushAt(du);
+      return [mx + ux * du + nx * q, mz + uz * du + nz * q]; };
     const at = (du, dn) => { const p = P(du, dn); return new THREE.Vector3(p[0], y, p[1]); };
     // yaw maps local +Z ALONG the shore and +X seaward (the headingAt
     // convention); +PI/2 turns that so local +Z points out to sea, which is
