@@ -18608,11 +18608,46 @@ export class Track {
     // r430: the flag, not the name — see THEMES.medterrace.grove. A derived
     // theme that reached this line before got FIR CONES on its olive hills.
     const terrace = this.T.grove === 'olive';
+    // E-28 (owner, same coast frame as E-27): "the olive trees a bit more
+    // definition". Photographed at the verge first: the crown was ONE
+    // squashed sphere, so it read as a boulder — a few big plates with no
+    // silhouette to catch — over a trunk 0.20-0.34 u thick under a 3.4 u
+    // canopy, which is a pencil holding up a ball and disappears entirely.
+    //
+    // THE BUDGET SAYS HOW, NOT WHETHER. Measured on OLIVE COAST: 59,663
+    // carpet instances, 2,406,334 triangles. Every triangle added here is
+    // paid sixty thousand times, so three lobes instead of one ball is the
+    // wrong answer even though it is the obvious one. Definition comes from
+    // SHAPE AND SHADING at the same triangle count:
+    //
+    //   the crown is LOBED, not subdivided — each vertex is pushed in and out
+    //   radially by a low-frequency function of its own angle, so the ball
+    //   grows three soft masses and the notches between them. Same 9x6
+    //   sphere, same triangles, a silhouette that reads as a tree;
+    //   the trunk is SHORTER AND THICKER with a flared base, so there is
+    //   something under the canopy at eye height. Same six sides.
     const oliveDome = () => {
-      const crown = roughenC(new THREE.SphereGeometry(1.7, 9, 6), 0.20);
-      crown.scale(1, 0.72, 1); crown.translate(0, 2.7, 0);
-      const trunk = roughenC(new THREE.CylinderGeometry(0.20, 0.34, 2.4, 6), 0.12);
-      trunk.translate(0, 1.2, 0);
+      const crown = new THREE.SphereGeometry(1.7, 9, 6);
+      {
+        const P = crown.attributes.position;
+        for (let i = 0; i < P.count; i++) {
+          const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+          const r = Math.hypot(x, y, z);
+          if (r < 1e-4) continue;
+          const th = Math.atan2(z, x);              // around the trunk
+          const ph = Math.asin(THREE.MathUtils.clamp(y / r, -1, 1));  // up the crown
+          // three masses around, one flatter shoulder on top: an olive is a
+          // handful of clumps, not a dome
+          const k = 1 + 0.26 * Math.sin(th * 3 + 0.7) * Math.cos(ph * 1.4)
+            + 0.13 * Math.sin(ph * 2.6 + th);
+          P.setXYZ(i, x * k, y * k, z * k);
+        }
+        P.needsUpdate = true;
+      }
+      roughenC(crown, 0.16);                       // the old grain, on the lobes
+      crown.scale(1, 0.74, 1); crown.translate(0, 2.55, 0);
+      const trunk = roughenC(new THREE.CylinderGeometry(0.34, 0.62, 1.9, 6), 0.14);
+      trunk.translate(0, 0.95, 0);
       return [crown, trunk];
     };
     // VERGE WALL: the trees the chase camera actually lives beside — dense,

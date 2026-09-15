@@ -4171,6 +4171,55 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r436 — THE OLIVES WERE A BALL ON A PENCIL
+
+Owner, on the same coast frame as E-27: *"Also focus on the olive trees a bit
+more definition."*
+
+Photographed at the verge before touching anything, because the last two
+builds both turned on the difference between the authored value and the
+pixel. The close-up says it plainly:
+
+- the crown was **one squashed sphere**, so it read as a boulder — a handful
+  of big plates with no silhouette to catch;
+- the trunk was **0.20–0.34 u thick under a 3.4 u canopy**, a pencil holding
+  up a ball, and at eye height it simply was not there.
+
+Neither of the two things that usually explain "no definition" was the
+cause, and both were checked first: the carpet material is **already
+`flatShading: true`**, and the crown is **already a faceted 9×6 sphere**. The
+facets existed. There was just nothing for them to describe.
+
+### The budget decided how, not whether
+
+Measured on OLIVE COAST: **59,663 carpet instances, 2,406,334 triangles.**
+Every triangle added to this geometry is paid sixty thousand times, so
+"three lobes instead of one ball" is the obvious answer and the wrong one.
+Definition had to come from shape and shading at the same cost:
+
+- **the crown is lobed, not subdivided.** Each vertex is pushed in and out
+  radially by a low-frequency function of its own angle, so the same sphere
+  grows three soft masses with notches between them. An olive is a handful of
+  clumps, not a dome.
+- **the trunk is shorter, thicker and flared** — 0.34 → 0.62 at the base over
+  1.9 u — so there is something under the canopy at eye height. Same six
+  sides.
+
+**Triangle count after: 2,406,334.** Identical to the digit. The whole change
+is free.
+
+### What it looks like, and what it does not
+
+At mid distance — which is where the chase camera actually sees the verge —
+the trees now read as clumped canopies with notched silhouettes and visible
+trunks, where before they were smooth ovals. At point-blank range they stay
+chunky: that is inherent to a 9×6 sphere and no reshaping fixes it without
+spending the triangles the budget does not have.
+
+Only the olive lineage is touched. The conifer carpet (`twoCone` /
+`twoConeMid`) is a different geometry on a different branch and is unchanged,
+so nothing outside the Mediterranean worlds moves.
+
 ## r435 — THE SEA WAS THE PALEST THING ON SCREEN
 
 Owner, with a coast frame: *"Make the sea look more imposing."*
