@@ -1,0 +1,9 @@
+world                 lapKm  range  crests/km(0.6) (2.0)  maxGrade%  p95Grade%  ascent
+KARVEN CLIMB           8.49    425            0.1   0.1       18.9       13.0  ASCENT
+FALKEN RIDGE           8.60    427            0.2   0.1       17.5       13.0  ASCENT
+ROCKFALL RAVINE        8.67     14            0.8   0.6       21.0        3.5  octave amp 7
+DUST CANYON            6.15     18            1.0   0.7        9.6        6.0  octave amp 10
+EMBER PASS             5.77     19            1.4   1.2       14.1        6.5  octave amp 12
+THE HEADLANDS         11.98    500            0.1   0.1       17.1       11.1  octave amp 10
+SERPENT PASS           9.30     13            0.8   0.4        8.4        3.0  octave amp 9
+SALINE SPRINT          4.71    237            0.2   0.2       21.9       12.5  octave amp 3
