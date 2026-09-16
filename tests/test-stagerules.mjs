@@ -1,0 +1,322 @@
+/* CLAUDE.md v1.5 §11/§12 — the stage rules, as laws (r310, Phase 1).
+ *
+ *   S1  §11.1 the line lives on a straight: run-in 60 m + run-out 80 m
+ *       clear of corners under 60 m radius, on the recording-E stage, the
+ *       street reference and the canyon reference (generator rotation)
+ *   S2  §11.5/§6.6 the nitro ceiling: held boost cannot pass the stage
+ *       budget (street 160 absolute; recording E measured 205-213)
+ *   S3  §11.2 nitro pickups: per-lap cap (street 1, others 2), none
+ *       within 80 m of the line
+ *   S4  §11.3 the validator's auto-fixes hold: no live cullable
+ *       obstacle-class prop in a street corridor or a kicker landing fan
+ *   S5  §6.8 buildings are in the camera probe: parked against the
+ *       biggest structure in town, the boom does not sink inside it
+ *
+ *   node tests/test-stagerules.mjs
+ */
+import { chromium } from 'playwright-core';
+const BASE = process.env.BASE ?? 'http://localhost:8901';
+let pass = 0, fail = 0;
+const ok = (c, m, e = '') => { if (c) { pass++; console.log('PASS ', m, e); } else { fail++; console.log('FAIL ', m, e); } };
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+
+const boot = async (lvl) => {
+  const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  p.setDefaultTimeout(300000);
+  const errors = [];
+  p.on('pageerror', (e) => errors.push(String(e.message)));
+  await p.goto(`${BASE}/?level=${lvl}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 180000 });
+  await p.waitForFunction(() => window.__game?.player && window.__game.track?.center,
+    undefined, { timeout: 300000 });
+  await p.evaluate(() => {
+    const g = window.__game;
+    if (g.composer) g.composer.render = () => {};
+    let elapsed = g.clock.elapsedTime;
+    g.clock = { getDelta: () => { elapsed += 1 / 60; return 1 / 60; }, get elapsedTime() { return elapsed; } };
+    for (let k = 0; k < 900 && g.state !== 'race'; k++) { g.countdown = 0.01; g.frame(); }
+    g._frameBody();                                  // validator frame
+  });
+  return { p, errors };
+};
+
+for (const [lvl, tag] of [[59, 'CLIFF KNOT'], [74, 'IL BUDELLO'], [4, 'CANYON RUN']]) {
+  const { p, errors } = await boot(lvl);
+  const R = await p.evaluate(async () => {
+    const g = window.__game, t = g.track, N = t.center.length, pl = g.player;
+    const sampleLen = Math.max(1, Math.hypot(t.center[1].x - t.center[0].x, t.center[1].z - t.center[0].z));
+    const rad = (i) => {
+      const a = t.center[(i - 6 + N) % N], b = t.center[i % N], c = t.center[(i + 6) % N];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ac = Math.hypot(c.x - a.x, c.z - a.z);
+      return (ab * bc * ac) / (2 * Math.abs(cross));
+    };
+    let worst = 1e9;
+    const outS = Math.round(80 / sampleLen), inS = Math.round(60 / sampleLen);
+    for (let j = -inS; j <= outS; j += 3) worst = Math.min(worst, rad((j + N) % N));
+    // S2: hold the boost 6 s on the back straight
+    pl.placeAt(Math.floor(N * 0.5), 0, true);
+    const v0 = 30 / 3.6 * 3.1;
+    pl.speedAlong = v0; pl.vel.set(Math.sin(pl.heading) * v0, 0, Math.cos(pl.heading) * v0);
+    g.input.analog.throttle = 1;
+    let maxKmh = 0;
+    for (let f = 0; f < 360; f++) {
+      pl.nitro = 1; pl.boostTimer = 1;
+      g._frameBody();
+      if (!pl.airborne) maxKmh = Math.max(maxKmh, Math.hypot(pl.vel.x, pl.vel.z) * 3.1);
+    }
+    g.input.analog.throttle = 0; pl.boostTimer = 0;
+    // S3: nitro pickups
+    const guard = Math.round(80 / sampleLen);
+    const nitros = g.pickups.filter((x) => x.type === 'nitro');
+    const nearLine = nitros.filter((x) => Math.min(x.index, N - x.index) <= guard).length;
+    // S4: live cullable obstacles in street corridors / landing fans
+    const { propClassOf } = await import('./src/route.js');
+    const half = (i) => t.widthAt?.(i) ?? 9;
+    let streetLive = 0, fanLive = 0;
+    const reachS = Math.round(((g._nitroCeilU ?? 48) * 1.9) / sampleLen);
+    const fans = (t.crests ?? []).map((cr) => [
+      (cr.index + Math.round(cr.len * 0.5)) % N, Math.round(cr.len * 0.5) + reachS]);
+    const scan = (list, cullable) => {
+      for (const it of list ?? []) {
+        if (!it || it.dead || it.culled) continue;
+        if (propClassOf(it) !== 'obstacle') continue;
+        if (!cullable(it)) continue;
+        const gi = t.nearestIndex(it, null);
+        const c = t.center[gi];
+        const d = Math.hypot(it.x - c.x, it.z - c.z);
+        if (g.route.kindAtIndex(gi) === 'street' && d <= half(gi) + 12) streetLive++;
+        for (const [from, span] of fans) {
+          if ((gi - from + N) % N <= span && d <= half(gi) + 6) { fanLive++; break; }
+        }
+      }
+    };
+    scan(t.trees, (x) => !!x.parts?.length);
+    scan(t.solids, (x) => x.mat === 'stone' && x.r > 0 && x.r <= 8 && x.im && x.inst !== undefined);
+    const rep = (g._stageReport ?? []).map((v) => v.rule);
+    return { worst: Math.round(Math.min(worst, 9999)), maxKmh: +maxKmh.toFixed(0),
+      ceil: +((g._nitroCeilU ?? 0) * 3.1).toFixed(0), nitros: nitros.length,
+      nearLine, streetLive, fanLive, rep,
+      kind: (await import('./src/driving.js')).stageTemplate(g.level) };
+  });
+  const cap = R.kind === 'street' ? 1 : 2;
+  ok(R.worst >= 60, `S1 [${tag}] the line lives on a straight (run-in 60 m + run-out 80 m)`,
+    `worst radius ${R.worst} m`);
+  ok(R.maxKmh <= R.ceil + 12,
+    `S2 [${tag}] held nitro respects the stage ceiling`,
+    `${R.maxKmh} km/h vs ceiling ${R.ceil} (${R.kind})`);
+  ok(R.nitros <= cap && R.nearLine === 0,
+    `S3 [${tag}] nitro pickups: ≤${cap} per lap, none near the line`,
+    `${R.nitros} nitro pickup(s), ${R.nearLine} within 80 m of the line`);
+  ok(R.streetLive === 0 && R.fanLive === 0,
+    `S4 [${tag}] street corridors and kicker landing fans hold no cullable obstacle`,
+    `street ${R.streetLive}, fans ${R.fanLive} (validator saw: ${R.rep.join(',') || 'clean'})`);
+  ok(errors.length === 0, `[${tag}] no page errors`, errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
+// ---- S5: buildings are in the camera probe (street reference) -------------
+{
+  const { p, errors } = await boot(74);
+  const C = await p.evaluate(() => {
+    const g = window.__game, t = g.track, pl = g.player;
+    g.camMode = 3;                                  // CHASE: the low boom
+    const big = (t.solids ?? []).filter((s) => (s.r ?? 0) >= 3 && s.r <= 20 && s.y !== -9999)
+      .sort((a, b) => b.r - a.r)[0];  // building-scale: landscape cones are the terrain probe's job
+    if (!big) return { none: true };
+    // park just off the structure, nose away — the boom swings toward it
+    const ang = Math.atan2(pl.pos.z - big.z, pl.pos.x - big.x);
+    pl.placeAt(pl.trackIndex, 0, true);
+    pl.pos.set(big.x + Math.cos(ang) * (big.r + 3), pl.pos.y, big.z + Math.sin(ang) * (big.r + 3));
+    pl.heading = Math.atan2(big.x - pl.pos.x, big.z - pl.pos.z) + Math.PI;
+    pl.vel.set(0, 0, 0);
+    let worstIn = 0;
+    for (let f = 0; f < 90; f++) {
+      pl._wedgeT = 0; pl._lostT = 0; g._gateMissT = 0;
+      g.frame();
+      const cp = g.camera.position;
+      const d = Math.hypot(cp.x - big.x, cp.z - big.z);
+      const top = (big.y ?? t.terrainHeight(big.x, big.z)) + Math.min(14, big.r * 1.6);
+      if (d < big.r - 0.5 && cp.y < top) worstIn = Math.max(worstIn, big.r - d);
+    }
+    return { r: +big.r.toFixed(1), worstIn: +worstIn.toFixed(1) };
+  });
+  if (C.none) ok(false, 'S5 the street world has a structure to test against');
+  else ok(C.worstIn === 0,
+    'S5 the boom never sinks inside the biggest structure in town',
+    `structure r=${C.r}, deepest intrusion ${C.worstIn} u`);
+  ok(errors.length === 0, 'S5 no page errors', errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
+// ---- HRD: hard road rules (CLAUDE.md §7A, owner directives, r394) ---------
+// Checked on the two hairpin-dense references plus the deliberate street
+// lane. True radius comes from the circumcircle of real centreline points —
+// NEVER from t.curvature, whose 16×segLen divisor understates curvature ~3×
+// wherever the relaxation bunches stations (measured on GLACIER: the array
+// reported ZERO stations under R30 on a lap whose true minimum is 7 u).
+for (const [lvl, tag] of [[66, 'GLACIER COL'], [59, 'CLIFF KNOT'], [74, 'IL BUDELLO']]) {
+  const { p, errors } = await boot(lvl);
+  const H = await p.evaluate(() => {
+    const t = window.__game.track, N = t.center.length;
+    const rad = (i) => {
+      const a = t.center[(i - 6 + N) % N], b = t.center[i % N], c = t.center[(i + 6) % N];
+      const abx = b.x - a.x, abz = b.z - a.z, bcx = c.x - b.x, bcz = c.z - b.z;
+      const cross = abx * bcz - abz * bcx;
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ac = Math.hypot(c.x - a.x, c.z - a.z);
+      return (ab * bc * ac) / (2 * Math.abs(cross));
+    };
+    const ws = []; for (let i = 0; i < N; i++) ws.push(t.widthAt(i));
+    const wBase = [...ws].sort((a, b) => a - b)[Math.floor(N * 0.5)];
+    let wMin = 1e9, wStep = 0, hairN = 0, flareBad = 0, minR = 1e9, apexDip = 0;
+    for (let i = 0; i < N; i++) {
+      wMin = Math.min(wMin, ws[i]);
+      wStep = Math.max(wStep, Math.abs(ws[(i + 1) % N] - ws[i]));
+      const R = rad(i);
+      minR = Math.min(minR, R);
+      if (R < 25) {
+        hairN++;
+        // the flare owed here is capped by the fold law: the inner edge
+        // keeps >= 6 u of radius, so at R 16-17 the road cannot lawfully
+        // reach 1.19x base. 0.45 covers the taper limiter's shave.
+        const owed = Math.min(wBase * 1.19, Math.max(wBase, R - 6)) - 0.45;
+        if (ws[i] < owed) flareBad++;
+      }
+      // W-CURVE-01.5 (r401): SOLID APEX. At every sharp station (R <= 30)
+      // the INNER verge — the circumcenter's side, where a cutting car
+      // crosses — must be solid ground close under the road edge. A fold
+      // or pit (the pre-r394 V-seam class) reads 8-30 u here; the steepest
+      // lawful inner bank measured is 4.15 (GLACIER station 478).
+      if (R <= 30) {
+        const c = t.center[i], n = t.nrm[i], w = ws[i];
+        const a2 = t.center[(i - 6 + N) % N], c2 = t.center[(i + 6) % N];
+        const dd = 2 * (a2.x * (c.z - c2.z) + c.x * (c2.z - a2.z) + c2.x * (a2.z - c.z));
+        if (Math.abs(dd) > 1e-6) {
+          const aa = a2.x * a2.x + a2.z * a2.z, bb = c.x * c.x + c.z * c.z,
+            cc = c2.x * c2.x + c2.z * c2.z;
+          const ux = (aa * (c.z - c2.z) + bb * (c2.z - a2.z) + cc * (a2.z - c.z)) / dd;
+          const uz = (aa * (c2.x - c.x) + bb * (a2.x - c2.x) + cc * (c.x - a2.x)) / dd;
+          const sIn = Math.sign((ux - c.x) * n.x + (uz - c.z) * n.z) || 1;
+          const edgeY = c.y + (t.bankOffset ? t.bankOffset(i, w * sIn) : 0);
+          for (const d of [0.5, 1.5, 2.5, 3.5]) {
+            const x = c.x + n.x * (w + d) * sIn, z = c.z + n.z * (w + d) * sIn;
+            const g = (t._drawnGroundY ? t._drawnGroundY(x, z) : null) ?? t.terrainHeight(x, z);
+            apexDip = Math.max(apexDip, edgeY - g);
+          }
+        }
+      }
+    }
+    return { wMin: +wMin.toFixed(2), wStep: +wStep.toFixed(2), hairN, flareBad,
+      wBase: +wBase.toFixed(2), minR: +minR.toFixed(1), apexDip: +apexDip.toFixed(2) };
+  });
+  ok(H.wMin >= 3.0, `HRD-3 [${tag}] half-width floor 3.0 u`, `min ${H.wMin}`);
+  ok(H.wStep <= 0.6, `HRD-4 [${tag}] width tapers, never steps`, `max step ${H.wStep} u/station`);
+  ok(H.flareBad === 0,
+    `HRD-2 [${tag}] hairpin stations (true R<25) carry the owed flare`,
+    `${H.hairN} hairpin station(s), ${H.flareBad} under-flared, base ${H.wBase} u`);
+  ok(H.minR >= 15.5,
+    `HRD-7 [${tag}] the road never turns tighter than it is wide (R floor)`,
+    `min circumcircle R ${H.minR} u`);
+  ok(H.apexDip <= 5.0,
+    `W-CURVE-01.5 [${tag}] the apex verge is solid (inner ground close under the edge)`,
+    `worst inner-verge dip ${H.apexDip} u (steepest lawful bank measured 4.15; a fold reads 8+)`);
+  if (lvl === 66) {
+    // HRD-5/6 (owner: always a mountain on one side in steep country; no
+    // ridges/causeways). Census: at every station outside the start zone,
+    // at least one side carries ground at road level or rising within the
+    // corridor. Residue allowance 25 covers stations where ANOTHER LEG
+    // runs on the mountain side and the road-ceiling clamp rightly holds
+    // the flank down — a mountain cannot be built through a carriageway
+    // (measured 13 such stations, all beside crossing legs).
+    const M = await p.evaluate(() => {
+      const t = window.__game.track, N = t.center.length;
+      let bad = 0;
+      for (let i = 0; i < N; i++) {
+        if (t._circDist(i, 0) < 110) continue;
+        const c = t.center[i], n = t.nrm[i];
+        let okS = false;
+        for (const s of [1, -1]) {
+          for (const d of [14, 24, 38]) {
+            if (t.terrainHeight(c.x + n.x * d * s, c.z + n.z * d * s) >= c.y - 1) { okS = true; break; }
+          }
+          if (okS) break;
+        }
+        if (!okS) bad++;
+      }
+      return { bad, planned: !!t._mtnSide };
+    });
+    ok(M.planned, `HRD-5 [${tag}] the mountain-side plan exists on a MOUNTAIN world`);
+    ok(M.bad <= 25,
+      `HRD-5/6 [${tag}] every station carries rising ground on one side (no causeways)`,
+      `${M.bad} station(s) with both sides falling (crossing-leg allowance 25)`);
+  }
+  ok(errors.length === 0, `HRD [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
+// ---- W-CURVE-01.4: continuous drop-side barriers through sharp curves ------
+// At every sharp station (circumcircle over ~30u of arc <= 30) whose side
+// falls >= 2.5 u at (half+7) — the edge-rail builder's own DROP law — and
+// where a rail can lawfully stand (outside gate/jump-gorge/ford/tunnel zones
+// and clear of every carriageway), a barrier segment must lie within 8 u of
+// the rail point (the spec's gap cap). Stations with no lawful stand are the
+// apex openings the spec allows. Measured r397: worst distance 0.0 on
+// GLACIER (54 stations) and SUMMIT CLIMB (2, incl. the station 289 hole the
+// MINRUN fix closed); CLIFF KNOT and SEA CLIFF RUN have no qualifying
+// stations at all.
+for (const [lvl, tag] of [[66, 'GLACIER COL'], [6, 'SUMMIT CLIMB']]) {
+  const { p, errors } = await boot(lvl);
+  const W = await p.evaluate(() => {
+    const t = window.__game.track, N = t.center.length;
+    const KE = Math.max(3, Math.round(30 / t.segLen));
+    const radE = (i) => {
+      const a = t.center[(i - KE + N) % N], b = t.center[i % N], c = t.center[(i + KE) % N];
+      const cross = (b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x);
+      if (Math.abs(cross) < 1e-6) return 1e9;
+      return (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(c.x - b.x, c.z - b.z)
+        * Math.hypot(c.x - a.x, c.z - a.z)) / (2 * Math.abs(cross));
+    };
+    const segDist = (px, pz, q) => {
+      const dx = q.x2 - q.x1, dz = q.z2 - q.z1;
+      const L2 = dx * dx + dz * dz || 1;
+      const u = Math.max(0, Math.min(1, ((px - q.x1) * dx + (pz - q.z1) * dz) / L2));
+      return Math.hypot(px - (q.x1 + dx * u), pz - (q.z1 + dz * u));
+    };
+    let checked = 0, worst = 0; const holes = [];
+    for (let i = 0; i < N; i++) {
+      if (radE(i) > 30) continue;
+      if (t._circDist(i, 0) < 30) continue;
+      if ((t._jumpGorges ?? []).some((G) => t._circDist(i, G.i) < 40)) continue;
+      if (t.fords.some((f) => t._circDist(i, f.i) < 14)) continue;
+      if (t._tunnels.some((tu) => i >= tu.s - 6 && i <= tu.e + 6)) continue;
+      const half = t.widthAt(i);
+      for (const s of [1, -1]) {
+        const out = t.pointAt(i, (half + 7.0) * s);
+        if (t.center[i].y - t.terrainHeight(out.x, out.z) < 2.5) continue;
+        const pr = t.pointAt(i, (half + 1.8) * s);
+        const tg = t.tan[i];
+        const okStand = [[0, 0], [tg.x * 2.4, tg.z * 2.4], [-tg.x * 2.4, -tg.z * 2.4]]
+          .every(([ox, oz]) => t._distToTrack(pr.x + ox, pr.z + oz) >= half + 0.25);
+        if (!okStand) continue;
+        checked++;
+        let best = 1e9;
+        for (const q of t.barriers) best = Math.min(best, segDist(pr.x, pr.z, q));
+        if (best > worst) worst = best;
+        if (best > 8) holes.push(i);
+      }
+    }
+    return { checked, worst: +worst.toFixed(1), holes: holes.length };
+  });
+  ok(W.holes === 0,
+    `W-CURVE-01.4 [${tag}] sharp drop curves carry a barrier within 8 u`,
+    `${W.checked} station-side(s) checked, worst distance ${W.worst} u, ${W.holes} hole(s)`);
+  ok(errors.length === 0, `W-CURVE [${tag}] no page errors`, errors.slice(0, 3).join(' | '));
+  await p.close();
+}
+
+await browser.close();
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
