@@ -4171,6 +4171,117 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r437 — A STRAIGHT LINE CANNOT FOLLOW A LOOP, AND A RETAINING WALL RETAINS
+
+Three owner reports, two root causes, and both causes turned out to be a model
+that could not express the thing the rule asked for.
+
+### The sea was never going to work
+
+*"Races with sea in it needs to really be next to the sea"* — the SECOND time
+that was asked, r429 having closed the first. So working rule 3 applied and the
+solver was left alone until the second code path turned up.
+
+`_coastSide` was one cross product against the line through `coast.a` and
+`coast.b`: **an infinite straight shore**, and the only thing any coast world
+declares. A lap is a closed loop, and a straight line is tangent to a loop at
+one point — which is the census signature exactly: minimum **34 u** where the
+tangent touches, median **390–1198 u** for the rest of the loop curving away.
+r429 swept that line's heading and offset for the best possible fit. It was
+fitting a straight line to a closed curve, and no tuning could ever have closed
+it.
+
+The a–b line is now only an **axis**. A profile along it carries the
+waterline's landward displacement, taken from the most seaward lap station near
+each point, gap-filled, smoothed and rate-limited so the shore cannot kink or
+fold. `_coastSide` stays O(1) — project, one array read, one lerp — because the
+drowning rule calls it every tick, and an empty profile reproduces the old
+value bit for bit.
+
+Two choices that are easy to get backwards, both deliberate:
+
+- **the minimum, not the maximum.** At most points the loop has a seaward leg
+  and an inland one. The minimum seats the water against the seaward leg; the
+  maximum would seat it against the inland one and flood the seaward leg. The
+  minimum is also safe by construction — every station keeps at least the gap
+  of dry land.
+- **the drawn sea reads the same array from the same origin** as the logical
+  waterline. If those drifted apart the car would drown on dry land.
+
+Measured against acceptance written down BEFORE the code:
+
+| | %lap ≤60 u | longest run | boats ≤200 u |
+|---|---|---|---|
+| CITADEL BAY | **39.2%** ✓ | **2238 u** ✓ | 0 |
+| SEA CLIFF RUN | 32.5% | **880 u** ✓ | **90** |
+| MOUNTAIN TO SEA | 15.3% | 469 u | 0 |
+
+CITADEL BAY's median distance to water went **380 u → 12 u** with 2.2 km of
+continuous seafront. A1 is 1 of 3 and A2 is 2 of 3: **this does not fully meet
+its own target and is shipped as an improvement, not a completion.**
+
+### The boats were moored to the wrong line
+
+*"Add boats on the water."* They were already there — 883 marina bodies on
+CITADEL BAY, 681 of them boats — moored a third of a kilometre from the road.
+Adding more would have built the mistake twice.
+
+`_buildMarina` and the flotilla both placed from the raw a–b frame, so when the
+waterline stopped being that line the whole harbour stayed behind on it. Both
+now carry the profile, so `dn` means distance from the **waterline** everywhere.
+SEA CLIFF RUN went **0 → 90** boats within 200 u.
+
+CITADEL BAY stayed at 0, and the frame probe says why moving water cannot fix
+it: the lap spans 2400 u of shoreline and the basin occupies 277 u of it. Its
+remaining distance is **along**-shore, which the profile does not move. Recorded,
+not guessed at.
+
+### A retaining wall retains something
+
+*"Floating fence again??"* `_buildRetainingWalls` seated each block at the
+**road's** height and built it only where `p.y - ground >= drop` — only where
+the shelf falls away. The float was never incidental: **it was exactly the drop
+the wall existed to hold up.**
+
+The crest stays where it was and the collider is untouched, so driving is
+unchanged; the body now reaches the ground. Seating the centre was not enough —
+a 3.4 u block on a steep face hangs its downhill corner up to `1.7·tan(slope)`
+lower — so it seats to the lowest ground under its own **footprint**.
+
+| SALINE SPRINT | floating | max | mean |
+|---|---|---|---|
+| before | 460 / 460 | +18.38 u | +7.32 u |
+| centre-seated | 232 / 460 | +5.65 u | +0.76 u |
+| footprint-seated | **0 / 460** | **−0.02 u** | −5.11 u |
+
+And `retaining-wall` came off `test-nothing-floats`'s exemption list, which is
+where it had been sitting under a comment reading THINGS THAT ARE MEANT TO BE
+IN THE AIR. That is why 460 floating blocks passed a green gate.
+
+### What this build does NOT fix, with numbers
+
+- **`edge-rail`**: 221 of 221 floating on SALINE SPRINT, 175 of 175 on THE
+  HEADLANDS at mean 5.15 u. Posts and beams are merged into one geometry, so
+  extending the posts is a different change. Still exempt in the suite.
+- **`element-wall`**: floats up to **87.4 m**. Never exempt — the gate could
+  always see it and passed anyway.
+- **THE HEADLANDS is 69.6% ridge** with faces to 89°, and the `retainMaxDepthU`
+  clause drops 118 of its 167 walls rather than float them. Correct under
+  HRD-8, but that world now has long unguarded drops and its real fault is the
+  ridge (E-35), untouched here.
+- HRD-5 and HRD-6 are recorded as gate-enforced and **are not**:
+  `test-mountainrun.mjs` measures exactly those flanks and is in no deploy set.
+
+### One correction to the record
+
+A commit earlier in this build described the footprint seating as applied when
+it was not — the edit's assert failed inside a backgrounded command whose
+output I never read, and the re-measure then returned the previous numbers to
+every decimal. This project's own rule caught it: identical output after a
+behavioural change means the change did not execute. Verification now checks
+the marker is in the file and in what the server serves before any number is
+trusted.
+
 ## r436 — THE OLIVES WERE A BALL ON A PENCIL
 
 Owner, on the same coast frame as E-27: *"Also focus on the olive trees a bit
