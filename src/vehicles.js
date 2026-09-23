@@ -2263,7 +2263,6 @@ export class Car {
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     let vf = this.vel.dot(fwd);
     let vl = this.vel.dot(side);
-    const sliding = Math.abs(vl) > 5.5;
 
     const boosting = this.boostTimer > 0;
     if (boosting) this.boostTimer -= dt;
@@ -2436,7 +2435,7 @@ export class Car {
       slope = offRoad ? terrGrade : (this.game.track.slopeAt?.(this.trackIndex) ?? 0);
       if (slope !== 0) vf -= GRADE * slope * dt;
     }
-    // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
+    // drag (rough going adds a bit off-road)
     // TWO DRAGS, NOT ONE (r288): the 0.55/s coefficient is really the
     // hidden top-speed governor — thrust equals drag at ~62 u/s — and it
     // stays, but only UNDER POWER, where it is invisible. On a lifted
@@ -2454,6 +2453,21 @@ export class Car {
     // rivals together, PINE's crests to 1 launch, GLACIER COL's control
     // from 6 to 1. This restores the average the tuning assumed; the top
     // speed itself is clamped at vCap, so only mid-range punch returns.
+    // ...AND THE EASE THE NOTE ABOVE DESCRIBES IS NOW GONE. r293's adoption
+    // of DRIVING_SPEC.md §6/12.1 dropped drag 0.50 -> dragPower 0.122 /
+    // dragCoast 0.14, both far under the 0.40 ceiling, so the old
+    // `sliding ? Math.min(0.40, dragK) : dragK` had two arithmetically
+    // identical arms: Math.min(0.40, 0.122) is 0.122 and Math.min(0.40,
+    // 0.14) is 0.14, on every path, since nothing else writes dragK and
+    // driving.json:5-6 overrides to the same pair. It was the one branch
+    // `sliding` fed, so that local went with it. (The suite comments at
+    // tests/test-goat.mjs:479 and tests/test-jumps.mjs:159 still blame low
+    // ambient slip for the ease being absent; since r293 it did nothing even
+    // when the car WAS sliding.) Not revived as a dragK multiplier either:
+    // r379 ("DRIFTS COST SPEED") named this 0.40 ease as one of the three
+    // reasons drifts were free, alongside driftReward handing half the
+    // scrub back — a drift pays driftForwardScrub below now, and drag is
+    // throttle-and-surface only.
     const dragK = inputs.throttle > 0.05 ? DRIVING.dragPower : DRIVING.dragCoast;
     // MEADOW TOURING (r292, from the player's alpine photo): in FREE ROAM
     // the off-road drag halves — a safari car wandering a high meadow
@@ -2465,7 +2479,7 @@ export class Car {
     // (drag - 1)/0.35 ratio; blended over the same 0.4 s as everything else.
     const offDrag = (this.game.freeRoam ? DRIVING.dragOffRoadRoam : DRIVING.dragOffRoad)
       * ((row9.drag - 1) / 0.35) * offB;
-    vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + offDrag) * dt;
+    vf -= vf * (dragK + offDrag) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
     // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
@@ -5609,10 +5623,26 @@ export class EnemyCar extends Car {
         }
       }
     }
-    // defense: leading the player with them tucked within ~10u at pace ->
-    // ONE deliberate line move onto their side. Committed once, held ~1.4s,
+    // defense: leading the car behind — player or rival, whoever the chaser
+    // scan above picked — with them tucked within ~10u at pace -> ONE
+    // deliberate line move onto THEIR side. Committed once, held ~1.4s,
     // and not re-armed until a corner passes — readable blocking, never
     // weaving, and only at speed (never engaged below 70% pace).
+    //
+    // The committed lane used to read `g.player.lateral` while every gate
+    // around it already read `chaser` — the un-generalised half of the edit
+    // that added the scan, and this wording is what hid it. Since the player
+    // is behind a rival only 0.5-2.1% of frames (measured above), nearly
+    // every firing stored an unrelated car's lane: a defender at +1.0 with a
+    // rival attacking from +2.5 committed to -5.0 because that is where the
+    // player sat 400 m up the lap — 7.5u away from the car it was triggered
+    // to cover, on a carriageway 7.4u half-wide, handing the attacker the
+    // inside. An unmotivated 1.4 s swerve that defends nothing. `chaser`
+    // is the car actually attacking, and it is the same number as before in
+    // the case the line was written for (chaser === g.player), so a chased
+    // player sees no change. Keep the ±7: `lateral` is unbounded off-road,
+    // so a rival that has speared into the scenery must not drag the steer
+    // target off the road before latLim below reins it in.
     if (this._blockT > 0) {
       this._blockT -= dt;
       targetLat = THREE.MathUtils.lerp(targetLat, this._blockLat, 0.85);
@@ -5635,7 +5665,7 @@ export class EnemyCar extends Car {
         if (c < CORNER_CURV) {
           this._blockUsed = true;
           this._blockT = 1.4;
-          this._blockLat = THREE.MathUtils.clamp(g.player.lateral, -7, 7);
+          this._blockLat = THREE.MathUtils.clamp(chaser.lateral, -7, 7);
         }
       }
     }

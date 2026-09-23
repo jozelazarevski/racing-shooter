@@ -5335,13 +5335,36 @@ THEMES.savanna = {
  *  Everything textures.js hands out is freshly made per call, so it belongs to
  *  the world that asked for it — the sole exception is the memoised contact
  *  shadow, which tags itself `userData.shared` and is left alone. Geometry can
- *  opt out the same way. */
+ *  opt out the same way — or, for anything that is ever `clone()`d, by joining
+ *  `SHARED_ASSETS` below, which a clone cannot inherit. */
+
+/** The module-level singletons a world BORROWS and must not free: the prop
+ *  geometry/material cache (`propAssets`) and the shared gable prism. They
+ *  hang off `this.group` like everything else, so `disposeSubtree` was walking
+ *  straight into them on every level swap — ~45 KB of primitives plus the
+ *  crate (128x128) and cone (64x64) canvases, ~155 KB re-uploaded per swap for
+ *  nothing. `Track.dispose`'s own docstring claimed they were "deliberately
+ *  left alone"; they were not, because the opt-out the docstring advertises was
+ *  never taken. The repo has been bitten by this class twice from the other
+ *  side (HANDOVER.md 1194-1205, 2679-2684: disposing one bay car's shared
+ *  light material blanked every car's headlights), so the exclusion is the
+ *  established rule and this is the cache that never got it.
+ *
+ *  A WeakSet, NOT `userData.shared`: three r160's Material.copy and
+ *  BufferGeometry.copy both do `userData = JSON.parse(JSON.stringify(...))`,
+ *  so a tag would be inherited by `_makeProp`'s `base.clone()` night-tape
+ *  materials (and by `gablePrismGeo().clone()`), making those per-Track copies
+ *  and their un-memoised emissive maps permanently undisposable — an unbounded
+ *  leak traded for a bounded re-upload. A clone is a new object, so it is not
+ *  in this set. */
+export const SHARED_ASSETS = new WeakSet();
+
 export function disposeSubtree(root) {
   if (!root) return;
   const geos = new Set(), mats = new Set();
   const freeTex = (t) => { if (t && t.isTexture && !t.userData?.shared) t.dispose(); };
   const freeMat = (m) => {
-    if (!m || mats.has(m) || m.userData?.shared) return;
+    if (!m || mats.has(m) || m.userData?.shared || SHARED_ASSETS.has(m)) return;
     mats.add(m);
     for (const k of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap',
       'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'lightMap', 'envMap']) freeTex(m[k]);
@@ -5349,7 +5372,9 @@ export function disposeSubtree(root) {
   };
   root.traverse((o) => {
     const g = o.geometry;
-    if (g && !geos.has(g) && !g.userData?.shared) { geos.add(g); g.dispose(); }
+    if (g && !geos.has(g) && !g.userData?.shared && !SHARED_ASSETS.has(g)) {
+      geos.add(g); g.dispose();
+    }
     const m = o.material;
     if (Array.isArray(m)) m.forEach(freeMat); else freeMat(m);
   });
@@ -6764,6 +6789,9 @@ function gablePrismGeo() {
   PRISM_GEO.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   PRISM_GEO.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   PRISM_GEO.computeVertexNormals();
+  // borrowed by every world, freed by none: parented un-cloned at the roof
+  // sites below, so disposeSubtree would otherwise take it down with the world
+  SHARED_ASSETS.add(PRISM_GEO);
   return PRISM_GEO;
 }
 
@@ -6852,6 +6880,10 @@ function propAssets() {
       pengOrange: new THREE.MeshStandardMaterial({ color: 0xe8862e, roughness: 0.8 }),
     },
   };
+  // the cache is built once and handed to every world after it, so nothing
+  // here belongs to the world that happens to be tearing down
+  for (const g of Object.values(PROP_ASSETS.geo)) SHARED_ASSETS.add(g);
+  for (const m of Object.values(PROP_ASSETS.mat)) SHARED_ASSETS.add(m);
   return PROP_ASSETS;
 }
 
@@ -13964,9 +13996,38 @@ export class Track {
         // The two ground functions were checked against each other before this
         // was blamed on them: _terrainMeshHeight and terrainHeight return
         // identical values here, max difference 0 over 25 samples.
+        //
+        // THAT PROBE WAS WALKING THE WRONG AXIS. It stepped (cos h, -sin h)
+        // * 1.7, which is `nrm` itself -- headingAt is atan2(tan.x, tan.z)
+        // and nrm is (tan.z, -tan.x) -- so it sampled 1.7 u ACROSS the road,
+        // along the 0.9 u thin axis whose half-width is 0.45, and never once
+        // along the 3.4 u long axis it was written for. (The quaternion above
+        // sends local +X to -(sin h, cos h), the tangent; `_barrier` below
+        // declares the same direction for its segment.) Both halves of the
+        // bug bite: on the laterally falling shelf this builder only ever
+        // builds on, the outboard sample reads 1.7*tan(lat) low where the
+        // true footprint minimum is 0.45*tan(lat) low, so on a 40-degree face
+        // off a 3.0 u drop `need` came out 5.38 instead of 4.33 -- 1.05 u,
+        // 24%, of body stretched into solid hillside, and the `need > 26` cap
+        // below spuriously dropped walls whose true need was inside it; while
+        // the downhill END on a longitudinal grade, the 232-instance residue
+        // this whole block exists to kill, was still never sampled at all
+        // (0.34 u at a 20% grade, 1.7 u at 45 degrees). So probe the four
+        // corners the footprint actually has: long axis the TANGENT
+        // (sin h, cos h) at half 1.7, thin axis the NORMAL (cos h, -sin h) at
+        // half 0.45. Every sample is now a point the block actually stands on,
+        // so `ground` moves both ways and both ways are right: up on a
+        // laterally falling shelf (less body buried) and down on a
+        // longitudinal grade (the hanging end finally seated). Nothing can
+        // float that did not float before, because the old pair sampled
+        // ground the footprint never reached.
         const hdF = this.headingAt(i);
-        const fxF = Math.cos(hdF) * 1.7, fzF = -Math.sin(hdF) * 1.7;
-        for (const [ox, oz] of [[fxF, fzF], [-fxF, -fzF]]) {
+        const sF = Math.sin(hdF) * 1.7, cF = Math.cos(hdF) * 1.7;
+        const snF = Math.sin(hdF) * 0.45, cnF = Math.cos(hdF) * 0.45;
+        for (const [ox, oz] of [
+          [sF + cnF, cF - snF], [sF - cnF, cF + snF],
+          [-sF + cnF, -cF - snF], [-sF - cnF, -cF + snF],
+        ]) {
           const g2 = this._terrainMeshHeight(p.x + ox, p.z + oz);
           if (Number.isFinite(g2) && g2 < ground) ground = g2;
         }
@@ -15158,7 +15219,14 @@ export class Track {
         const du = -HALF * 0.35 + (HALF * 0.7 * c2) / segs;
         const wig = Math.sin(c2 * 1.7) * 2.2;
         for (let e = 0; e < 2; e++) {
-          const dd = dn + wig * 0.3 + e * w;
+          // r437: `dn` is distance from the WATERLINE, so the ribbon has to
+          // carry the coast profile the sea grid above carries. Laid on the
+          // raw a-b line it sat `push` units out to sea: on CITADEL BAY the
+          // profile runs ~368 u over the bulk of the axis (RALLY_RULES.md
+          // E-31 recorded median distance to water 380 u -> 12 u), so the one
+          // bright beach ribbon floated a third of a kilometre offshore while
+          // the shore it belongs to read as a hard sea/land edge.
+          const dd = dn + wig * 0.3 + e * w - this._coastPushAt(du);
           const o = (c2 * 2 + e) * 3;
           fverts[o] = mx + ux * du + nx * dd;
           fverts[o + 1] = y + 0.06;
@@ -15443,16 +15511,27 @@ export class Track {
       foamCol.setRGB(1, 1, 1).lerp(seaTint, fade);
       crest.setColorAt(ck2++, foamCol);
     };
+    // r437: bands (a)-(c) are distances from the WATERLINE and must carry the
+    // coast profile, the same term the sea grid, the flotilla and the marina
+    // carry. Without it band (b) - labelled "patches at the drawn shore" -
+    // was laid on the raw a-b line, i.e. ~push units seaward of the row the
+    // grid actually draws the shore at (~368 u on CITADEL BAY), so the drawn
+    // beach had no surf on it at all and every dash sat in open water.
+    // The term belongs at the CALL SITES, not inside `dash`: band (d)'s rings
+    // take their centres from the un-pushed ISLES table and `srTaken`, whose
+    // coordinates also feed `_clearsRoad` and the `dn <= 24` solids grade
+    // gate and so have to stay put, and pushing `dash` wholesale would slide
+    // every surf ring off the rock it circles.
     // (a) open-bay drift dashes - as before
     for (let k = 0; k < 90; k++) {
-      dash((Math.sin(k * 12.9898) * 0.5 + 0.5) * 1400 - 700,
-        14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300,
+      const du = (Math.sin(k * 12.9898) * 0.5 + 0.5) * 1400 - 700;
+      dash(du, 14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300 - this._coastPushAt(du),
         Math.sin(k * 3.7) * 0.3, 1, 1, 0.25);
     }
     // (b) the waterline band: broken foam patches at the drawn shore
     for (let k = 0; k < 170; k++) {
       const du = -700 + k * (1400 / 170) + Math.sin(k * 7.31) * 3;
-      dash(du, 1.5 + (Math.sin(k * 12.9898) * 0.5 + 0.5) * 3.5,
+      dash(du, 1.5 + (Math.sin(k * 12.9898) * 0.5 + 0.5) * 3.5 - this._coastPushAt(du),
         Math.sin(k * 5.1) * 0.25,
         0.5 + (Math.sin(k * 3.3) * 0.5 + 0.5) * 1.1,
         1.2 + (Math.sin(k * 9.7) * 0.5 + 0.5) * 2.0,
@@ -15461,7 +15540,7 @@ export class Track {
     // (c) the outer break line, dimmer
     for (let k = 0; k < 110; k++) {
       const du = -700 + k * (1400 / 110) + Math.sin(k * 4.7) * 5;
-      dash(du, 7 + (Math.sin(k * 6.9) * 0.5 + 0.5) * 7,
+      dash(du, 7 + (Math.sin(k * 6.9) * 0.5 + 0.5) * 7 - this._coastPushAt(du),
         Math.sin(k * 8.3) * 0.3, 0.8, 1.4, 0.35 + (Math.sin(k * 3.1) * 0.5 + 0.5) * 0.15);
     }
     // (d) surf rings around every isle and sea rock
@@ -29507,9 +29586,13 @@ export class Track {
    *  geometries and textures are NOT garbage collected on their own, and a
    *  player hopping between tracks would otherwise leak a world each time.
    *
-   *  Shared module-level assets (the prop geometry cache, the texture makers'
-   *  memoised canvases) are deliberately left alone: they are reused by the
-   *  next world and disposing them would cost a rebuild for nothing. */
+   *  Shared module-level assets (the prop geometry/material cache, the gable
+   *  prism, the texture makers' memoised canvases) are left alone: they are
+   *  reused by the next world and disposing them would cost a rebuild for
+   *  nothing. That is enforced, not assumed — `SHARED_ASSETS` and
+   *  `userData.shared` are the two opt-outs `disposeSubtree` honours. This
+   *  paragraph used to assert it while the walk was in fact freeing the prop
+   *  cache on every swap. */
   dispose() {
     disposeSubtree(this.group);
     this.scene.remove(this.group);

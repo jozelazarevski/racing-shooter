@@ -12153,9 +12153,16 @@ class Game {
       }
       if (rim > p.pos.y + 8) gorgeLift = Math.min(30, rim - p.pos.y - 8);
     }
+    // One expression for how far above the car this mode asks to sit, because
+    // the MAX_UP cap far below has to allow exactly what this asks for and
+    // nothing here can be named down there: the terrain branch shadows `lift`
+    // with the sightline probe's own lift, so the cap was rebuilt by hand and
+    // drifted. Computed here, while the cliff lift and the speed rise are
+    // still in scope, both sites read the same number by construction.
+    const anchorUp = gorgeLift + (M.h || 0) + lift + speedZoom * (M.spdH || 0);
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
-      .add(new THREE.Vector3(0, gorgeLift + M.h + lift + speedZoom * (M.spdH || 0), 0));
+      .add(new THREE.Vector3(0, anchorUp, 0));
     const targetLook = p.pos.clone()
       .addScaledVector(fwd, M.look)
       .add(new THREE.Vector3(0, M.lookH || 0, 0));
@@ -12521,7 +12528,24 @@ class Game {
       // the overhead anchor rides the rim, so the allowance carries it —
       // without this the cap clipped the camera right back into the slot
       // (measured: target 54.8, capped to 27.3, wall interiors again).
-      const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift
+      // ...AND SO IS EVERY OTHER ANCHOR TERM. Carrying only `M.h + gorgeLift`
+      // left the allowance a hand-copy of `targetPos` that had fallen behind
+      // it twice over, and `lift` here is the sightline probe's lift, not the
+      // cliff lift, so the missing term could not even be spelled at this
+      // line. Measured: TRAIL on CANYON RUN (h 26, cliffLift 11, spdH 6)
+      // asked for car+37 at rest and car+43 at pace and was pinned at
+      // car+26.5, so the 11 u rise cliffLift exists to deliver arrived as
+      // 0.5 and the mode was still eating rock faces; TOP-DOWN, the default
+      // view on every world, asked for car+54 at pace against a cap of 46.5,
+      // i.e. 1.011x of its height where §6.4 specifies 1.0x to 1.35x. The
+      // recorded post-r170 heights (46.5 / 72.5 / 26.5) are all exactly
+      // `h + 0.5` — the camera was sitting AT the cap, not at its anchor.
+      // `anchorUp` is that anchor, so the cap allows what the mode asked for
+      // and no more; it already includes gorgeLift, which is therefore gone
+      // from here rather than counted twice. The ternary still grants the
+      // probe lift its own room, and the 13 u floor still keeps the chase
+      // family on the behaviour it was tuned with.
+      const MAX_UP = Math.max(13, anchorUp
         + (lift > 0 || liftHard > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
