@@ -281,7 +281,18 @@ export class Chopper {
     g.shake = Math.min(1, (g.shake ?? 0) + 0.35);
     if (g.buzz) g.buzz(40);
     g.onChopperKill?.(this); // lead pays out the kill reward here
-    // full mesh cleanup — the wreck doesn't linger
+    this.despawn();          // full mesh cleanup — the wreck doesn't linger
+  }
+
+  /** Take the gunship out of the world: off the graph, geometry and materials
+   *  freed. `_die` ends with this, and so must every SILENT removal — the
+   *  SURVIVOR redeploy, the mission debrief and the race restart. Those three
+   *  used `scene.remove(c.mesh)`, which is a no-op: the mesh is parented to
+   *  `worldLayer` by the constructor above, so every silently-retired chopper
+   *  stayed hanging in the sky, still drawn, until the next level teardown. */
+  despawn() {
+    this.alive = false;
+    if (!this.mesh) return;
     this.mesh.parent?.remove(this.mesh);   // remove from wherever it actually is
     this.mesh.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
@@ -290,5 +301,6 @@ export class Chopper {
         else o.material.dispose();
       }
     });
+    this.mesh = null;
   }
 }

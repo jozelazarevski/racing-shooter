@@ -1992,17 +1992,36 @@ export class Car {
     }
     if (offRoad && !this.airborne) {
       const tk = this.game.track;
-      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
       if (tk?.terrainHeight) {
-        // Below walking pace the velocity direction is noise, and the old
-        // `v2h > 1` guard simply skipped the sample — so a car crawling up
-        // a 55° face read grade 0, felt NO gravity, got its drive back and
-        // CREPT to any summit at 1 u/s (measured, slopeprobe.mjs — the
-        // recording-A wall climb's quiet enabler). The car still FACES
-        // somewhere: at a crawl the grade reads along the heading.
-        const slow = v2h <= 1;
-        const dirx = slow ? Math.sin(this.heading) : this.vel.x / Math.sqrt(v2h);
-        const dirz = slow ? Math.cos(this.heading) : this.vel.z / Math.sqrt(v2h);
+        // A much older revision skipped this sample entirely below walking
+        // pace (a `v2h > 1` guard), so a car crawling up a 55° face read
+        // grade 0, felt NO gravity, got its drive back and CREPT to any
+        // summit at 1 u/s (measured, slopeprobe.mjs — the recording-A wall
+        // climb's quiet enabler). The car still FACES somewhere, so the grade
+        // is read along the heading, and that holds at every speed:
+        //
+        // ALONG THE HEADING, ALWAYS — never along the travel direction.
+        // `terrGrade` feeds `vf -= GRADE * slope * dt`, and `vf` is the
+        // component of velocity on the FORWARD axis, so the grade must be the
+        // one the nose points up: gravity's pull along that axis is fixed by
+        // the car's attitude and does not care which way it happens to be
+        // moving. That is exactly what the on-road branch supplies — the
+        // comment on that line calls terrGrade "the same quantity slopeAt
+        // reports for the road", and slopeAt is a world-space tangent grade,
+        // independent of travel.
+        //
+        // Sampling along velocity above 1 u/s broke that equivalence at the
+        // crossover: whenever the car moved backwards (reverse gear, or a
+        // stalled climb starting to slide back) the sample was taken on the
+        // opposite side and terrGrade came back NEGATED, so gravity pushed the
+        // car further up the hill instead of down it. A car parked nose-up on
+        // a bank also chattered around 1 u/s forever, because the term flipped
+        // from "slide down" to "brake the descent" the moment it got moving —
+        // the hang that the r330 far-off-road body-push was bolted on to hide,
+        // and which that push never covered inside the rejoin band.
+        // Sampling the heading also drops the /sqrt(v2h) NaN at a dead stop.
+        const dirx = Math.sin(this.heading);
+        const dirz = Math.cos(this.heading);
         const LOOK = 4;
         const h0 = tk.terrainHeight(this.pos.x, this.pos.z);
         terrGrade = THREE.MathUtils.clamp(

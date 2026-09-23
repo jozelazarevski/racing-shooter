@@ -2092,7 +2092,7 @@ class Game {
       chip.addEventListener('click', () => {
         this.steerSetting = id;
         localStorage.setItem('ir-steer', id);
-        this.applyUpgrades();
+        this._applyControlSettings();   // NOT applyUpgrades: see that method
         applySteerChips();
       });
       ssel.appendChild(chip);
@@ -2149,7 +2149,7 @@ class Game {
       const ids = STEERS.map(([i]) => i);
       this.steerSetting = ids[(ids.indexOf(this.steerSetting) + 1) % ids.length];
       localStorage.setItem('ir-steer', this.steerSetting);
-      this.applyUpgrades();
+      this._applyControlSettings();     // NOT applyUpgrades: see that method
       applySteerChips();
       this.hud.feed(`STEERING: ${this.steerSetting.toUpperCase()}`, 'info');
     });
@@ -2175,7 +2175,7 @@ class Game {
       chip.addEventListener('click', () => {
         this.assistSetting = id;
         localStorage.setItem('ir-assist', id);
-        this.applyUpgrades();
+        this._applyControlSettings();   // NOT applyUpgrades: see that method
         applyAidChips();
       });
       asel.appendChild(chip);
@@ -5102,8 +5102,7 @@ class Game {
     p.gripBoost = (1 + 0.04 * (g.tires || 0)) * eng.grip;
     p.downforce = wing.down || 0;
     p.damperLvl = g.dampers || 0;                // read by Car.onLand
-    p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
-    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
+    this._applyControlSettings();
     // ...AND THE CAR LOOKS LIKE WHAT YOU BOUGHT. Every upgrade until now was
     // an invisible multiplier: a fully built machine was identical to the one
     // on the forecourt, so the money had nothing to show for itself. Rebuilt
@@ -5111,6 +5110,22 @@ class Game {
     // one place that reads the garage row, so the mesh cannot drift from the
     // numbers.
     applyUpgradeKit(p.mesh, g, { engine: eng, spoiler: wing });
+  }
+
+  /** The two SETTINGS the pause menu can change without leaving the race:
+   *  steering weight and driving aid. Split out of applyUpgrades() because the
+   *  pause-menu handlers used to call that whole method just to push these two
+   *  fields, and applyUpgrades() is a BETWEEN-RACES rebuild — it full-heals the
+   *  car (`p.health = p.maxHealth`) and rebuilds every stat from the garage row,
+   *  which by its own docstring is how the per-race kit penalties get reverted
+   *  "on the next one". Run mid-race from the pause menu it did both: three taps
+   *  on STEERING repaired a wrecked hull for free and handed back the grip, gun,
+   *  nitro, top end and dampers the world had taken for an unmet feat. */
+  _applyControlSettings() {
+    const p = this.player;
+    if (!p) return;
+    p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
+    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }
 
   /** RACE FOR THE PART, ANNOUNCED. The locks read live career data, so a part
@@ -8481,7 +8496,10 @@ class Game {
       s.spr.position.y = s.y + 2.2 + Math.sin(time * 2 + s.x) * 0.5;
       if (Game._segDist2(from.x, from.z, p.pos.x, p.pos.z, s.x, s.z) < 16) {
         s.got = true;
-        this.scene.remove(s.spr);
+        // parent, not scene: the star sprites are added to worldLayer, so
+        // scene.remove was a no-op and a collected star kept glowing on the
+        // spot for the rest of the session — including the summit star.
+        s.spr.parent?.remove(s.spr);
         if (this.missionMode) { this._missionEvent('star', s); continue; } // [MISSIONS]
         if (s.summit) {
           this.score += 600;
@@ -8996,7 +9014,7 @@ class Game {
             if (d2 > fd) { fd = d2; far = c; }
           }
           // silent removal, NOT a kill — no score, no hull patch, no feed line
-          if (far) { far.alive = false; this.scene.remove(far.mesh); }
+          if (far) far.despawn();
           this._spawnChopper(true);
         }
       }
@@ -9119,7 +9137,7 @@ class Game {
     this.state = 'finished';
     const def = M.def;
     // survivor stragglers stop shooting the debrief screen
-    for (const c of this.choppers) if (c.alive) { c.alive = false; this.scene.remove(c.mesh); }
+    for (const c of this.choppers) if (c.alive) c.despawn();
     const medal = this._missionMedal(win, M);
     if (def.survive) win = medal > 0; // outlasted nothing = failed the run
     const cr = MISSION_CR[medal] | 0;
@@ -9205,9 +9223,14 @@ class Game {
     // `missionNoGuns` would follow you out of a DUEL and disarm the next race.
     this.missionFoe = null;
     this.missionNoGuns = false;
-    for (const gsp of this.missionGates ?? []) this.scene.remove(gsp.spr);
+    // parent, not scene — both live on worldLayer (the teardown paths in
+    // swapLevel and _rebuildModeWorld already use worldLayer.remove here).
+    // Via scene.remove this reset kept nothing: retrying a mission left every
+    // star and every blitz gate of the previous attempt standing in the world,
+    // and the new attempt's set was built on top of them.
+    for (const gsp of this.missionGates ?? []) gsp.spr.parent?.remove(gsp.spr);
     this.missionGates = null;
-    for (const s of this.roamStars ?? []) if (!s.got) this.scene.remove(s.spr);
+    for (const s of this.roamStars ?? []) if (!s.got) s.spr.parent?.remove(s.spr);
     this.roamStars = [];
   }
 
@@ -10445,7 +10468,11 @@ class Game {
         this.particles.damageSmoke?.(new THREE.Vector3(h.pos.x, h.pos.y + 1, h.pos.z), 0.7);
       }
       if (h.life < 1.5) h.mesh.position.y -= dt * 1.4; // sink away
-      if (h.life <= 0) { this.scene.remove(h.mesh); this.husks.splice(i, 1); }
+      // parent, not scene: spawnHusk adds to worldLayer, so scene.remove never
+      // unhooked anything. The husk left the list but not the graph, so the
+      // 6-husk cap stopped bounding the scene and every wreck of the session
+      // stayed drawn — sunk just below the road where the sink loop left it.
+      if (h.life <= 0) { h.mesh.parent?.remove(h.mesh); this.husks.splice(i, 1); }
     }
   }
 
@@ -10791,7 +10818,7 @@ class Game {
     this.track?.restoreSmashed?.();
     this._missionReset?.(); // [MISSIONS] mission state never survives a reset
     this._clearWorldHazards?.();
-    for (const h of this.husks) this.scene.remove(h.mesh);
+    for (const h of this.husks) h.mesh.parent?.remove(h.mesh);
     this.husks.length = 0;
     this.restoreCarParts(this.player);
     for (const e of this.enemies) this.restoreCarParts(e);
@@ -10865,11 +10892,14 @@ class Game {
     this.track.setLights('red');
 
     // choppers + destructible props back to pristine
-    for (const c of this.choppers) if (c.alive && c.mesh) this.scene.remove(c.mesh);
+    for (const c of this.choppers) if (c.alive) c.despawn();
     this.choppers = [];
     this._raceChopper = false;
     this.chopperTimer = 15;
-    for (const f of this.flyingProps) this.scene.remove(f.mesh);
+    // parent, not scene: popped body panels are added to worldLayer (see
+    // popCarPart), so scene.remove left every in-flight panel frozen mid-air
+    // for the whole next race. Same idiom as the debris sweep below.
+    for (const f of this.flyingProps) f.mesh.parent?.remove(f.mesh);
     this.flyingProps = [];
     // A NEW RACE STARTS ON A CLEAN ROAD. The wreckage persists for the whole
     // race, which is the point of it — but restarting means restarting, and

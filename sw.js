@@ -39,6 +39,15 @@ const CORE = [
   './src/route.js',
   './src/traffic.js',
   './src/main.js',
+  // r438: these two were MISSING while main.js imports both statically at its
+  // top (`runStageValidator` from stagecheck.js at main.js:14, the whole sync
+  // service from sync.js at main.js:20). A static import that is not in the
+  // precache is not a degraded feature — the module graph fails to resolve and
+  // the game does not boot at all, so "armed for a flight" got a blank page.
+  // Nothing caught it: test-static.mjs checks the cache NAME carries the
+  // version, never that CORE covers what the entry point actually imports.
+  './src/stagecheck.js',
+  './src/sync.js',
   './src/audio.js',
   './src/choppers.js',
   './src/hostiles.js',

@@ -210,6 +210,22 @@ export const DRIVING = {
     boreRiseCapUPerS: 22,
     propShoveRadiusU: 1.15,
     camClearanceM: 2.2,
+    // r438: THESE SEVEN WERE IN driving.json AND NOT HERE, so the loader below
+    // dropped every one of them — the exact failure its r426 warning was added
+    // to catch, logged on every boot and never acted on. The consumers all
+    // read `D.<key> ?? <literal>` (the coast profile at track.js:10844-10849,
+    // the retaining-wall depth cap at track.js:13913), so the world was built
+    // from those literals and editing driving.json changed nothing at all,
+    // against the working spec's rule that every tuning number lives there.
+    // Values are the consumers' own fallbacks, which already agree with the
+    // JSON, so this is inert today and live from the next edit onward.
+    coastProfStepU: 8,
+    coastProfMaxPushU: 900,
+    coastProfSlopeMax: 0.5,
+    coastProfFadeU: 320,
+    coastProfReachU: 900,
+    coastProfSmoothPasses: 4,
+    retainMaxDepthU: 26,
   },
 
   // RALLY_CORRIDOR_REFACTOR v2.0 §14 — the route constants, complete as the

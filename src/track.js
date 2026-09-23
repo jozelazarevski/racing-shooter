@@ -16423,7 +16423,13 @@ export class Track {
     const terr = this._seatY(p.x, p.z);
     const stand = gy - terr;
     if (stand > 0.3) {
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 0.6, stand + 0.6, D * 2 - 0.6),
+      // W and D are the body's FULL width and depth (BoxGeometry(W, H, D)
+      // above), so `W * 2 - 0.6` built the masonry at nearly twice the
+      // building it is supporting — 33.4 x 18.4 under a 17 x 9.5 hotel, the
+      // opposite of this comment's "just inside the footprint", and 6 u of it
+      // reached past the solid record below (r = max(W, D) * 0.62) as
+      // collider-free stone a car could drive into.
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(W - 0.6, stand + 0.6, D - 0.6),
         new THREE.MeshStandardMaterial({ color: 0x6f6a60, roughness: 1, flatShading: true }));
       plinth.position.set(p.x, terr + (stand + 0.6) / 2 - 0.3, p.z);
       plinth.rotation.y = yaw;
@@ -18482,8 +18488,18 @@ export class Track {
    *  Rather than teach every cull path to also edit the registry — the same
    *  "fix it in three places" trap the placeAt wrap-count law fell into — the
    *  registry is reconciled ONCE, here, after every builder and every law has
-   *  run: an instance scaled away is not a tree, so its record goes. Reading
-   *  element 0 of each 16-float block is the instance's x scale.
+   *  run: an instance scaled away is not a tree, so its record goes.
+   *
+   *  The instance's x scale is the LENGTH OF THE FIRST COLUMN of its matrix,
+   *  not its first element. This read was `array[idx * 16] >= 0.01`, i.e.
+   *  element 0 alone — but every carpet instance is composed with a uniformly
+   *  random yaw (`_buildForestCarpet` below: `eu.set(0, random * 2PI, 0)`), and
+   *  for a Y-rotation element 0 is sx*cos(yaw). cos(yaw) is negative for
+   *  exactly half a full turn, so this test dropped roughly HALF of every
+   *  world's live carpet records — the opposite of the desync it was written to
+   *  repair, and it blinded the camera's foliage guard to half the real crowns.
+   *  Column 0 of T*R*S is sx times a unit vector for ANY rotation, so its
+   *  length is sx exactly, and a zeroed (culled) instance still reads 0.
    */
   _pruneGhostTrees() {
     if (!this.camTrees?.length) return;
@@ -18491,7 +18507,8 @@ export class Track {
     this.camTrees = this.camTrees.filter((t) => {
       const m = t.meshes && t.meshes[0];
       if (!m || t.idx == null || !m.instanceMatrix) return true;
-      return m.instanceMatrix.array[t.idx * 16] >= 0.01;
+      const a = m.instanceMatrix.array, o = t.idx * 16;
+      return Math.hypot(a[o], a[o + 1], a[o + 2]) >= 0.01;
     });
     this._camTreeGrid = null;          // the cell hash was built from the old list
     this._ghostTreesPruned = before - this.camTrees.length;
@@ -27742,6 +27759,16 @@ export class Track {
       const p = this._trackSidePos(hayNear, hayFar);
       return p && !this._inWater(p.x, p.z) ? p : null;
     }, (p) => {
+      // BUDGET FIRST. `hayCount` is the instance capacity allocated above, and
+      // the two `hk < hayCount` guards below already treat it as the cap on
+      // total bales — but THIS write was unguarded, and the rect style lays up
+      // to three bales per call while _scatter still calls back `hayCount`
+      // times. Averaging 1.8 bales a group, hk ran ~44% past the buffer on
+      // every harvest world: setMatrixAt silently dropped the overflow (a
+      // typed-array write past the end is a no-op) and then `hay.count = hk`
+      // told the renderer to draw instances whose matrices were never
+      // allocated, plus a contact shadow under each phantom bale.
+      if (hk >= hayCount) return;
       const yaw = Math.random() * Math.PI;
       q.setFromAxisAngle(up, yaw);
       const baseY = this._seatY(p.x, p.z) + (rectHay ? 0.48 : 0.8);

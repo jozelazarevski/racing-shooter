@@ -7,7 +7,7 @@
 // menu had six mode chips instead of three. Cheap check, expensive miss.
 import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join, dirname, extname } from 'node:path';
+import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -92,6 +92,34 @@ for (const f of walk(ROOT)) {
 try { unlinkSync(tmp); } catch { /* already gone */ }
 check(badParse.length === 0, 'every module parses in the module goal (strict mode)',
   badParse.join('; '));
+
+// 5. THE PRECACHE COVERS THE WHOLE STATIC MODULE GRAPH.
+//
+// This suite already checks that sw.js carries the version, which says nothing
+// about whether it carries the FILES. It did not: `src/stagecheck.js` and
+// `src/sync.js` were imported at the top of src/main.js and absent from CORE,
+// and a static import missing from the precache does not degrade a feature —
+// the graph fails to resolve and an offline boot is a blank page. Walk the
+// graph from the entry point the way the browser does and require every hop.
+const graph = new Set();
+const walkImports = (file) => {
+  if (graph.has(file)) return;
+  graph.add(file);
+  let src;
+  try { src = readFileSync(file, 'utf8'); } catch { return; }
+  for (const m of src.matchAll(/(?:^|[\s;])(?:import|export)[^'"]*?from\s*['"](\.[^'"]+)['"]/g)) {
+    walkImports(resolve(dirname(file), m[1]));
+  }
+};
+for (const m of html.matchAll(/<script[^>]+type="module"[^>]*src="([^"?]+)/g)) {
+  walkImports(resolve(ROOT, m[1].replace(/^\.?\//, '')));
+}
+const uncached = [...graph]
+  .map((f) => f.slice(ROOT.length + 1).replace(/\\/g, '/'))
+  .filter((rel) => !sw.includes(`'./${rel}'`) && !sw.includes(`"./${rel}"`));
+check(uncached.length === 0,
+  `sw.js precaches every statically imported module (${graph.size} in the graph)`,
+  `not in CORE: ${uncached.join(', ')}`);
 
 console.log(fails ? `\n${fails} FAILED` : '\nall static checks passed');
 process.exit(fails ? 1 : 0);

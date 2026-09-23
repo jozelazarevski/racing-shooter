@@ -289,7 +289,7 @@ function buildTrailerMeshes(mat) {
   wheels.position.set(0, 0.42, -0.1);
   body.castShadow = wheels.castShadow = true;
   group.add(body, wheels);
-  return { group, body, wheels };
+  return { group, body, wheels, wR: 0.42 };   // spin radius, same as rwR/fwR above
 }
 
 function buildWagonMeshes(mat) {
@@ -309,7 +309,7 @@ function buildWagonMeshes(mat) {
   wheels.position.set(0, 0.62, -0.15);
   body.castShadow = wheels.castShadow = true;
   group.add(body, wheels);
-  return { group, body, wheels };
+  return { group, body, wheels, wR: 0.62 };   // spin radius, same as rwR/fwR above
 }
 
 // ---------- install ----------
@@ -694,7 +694,11 @@ function install(game) {
     // so its heading already carries the direction — always spin forward)
     ent.rearW.rotation.x += (ent.speed / ent.rwR) * dt;
     ent.frontW.rotation.x += (ent.speed / ent.fwR) * dt;
-    if (ent.wagon) ent.wagon.wheels.rotation.x += (ent.speed / 0.62) * dt;
+    // ...and a towed rig spins on ITS OWN radius. 0.62 was hardcoded here,
+    // which is the HAY WAGON's wheel; the luggage trailer behind the family
+    // car runs 0.42 (buildTrailerMeshes), so its wheels turned 32% too slow
+    // for the ground it was covering — a visible skid at every crossing.
+    if (ent.wagon) ent.wagon.wheels.rotation.x += (ent.speed / (ent.wagon.wR || 0.62)) * dt;
 
     // driver: idle bob + crash wobble
     ent.wobT = Math.max(0, ent.wobT - dt);
