@@ -1267,12 +1267,40 @@ export function buildPartIcon(kind, id) {
     tyre.rotation.z = Math.PI / 2;
     const hub = add(new THREE.CylinderGeometry(0.44, 0.44, 0.66, 16),
       cls === 2 ? M.chrome : M.alloy, 0, 0, 0);
+    // THE WHEEL'S AXLE IS X, AND THESE TWO LOOPS BUILT THEIR RING ABOUT Z.
+    // three.js cylinders are built about +Y, so the rotation.z = PI/2 carried
+    // by the tyre above, by the hub and by the ROAD slick band swings that
+    // axis onto X and lays the disc in the Y-Z plane, rubber spanning
+    // x in [-0.31, +0.31]. The spoke and tread loops were the only
+    // circumference features that never got it: they place (cos a, sin a, 0)
+    // and turn about Z, which is a ring in the X-Y plane whose axle is Z —
+    // square to the wheel it is supposed to ride on. The numbers leave no
+    // doubt: a gravel block at a = 0 landed at x = 1.02 with the sidewall at
+    // x = 0.31, so 10 of the 12 blocks (and all 22 snow sipes, whose 16.36
+    // deg step never hits +-90 deg at all) hung up to 0.71 u clear of the
+    // tyre in open air, while a spoke at a = 0 ran x = -0.01 -> 0.69 and
+    // speared out through the sidewall. Parenting both loops to a group
+    // turned about Y puts the ring's axle on X to match, and leaves every
+    // radius and rotation.z below exactly as tuned: local Z — the 0.7 the
+    // blocks were sized in — becomes the across-the-tread direction. Turning
+    // the group about Z instead would have achieved nothing, since Rz maps
+    // the X-Y plane onto itself and only shifts the phase.
+    const face = new THREE.Group();
+    face.rotation.y = Math.PI / 2;
+    g.add(face);
     // five spokes, so a wheel reads as a wheel and not as a washer
     for (let i = 0; i < 5; i++) {
       const a2 = (i / 5) * Math.PI * 2;
-      const sp = add(new THREE.BoxGeometry(0.7, 0.12, 0.24), M.alloy,
+      // 0.68 ALONG THE AXLE, NOT 0.24. In the wheel's own plane a spoke is
+      // inside a SOLID opaque rubber cylinder of radius 1.0, so at 0.24 deep
+      // and centred on x = 0 all five sat between x = -0.12 and +0.12 and
+      // were buried whole — the washer the line above says not to ship. At
+      // 0.68 they stand 0.03 u proud of the 0.62-wide rubber on each face,
+      // which is the same margin the 0.66-wide hub already uses to show.
+      const sp = add(new THREE.BoxGeometry(0.7, 0.12, 0.68), M.alloy,
         Math.cos(a2) * 0.34, Math.sin(a2) * 0.34, 0);
       sp.rotation.z = a2;
+      face.add(sp);
     }
     hub.rotation.z = Math.PI / 2;
     const blocks = cls === 0 ? 0 : cls === 1 ? 12 : 22;
@@ -1282,6 +1310,7 @@ export function buildPartIcon(kind, id) {
         cls === 2 ? M.chrome : M.rubber,
         Math.cos(a) * 1.02, Math.sin(a) * 1.02, 0);
       t.rotation.z = a;
+      face.add(t);
     }
     if (cls === 0) {                                  // a slick band, so ROAD is not a bare disc
       const band = add(new THREE.CylinderGeometry(1.03, 1.03, 0.2, 26), M.gunmetal, 0, 0, 0);
@@ -1841,6 +1870,27 @@ export class Car {
     this.y = gy; this.vy = 0; this.airborne = false;
     this.pos.y = gy;
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
+    // ...AND THE SLOPE-LAW GUARD'S HISTORY, which was the one vertical
+    // variable this method left holding the OLD elevation. The r394 guard
+    // clamps a rise to `_roadYPrev + cap` with cap = max(0.22, planar speed
+    // x dt x 0.75), and placeAt has just zeroed `vel`, so cap is exactly the
+    // 0.22 floor on the placement frame. An uphill relocation therefore read
+    // the ground it came from: a second SOS press hops 14 stations, and at
+    // the r340 segLen of 6.6-8.7 u that is ~98 m, which on KARVEN's ascent
+    // (425 u of road range over the lap) is ~10 u of rise — so the grounded
+    // branch snapped the car to a phantom gY ~9.8 u under the surface
+    // placeAt had just seated it on and it climbed out at 0.22 u/frame for
+    // most of a second, buried in the road with the chase camera and every
+    // ground-relative term reading the old height. The 40-station rescue and
+    // the rival pit-lift (14-60 stations) are worse. Clearing to undefined
+    // rather than to `gy` is deliberate: the guard already short-circuits on
+    // undefined, so the guard's own write re-seeds the history from the same
+    // continuous `groundHeightAtPos` read it compares against, whereas `gy`
+    // comes from the staircase `groundHeightAt` sampler and would itself
+    // trigger a frame of clamping wherever the two disagree by over 0.22 u.
+    // A teleport is the same discontinuity as a landing, which the guard
+    // already resets for; this was the case the reset missed.
+    this._roadYPrev = undefined;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
     // r358 (iterate round): a placement is a fresh start for the §3.6 wedge

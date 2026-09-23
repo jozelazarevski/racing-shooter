@@ -7428,16 +7428,23 @@ export class Track {
     // ---- W-CURVE-01.7 (r400): superelevation on gradient sharp curves ----
     this._buildBanking();
 
-    // Natural jumps. Must happen HERE — before any mesh is built — so the road
-    // ribbon, its skirts, the ruts, the terrain blend and every prop placement
-    // follow the hump for free.
-    this._buildCrests();
-    // ---- outback creeks: cut the dry watercourses into the same profile, for
-    // the same reason and under the same contract as the crests above.
-    this._planCreeks();
-
-    this._checkLayout();
-
+    // A GUARD CANNOT REFUSE STATE THAT DOES NOT EXIST YET. These three
+    // planners used to sit AFTER `_buildCrests`, and `_buildCrests`' own
+    // `_nearGorge(w.i, 60)` guard answers entirely from `this._overpasses`,
+    // `this._gorge` and `this._jumpGorges` — all three undefined at that
+    // point, and every read of them `??`/`&&`-guarded, so the guard returned
+    // false for every window on every world and had never rejected a single
+    // station. The crest placer's chasm and flyover avoidance was dead code,
+    // while the symmetric guard in `_planCreeks` ("never cut a creek through
+    // a crest — the two profiles would ADD") did its job: a gorge got exactly
+    // the treatment a creek is forbidden to get, and a 2.1-4.6 u hump could
+    // be baked at a jump's launch station, on a bridge crossing, or under an
+    // overpass deck. Planned before the bake, all three are honoured. All of
+    // them read only `center`/`tan`/`nrm`/`curvature`, which are final above,
+    // and none of them draws from the seeded RNG, so nothing downstream
+    // shifts; `_buildCrests` still rolls exactly two numbers per crest and
+    // still fills its quota, only from stations that are actually free.
+    //
     // OVERPASSES: where the ROUTE crosses itself, one leg rises on a bridge.
     // nearestIndex is hint-windowed (±30 samples), so index continuity keeps
     // every car on its own leg through the stack - the capability the 2-opt
@@ -7458,6 +7465,17 @@ export class Track {
     this._jumpGorges = [];
     this._jumpCut = null;
     if (this.T.gorgeJump) this._planJumpGorges();
+
+    // Natural jumps. Must happen HERE — before any mesh is built — so the road
+    // ribbon, its skirts, the ruts, the terrain blend and every prop placement
+    // follow the hump for free.
+    this._buildCrests();
+    // ---- outback creeks: cut the dry watercourses into the same profile, for
+    // the same reason and under the same contract as the crests above.
+    this._planCreeks();
+
+    this._checkLayout();
+
     // TUNNELS are planned, not found: the road-field blend flattens the
     // ground beside every carriageway, so no natural cutting is ever deep
     // enough to bore. Instead the straightest eligible stretches are chosen
@@ -9845,9 +9863,21 @@ export class Track {
   waterAt(x, z) {
     const R = this._river;
     if (!R) return 0;
-    const { d } = this._riverNearest(x, z);
-    if (!(d < R.half)) return 0;
-    const across = Math.cos((d / R.half) * Math.PI * 0.5);   // 1 mid-channel
+    // ...and it has to ask the SAME width the water was built from. This
+    // measured the channel with the scalar `R.half` (4.0) while the carve
+    // (`halfAt[k]` above) and the drawn ribbon both read the per-station
+    // `halfAt`, which breathes 2.56 to 5.44 u. So on a wide station the outer
+    // 1.44 u of the drawn, carved channel read bone dry — at d = 4.0 under
+    // halfAt 5.44 the honest depth is 1.05 u and this returned 0, well over
+    // the 0.06 u that arms the drag, the aquaplane and the wet-tyre fade —
+    // and on a narrow station (halfAt 2.56, breathing alone, before the
+    // tight-bend clamp) the car took full river drag plus the 3.5 s grip fade
+    // on dry, un-carved bank. `_riverNearest` already hands back the station
+    // index, so there is now one width law with three readers.
+    const { d, k } = this._riverNearest(x, z);
+    const hw = (R.halfAt && R.halfAt[k] != null) ? R.halfAt[k] : R.half;
+    if (!(d < hw)) return 0;
+    const across = Math.cos((d / hw) * Math.PI * 0.5);       // 1 mid-channel
     const near = 1 - THREE.MathUtils.smoothstep(this._distToTrack(x, z), 10, 26);
     return R.depth * across * (0.12 + 0.88 * (1 - near));
   }
@@ -10529,8 +10559,12 @@ export class Track {
     if (this._nearGorge(i, reach)) return 0;
     // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
     //
-    // `_buildCrests` runs first and refuses narrows and gorges; it cannot
-    // refuse tunnels, because none exist yet. This ran second and asked about
+    // `_buildCrests` runs first and refuses narrows, overpasses and gorges
+    // (it only truly does since those three planners were hoisted above it —
+    // before that its `_nearGorge` call read three undefined fields and
+    // refused nothing); it cannot refuse tunnels, because none exist yet, and
+    // the two guards cannot both run second — hoisting `_planTunnels` too
+    // would kill the crest test below instead. This ran second and asked about
     // the start gate, gorges and curvature — never about the humps already
     // baked into the roadway. So a bore could be, and was, sited straight
     // over a jump built expressly to throw the car.
@@ -11672,8 +11706,20 @@ export class Track {
         // On the INSIDE of tight turns the apron may not reach past the turn
         // radius, or the ribbon folds over itself and sweeps up across the
         // road (visible as pale shards on hairpins/S-folds). Clamp reach.
+        // The sign was the wrong way round, so the clamp guarded the convex
+        // side and left the concave one at Infinity — the apron folded on
+        // exactly the stations this comment was written about. `nrm` is
+        // `(tan.z, 0, -tan.x)`, so rotating the tangent by phi toward +nrm
+        // gives `a.x*b.z - a.z*b.x = -sin(phi)`: the bend whose centre of
+        // curvature lies on the +nrm side (inside = side +1) reads NEGATIVE.
+        // Checked on a 64-station R20 circle built the way this class builds
+        // one, both traversal directions, against `_buildBanking`'s real
+        // circumcentre test at 8103, which returns sIn +1 for that geometry
+        // while this returned -1. At an R10 hairpin the unclamped inside
+        // apron reached wOff + face + 2.8 = 15.8 u, 5.8 u past the pivot,
+        // while the outside was needlessly cut back to the 11.0 u floor.
         const a = this.tan[j], b = this.tan[(j + 8) % N];
-        const insideSign = (a.x * b.z - a.z * b.x) > 0 ? 1 : -1;
+        const insideSign = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
         const maxLat = side === insideSign
           ? Math.max(WALL_OFF + 0.6, 0.85 / Math.max(this.curvature[j], 1e-4))
           : Infinity;
@@ -12763,6 +12809,22 @@ export class Track {
       // work. Rocks belong beside the course, not lining its edge like bollards.
       const lateral = side * (w + r + 4.6);
       const p = this.pointAt(i, lateral);
+      // ...AND THE SEAT HAS TO MOVE WITH THEM. `pointAt` returns the
+      // CARRIAGEWAY height ("the road surface is flat across its width"),
+      // which was right when these stood on the road at ±1.2-4.5 u. At
+      // `w + r + 4.6` ≈ 16 u the ground is no longer the road: `_blendHeight`
+      // holds it a tuck below the datum there — 0.47 u on the plain worlds and
+      // 1.22 u wherever `retainingWalls`/`shelfRoad` deepen it — and the drawn
+      // patch sits 0.12 u lower again, so the hoodoo stack, the log pile and
+      // the shelf-world boulders stood that far clear of the earth, with the
+      // baked contact-shadow decal hanging at road height with them. HRD-8
+      // allows 0.15 m. The file's own convention two hundred lines down is
+      // `_buildProps`' "beyond ~9.5 u lateral, seat on terrain", and
+      // `_buildNarrowDressing` already fixed this exact class with `_seatY`
+      // (measured 2.25 u in the air on OLIVE COAST). `_seatY` takes the lower
+      // of the physics ground and the drawn mesh, so it can only push the rock
+      // down onto the surface that is actually visible.
+      p.y = this._seatY(p.x, p.z);
       // AND CHECK IT AGAINST THE WHOLE LAP. `lateral` is measured along the
       // normal at sample `i`; on a switchback world the road's other leg
       // swings underneath, so an obstacle correctly set back from ITS leg can
@@ -12841,7 +12903,7 @@ export class Track {
         const g = new THREE.Group();
         const nSeg = 4 + (Math.random() < 0.4 ? 1 : 0);
         const wr = [1, 0.8, 0.64, 0.78, 0.55];
-        let y = p.y;                                     // stack up from the road surface
+        let y = p.y;                                     // stack up from the ground seat
         for (let s = 0; s < nSeg; s++) {
           const rad = r * wr[Math.min(s, wr.length - 1)] * (0.92 + Math.random() * 0.16);
           const hh = (2.5 - s * 0.25) * (0.85 + Math.random() * 0.35);
@@ -12860,7 +12922,8 @@ export class Track {
         }
         this.group.add(g);
       }
-      // collision stays horizontal ({x, z, r}); y is the road height for visuals
+      // collision stays horizontal ({x, z, r}); `y` is the ground seat the
+      // visuals stand on (the vehicle code reads only x/z/r)
       this.obstacles.push({ x: p.x, z: p.z, r, y: p.y });
       this._addShadow(p.x, p.z, r * 1.35, p.y);
     });
@@ -13960,26 +14023,49 @@ export class Track {
       const plankGeo = new THREE.BoxGeometry(deckW * 2, 0.22, 1.15);
       const tex = plankTexture();
       tex.anisotropy = 8;
+      // THE DECK RAN OUT OF BOARDS BEFORE IT REACHED THE FAR TOWER, and the
+      // boards it did lay were stacked on top of each other. `f` counts
+      // SAMPLES and advances by `1.5 / segLen` of one, so crossing the deck
+      // takes `rows * segLen / 1.5` iterations — 46.7 at the authored span 26
+      // and segLen 7 — while the buffer was sized `rows * 3` = 30 and the
+      // guard below hard-stopped there. Coverage was exactly `4.5 / segLen`,
+      // i.e. 0.52 to 0.68 of the span on this roster's 6.6-8.7 u samples: the
+      // far 38% of the crossing had towers, cables, hangers and railings over
+      // a bare ribbon that `_deckDip` had already dropped 0.34 u, so the deck
+      // read as stopping in mid-air. And `Math.round(f)` snapped every board
+      // onto a whole centreline sample, so ~4.7 consecutive iterations wrote
+      // the identical matrix and spent the buffer on coincident duplicates,
+      // leaving the survivors segLen (~7 u) apart under a 1.15 u board — 5.9 u
+      // gaps where the comment promises 1.5 u. Size the buffer from the real
+      // iteration count and lerp between the two bracketing samples, since
+      // `pointAt`/`headingAt` index `center`/`tan` directly and cannot take a
+      // fractional index.
+      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
+      const cap = Math.floor(rows / step) + 2;
       const planks = new THREE.InstancedMesh(
         plankGeo,
         new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }),
-        rows * 3
+        cap
       );
       planks.name = 'bridge-deck';
       planks.receiveShadow = planks.castShadow = true;
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
       const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
       let k = 0;
-      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
       for (let f = 0; f <= rows; f += step) {
-        const j = (i0 + Math.round(f) + N) % N;
-        const c = this.center[j];
-        q.setFromAxisAngle(up, this.headingAt(j));
-        m4.compose(new THREE.Vector3(c.x, c.y - 0.02, c.z), q, new THREE.Vector3(1, 1, 1));
+        const fi = Math.floor(f), u = f - fi;
+        const ja = (i0 + fi + N) % N, jb = (ja + 1) % N;
+        const ca = this.center[ja], cb = this.center[jb];
+        q.setFromAxisAngle(up, this.headingAt(ja));
+        m4.compose(new THREE.Vector3(
+          ca.x + (cb.x - ca.x) * u,
+          ca.y + (cb.y - ca.y) * u - 0.02,
+          ca.z + (cb.z - ca.z) * u
+        ), q, new THREE.Vector3(1, 1, 1));
         planks.setMatrixAt(k, m4);
         col.setScalar(0.86 + Math.random() * 0.28);
         planks.setColorAt(k++, col);
-        if (k >= rows * 3) break;
+        if (k >= cap) break;
       }
       planks.count = k;
       g.add(planks);
@@ -22754,14 +22840,30 @@ export class Track {
     // fog or haze tuning hides a 300 u cone, because at this fog distance the
     // cone IS the fog colour and the haze band behind it is not. Dropped here
     // rather than in `_buildHorizon` so no other world is touched.
+    // ONE NAME, UP TO THREE MESHES. `_buildHorizon` builds one InstancedMesh
+    // per distinct FORM per ring, not one per ring, so a 3-form set leaves
+    // three meshes called 'horizon-hills' and three called 'horizon-peaks'
+    // (track.js:24890). `getObjectByName` is `getObjectByProperty`, which
+    // returns the FIRST match, so this dropped one mesh of each name and left
+    // two thirds of the cone hills and two thirds of the far peaks standing —
+    // at fogFar 780 against rings at 930-1280 u, exactly the silhouette the
+    // negative list forbids. Worse, the material and its gradient map are
+    // shared by every form in a ring (one `mat` argument per `layer` call) and
+    // the form geometries are shared between the near and far ring, so the
+    // disposal below was tearing GPU resources out from under meshes that were
+    // still in the scene. Take every match, and dispose each material once by
+    // identity. The same ~130 ring colliders `place` pushed into `this.solids`
+    // go with them: a stone wall at 930 u with no mesh behind it is the BARE
+    // INTRUDER case, and today's partial removal already orphans a third.
     for (const n of ['horizon-hills', 'horizon-peaks']) {
-      const mesh = this.group.getObjectByName(n);
-      if (!mesh) continue;
-      this.group.remove(mesh);
-      mesh.geometry.dispose();
-      mesh.material.map?.dispose();
-      mesh.material.dispose();
+      const hits = this.group.children.filter((o) => o.name === n);
+      for (const mesh of hits) { this.group.remove(mesh); mesh.geometry.dispose(); }
+      for (const m of new Set(hits.map((o) => o.material))) {
+        m.map?.dispose();
+        m.dispose();
+      }
     }
+    this.solids = this.solids.filter((s) => !s.hzRing);
     const MAX = 2600;                 // deep enough that the back lanes exist
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     bodyGeo.translate(0, 0.5, 0);
@@ -24744,8 +24846,11 @@ export class Track {
           // height", and one rule is the only kind worth having.
           if (!profOf[form]) profOf[form] = this._formProfile(F[form]);
           this.solids.push({
+            // tagged so `_buildOldTown`, which drops the ring meshes behind a
+            // built skyline, can drop their colliders with them instead of
+            // leaving invisible stone at 930-1280 u
             x: px, z: pz, r: w * Math.max(1, zs) * 0.48,
-            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form],
+            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form], hzRing: true,
           });
         }
       }
@@ -24796,12 +24901,21 @@ export class Track {
     const mv = 1 + this._routeElevRange() / 420;
     place(near, 9, 930 * hs, 140 * hs, 48 * mv, 36 * mv, 240 * mv, 210 * mv, 0.82);
     place(far, 8, 1120 * hs, 160 * hs, 135 * mv, 60 * mv, 360 * mv, 300 * mv, 0.76);
+    // The near/far boundary in `meshes` is how many meshes `layer` PUSHED for
+    // the near ring, and `layer` de-duplicates by form name — so it is the
+    // distinct-form count, which equals `set.length` only when no form
+    // repeats. SETS[5] is ['dome','ridge','dome'], so on the ids that draw it
+    // `meshes` holds 4 entries against a set length of 3 and index 2 — the FAR
+    // ring's dome — was labelled 'horizon-hills'. The names are the handle
+    // `_buildOldTown` deletes the geological skyline by, so the mislabel
+    // changed which ring survived behind LIMESTONE COAST and PORTO GRANDE.
+    const nearCount = new Set(set).size;
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       // named so a world whose skyline must be built, not geological, can drop
       // them (OLD TOWN — see _buildOldTown)
-      mesh.name = mi++ < set.length ? 'horizon-hills' : 'horizon-peaks';
+      mesh.name = mi++ < nearCount ? 'horizon-hills' : 'horizon-peaks';
       if (mesh.count) this.group.add(mesh);
     }
     if (T.massif) this._buildMassif(m4);

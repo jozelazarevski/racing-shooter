@@ -295,12 +295,13 @@ const UPGRADES = [
 // tires, weapons, looks engine v4-8-12, add spoilers etc. I would purchase
 // parts and race for other parts."
 //
-// The ten UPGRADES above are TUNING: one ladder per line, every rung strictly
-// better than the last, no decision to make beyond what to spend next. Parts
-// are the other half — a SLOT holds exactly one part, the options TRADE
-// against each other rather than stacking, and picking one is a real choice
-// about how the car drives. A V12 is not "a better engine"; it is more power
-// than the tyres can put down, and you buy a wing to get it back.
+// The eleven UPGRADES above are TUNING: one ladder per line, every rung
+// strictly better than the last, no decision to make beyond what to spend
+// next. Parts are the other half — a SLOT holds exactly one part, the
+// options TRADE against each other rather than stacking, and picking one is
+// a real choice about how the car drives. A V12 is not "a better engine"; it
+// is more power than the tyres can put down, and you buy a wing to get it
+// back.
 //
 // Every part is visible from the chase camera (see applyUpgradeKit): the
 // engine sets how many pipes come out of the tail, the spoiler is the
@@ -714,7 +715,11 @@ const TRACK_FEATS = [
     check: (g, ct) => ct.rivalKills >= 3 },
   { id: 'onrails', label: 'ON RAILS', icon: '⚙️', need: { key: 'handling', lvl: 2 }, pay: 400,
     desc: 'finish without once dropping a wheel off the road',
-    check: (g, ct) => !ct.leftRoad },
+    // `!ct.leftRoad` also passed when the counter was never written at all,
+    // which is how declining a world's contracts used to pay this feat for
+    // a lap spent in the scenery. The strict test demands the observation
+    // actually ran; resetRace initialises the flag to false.
+    check: (g, ct) => ct.leftRoad === false },
 ];
 
 /** The two feats this world asks for — FIXED to the world, not rerolled.
@@ -800,7 +805,10 @@ const QUESTS = [
     id: 'recovery', name: 'CLEAN HANDS', icon: '🆘',
     desc: 'Finish 4 different worlds without ever calling the SOS',
     count: 4, reward: { part: 'beacon', cr: 1000 },
-    test: (g) => (g.player.sos >= g.player.maxSos ? `w${g.level.id}` : null),
+    // Same stale test as the NO BEACON job: nothing spends `sos` since
+    // CORRIDOR §10, so this handed over the free part after any four
+    // finishes. Count the rescues actually called this race instead.
+    test: (g) => ((g._ct?.rescues ?? 0) === 0 ? `w${g.level.id}` : null),
   },
   {
     id: 'stuntman', name: 'STUNTMAN', icon: '🪂',
@@ -944,7 +952,12 @@ const JOB_POOL = [
     id: 'solo', label: 'NO BEACON', icon: '🆘', base: 480,
     line: () => 'finish without calling the rescue',
     atFinish: true,
-    check: (g) => (g.player.sos ?? 0) >= (g.player.maxSos ?? 1),
+    // `sos >= maxSos` was written when the rescue cost a charge. CORRIDOR §10
+    // made recovery free and unlimited and deleted the decrement, so the
+    // counter is refilled at the start line and never spent: this 480 CR job
+    // paid out however often the player hammered SOS. `_ct.rescues` counts
+    // the calls themselves (see _updateContracts).
+    check: (g, ct) => (ct?.rescues ?? 0) === 0,
   },
   {
     id: 'reel', label: 'STUNT REEL', icon: '🪂', base: 440,
@@ -1292,7 +1305,8 @@ const WORLD_TRAITS = (id) => {
  *  of the three limits the physics actually imposes, using that car's own
  *  constants:
  *
- *    vCap    the slope-aware speed ceiling  (vehicles.js: GRADE / DOWNHILL_CAP)
+ *    vCap    the slope-aware speed ceiling  (vehicles.js: the on-road grade
+ *            law, −2.5× the slope up, +1.5× down to DOWNHILL_CAP)
  *    vYaw    steering authority vs the corner's curvature
  *    vGrip   the speed at which the sustained slide (v²k/grip) still fits
  *            inside the road — this is where the car's grip and the surface,
@@ -1305,7 +1319,12 @@ const WORLD_TRAITS = (id) => {
 function paceEstimate(car, track) {
   if (!car?.stats || !track?.center) return null;
   const S = car.stats;
-  const GRADE = 16, DOWNHILL_CAP = 1.18, SLIDE = 4.0;
+  // MIRRORED FROM THE INTEGRATOR, AND IT HAD DRIFTED. DOWNHILL_CAP was 1.18
+  // against vehicles.js's 1.15, and the uphill term below was still the
+  // `GRADE 16 / 0.55` law that MASTER FIX-6 repudiated by name — so GRADE is
+  // gone from this file, because paceEstimate walks the centreline and has no
+  // off-road branch, which is the only thing GRADE still prices over there.
+  const DOWNHILL_CAP = 1.15, SLIDE = 4.0;
   const surf = track.T?.surface;
   const base = surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1;
   const gripEff = S.grip * (base + (1 - base) * 0.62 * S.offroad);
@@ -1319,8 +1338,14 @@ function paceEstimate(car, track) {
     const k = Math.abs(wrap(track.headingAt((i + 2) % N) - track.headingAt(i))) / ds;
     const slope = (c.y - a.y) / ds;
     let vCap = S.maxSpeed;
-    if (slope > 0) vCap = Math.max(S.maxSpeed * 0.55, S.maxSpeed - (GRADE * slope) / 0.55);
-    else if (slope < 0) vCap = Math.min(S.maxSpeed * DOWNHILL_CAP, S.maxSpeed + (GRADE * -slope) / 0.55);
+    // The old additive form priced a 10% climb at 16*0.1/0.55 = 2.9 u/s, a
+    // 5.3% loss off a ~55 u/s top, where the integrator takes a quarter of
+    // top speed at that grade — the climb axis was rated at a fifth of its
+    // real weight, and the downhill at a third (+5.3% against +15%). These
+    // are vehicles.js:2506 (specCap, the on-road branch) and vehicles.js:2519
+    // written out with S.maxSpeed as the top speed.
+    if (slope > 0) vCap = S.maxSpeed * Math.max(0.25, 1 - 2.5 * slope);
+    else if (slope < 0) vCap = S.maxSpeed * Math.min(DOWNHILL_CAP, 1 + 1.5 * -slope);
     // steering authority: yaw available must out-turn v*k (taper ignored here —
     // it only bites near top speed, where the corner limit already dominates)
     const vYaw = k > 1e-5 ? steerRate * (1 - steerTaper) / k : Infinity;
@@ -2116,6 +2141,10 @@ class Game {
           paint();
           this._renderLevelCards();
           this.renderCarShop?.();
+          // ...except the job board, which memoises on the day: the repaint
+          // below could not see the new unlock set until the cache was
+          // dropped, so toggling OPEN ALL left the postings unchanged.
+          this._jobsCache = null;
           this._renderJobs?.();
           this._syncStartButton?.();
           this.audio?.ui?.();
@@ -2675,6 +2704,16 @@ class Game {
   _loadProfileState() {
     this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
     this._pkey = (base) => profileKey(this.profile.id, base);
+    // THE DAY'S JOB BOARD BELONGS TO A DRIVER. `_jobOffers` memoises on the
+    // day alone, but what it caches is seeded on the profile id AND filtered
+    // by this driver's unlock set and by the kinds this driver banked today —
+    // and a profile switch is an in-place reload (RULES §9b), not a page
+    // load, so the memo survived it. Hand the device to a second driver on
+    // the same day and they were served the first driver's five postings,
+    // including worlds they have never opened; taking one wrote it into their
+    // own career. Dropped here rather than in _applyProfileInPlace so switch,
+    // create, delete-active and the sync-driven reload are all covered.
+    this._jobsCache = null;
     // `rungs` is the contract-progression field: {contractId: rungIndex}. It
     // lives on CAREER rather than on the garage because it is progression, not
     // money, and career is already profile-scoped and carried by the sync
@@ -3311,12 +3350,25 @@ class Game {
   /** Swap the player's machine in place — no reload, no menu reset. */
   swapPlayerCar(entry) {
     const p = this.player;
-    this.scene.remove(p.mesh);
+    // THE OLD RIG IS FREED, NOT JUST DETACHED. buildCarMesh news a fresh
+    // BoxGeometry per part (dozens) plus eight body materials every call and
+    // caches nothing, and `p.mesh = mesh` below used to drop the last
+    // reference to the previous rig — so a garage session that tapped ten
+    // owned cars left ten bodies' worth of GPU buffers alive for the life of
+    // the page, with nothing in the game able to reclaim them. Same class of
+    // leak the crash planks and the stage car were already fixed for.
+    // _dropCarMesh and NOT disposeSubtree: the rig carries the shared
+    // carLightMaterial and, after applyUpgrades, the shared kit materials,
+    // and freeing either blanks the lamps or the kit on every car in the game.
+    const old = p.mesh;
+    this.scene.remove(old);
     const mesh = buildCarMesh(entry.spec);
-    mesh.position.copy(p.mesh.position);
-    mesh.rotation.copy(p.mesh.rotation);
+    mesh.position.copy(old.position);
+    mesh.rotation.copy(old.rotation);
     this.scene.add(mesh);
     p.mesh = mesh;
+    this._dropCarMesh(old);   // after the swap: a throw above must not leave
+                              // the player holding a disposed rig
     p.catalogKey = entry.key;
     p._popped = [];
     p._litFor = null;      // fresh mesh, fresh lamps: re-decide on the new rig
@@ -4960,6 +5012,16 @@ class Game {
     return Math.min(MOUNT_MAX, base + mountFromLevel(lv));
   }
 
+  /** THE HIGHEST MOUNT CLASS THIS CAR COULD EVER CARRY in a slot, ladder
+   *  maxed. A ladder is worth exactly one class, so this is base + 1 clamped
+   *  to MOUNT_MAX — and on a chassis with base <= 1 that lands BELOW
+   *  MOUNT_MAX, which is the distinction the bay header was missing. Written
+   *  through mountMax's `up` override rather than as a second copy of the
+   *  min/base/mountFromLevel expression. */
+  mountCeiling(slotKey, carKey = this.cars.selected) {
+    return this.mountMax(slotKey, carKey, { [PART_SLOT[slotKey].mount]: 5 });
+  }
+
   /** CAN THIS CAR TAKE THIS PART, and if not, is that a thing money can fix?
    *
    *  Three outcomes, and the difference between the last two is the whole
@@ -5180,14 +5242,16 @@ class Game {
    *  conflict; they were wearing different clothes, and the upgrade ladders
    *  were a wall of grey rows underneath a shop that had pictures.
    *
-   *  Every one of the ten UPGRADES lands in exactly one bay, so nothing is
-   *  orphaned by the regrouping:
+   *  Every one of the eleven UPGRADES lands in exactly one bay, so nothing is
+   *  orphaned by the regrouping (it said ten, and was written before r316
+   *  appended RALLY COPILOT — which then sat in no bay at all):
    *    ENGINE SHOP   the blocks, and the ENGINE WRENCH that tunes whichever
    *                  one is in
    *    BODY KIT      the wings, and the suspension that makes them worth it
    *    TIRE BAY      the compounds, and the TIRES ladder that unlocks them
    *    WEAPONS CACHE cannon, rockets, drums
-   *    CHASSIS       armour, nitro, dampers, the recovery beacon
+   *    CHASSIS & CREW armour, nitro, dampers, the recovery beacon, the
+   *                  rally copilot
    */
   _renderGarageBays() {
     this._renderBuildPreview();
@@ -5227,17 +5291,43 @@ class Game {
       { name: 'BODY KIT & SPOILERS', icon: '🪽', slot: 'spoiler', ups: ['handling'] },
       { name: 'TIRE BAY', icon: '🛞', tyres: true, ups: ['tires'] },
       { name: 'WEAPONS CACHE', icon: '🔫', ups: ['cannon', 'rack', 'magazine'] },
-      { name: 'CHASSIS & CREW', icon: '🛡️', ups: ['armor', 'nitro', 'dampers', 'beacon'] },
+      // RALLY COPILOT WAS ORPHANED. This table is the only place upgrade
+      // cards are built (the single UPGRADES.find that feeds _upgradeCard is
+      // in the `bay.ups` loop below), and `copilot` was appended to UPGRADES
+      // in r316 without being added here — so there was no card, no price and
+      // no button for it, `carUpgrades().copilot` was pinned at 0 for the
+      // life of every save, and _copilotTick's `if (!lvl)` guard returned on
+      // every frame, leaving the whole pacenote engine and the `case
+      // 'copilot'` rung ladder unreachable. HANDOVER asks for "a real garage
+      // part — RALLY COPILOT 🎧, max 3, priced on the standard rung ladder,
+      // per-car like every upgrade, and WIRED (no RECOVERY BEACON repeat)".
+      // It rides in CHASSIS & CREW because a co-driver is crew — no new
+      // header, no new layout.
+      { name: 'CHASSIS & CREW', icon: '🛡️', ups: ['armor', 'nitro', 'dampers', 'beacon', 'copilot'] },
     ];
+    // A ladder that reaches no bay is invisible to the player and silently
+    // disables whatever reads it, which is how copilot shipped inert. Warn
+    // rather than throw: a data-entry slip must not blank the garage.
+    if (UPGRADES.some((u) => !BAYS.some((b) => b.ups.includes(u.key)))) {
+      console.warn('orphaned upgrade ladder — no bay lists it');
+    }
 
     for (const bay of BAYS) {
       const box = document.createElement('div');
       box.className = 'bay';
       // A SLOT BAY SAYS WHAT THIS CHASSIS CAN TAKE, up front, so the greyed
-      // cards below are explained before they are met.
+      // cards below are explained before they are met. The headroom test was
+      // against the GLOBAL MOUNT_MAX, not this chassis's own ceiling, so a
+      // BRAWLER at ENGINE WRENCH 5 read "CHASSIS CLASS 2 · ENGINE WRENCH
+      // RAISES IT" directly above a V12 card reading "⛔ WON'T FIT — this
+      // body tops out at class 2", from the same render pass: partFits
+      // already computes base + one class and knows better. Nine of the
+      // sixteen chassis/slot pairs top out below MOUNT_MAX, so the header
+      // promised headroom that no amount of credits could buy.
       const cap = bay.slot
         ? `<b class="bay-cap">CHASSIS CLASS ${this.mountMax(bay.slot)}${
-  this.mountMax(bay.slot) < MOUNT_MAX ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
+  this.mountMax(bay.slot) < this.mountCeiling(bay.slot)
+    ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
         : '';
       box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}${cap}</div>`;
 
@@ -5861,6 +5951,16 @@ class Game {
     const car = this.cars.selected;
     const up = (this.garage.upgrades || {})[car];
     const max = tyreMaxClass(car, up);
+    // THE LEVEL COMES FROM THE CAR, NOT FROM THE COMPOUND. Both labels below
+    // used to read the required TIRES level off the compound being shown
+    // (`c >= 2 ? 3 : 1`), which is only right for a ROAD-base chassis: the
+    // rule in tyreMaxClass is base + bump, so a GRAVEL-base car reaches SNOW
+    // on ONE rung. On the starter BRAWLER (offroad 0.70) and on the ALPINE
+    // (0.84) the bay therefore quoted TIRES 3 for SNOW when TIRES 1 unlocks
+    // it — overstating its own headline purchase by 3,700 CR, and
+    // contradicting the world card on the same screen, which prices the
+    // identical advice through tyreLevelFor.
+    const lvlFor = (c) => tyreLevelFor(car, up, c) ?? 1;
     const now = this.fittedTyre(car);
     const need = this.level ? surfaceClass(this.level) : null;
     // REAL RUBBER, not three glyphs. The compounds differ by TREAD and the
@@ -5875,7 +5975,7 @@ class Game {
         need === c ? 'want' : ''].filter(Boolean).join(' ');
       return `<button class="${cls}" data-tyre="${c}"${locked ? ' disabled' : ''}>`
         + `${locked ? '🔒' : ICON[c]}<b>${TYRE_LABEL[c]}</b>`
-        + `<i>${locked ? 'BUY TIRES ' + (c >= 2 ? 3 : 1) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
+        + `<i>${locked ? 'BUY TIRES ' + lvlFor(c) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
     }).join('');
     // AUTO IS THE DEFAULT AND IT IS THE POINT OF BUYING TYRES AT ALL: it fits
     // the compound each world asks for, capped by what you own, so a purchase
@@ -5887,7 +5987,7 @@ class Game {
       + `<div class="tyre-row">${autoBtn}${btns}</div>`
       + (max < 2
         ? `<div id="jobs-note">You own up to ${TYRE_LABEL[max]}. `
-          + `TIRES STACK ${max < 1 ? 1 : 3} unlocks ${TYRE_LABEL[max + 1]}, `
+          + `TIRES STACK ${lvlFor(max + 1)} unlocks ${TYRE_LABEL[max + 1]}, `
           + `which is what the ${TYRE_LABEL[2] === TYRE_LABEL[max + 1] ? 'ICE' : 'LOOSE'} `
           + `stages want.</div>`
         : '');
@@ -7687,9 +7787,19 @@ class Game {
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
    *  already expose (heat/ammo/health deltas, _draftOn is counted via the
-   *  style() labels) — no hooks into files owned by the other agents. */
-  _updateContracts() {
-    if (this.freeRoam || this.state !== 'race' || !this.contracts?.length) return;
+   *  style() labels) — no hooks into files owned by the other agents.
+   *
+   *  THE COUNTERS ARE NOT PART OF THE CONTRACT SLATE. The guard used to bail
+   *  on `!this.contracts?.length`, which killed the per-race counters only
+   *  written here whenever the player declined every contract for a world —
+   *  a choice the contract board itself recommends. FLAT OUT (`topKph >=
+   *  190`) and BOOST RUN (`boostHeld >= 6`) then could not be earned at all,
+   *  and ON RAILS was handed over free because `leftRoad` stayed unwritten.
+   *  Feats are the other axis from contracts (see the TRACK FEATS header) and
+   *  are banked permanently, so the observation now runs on every race frame
+   *  and only the slate resolution at the bottom is gated. */
+  _updateContracts(dt = 1 / 60) {
+    if (this.freeRoam || this.state !== 'race') return;
     const ct = this._ct, p = this.player;
     if (!ct) return;
     // weapon-fire detection by state transition (cannon heats, ammo drops,
@@ -7704,7 +7814,26 @@ class Game {
     // Read off state the car already keeps, same as everything above it.
     const kph = Math.hypot(p.vel.x, p.vel.z) * 3.6;
     if (kph > (ct.topKph ?? 0)) ct.topKph = kph;
-    if (p.boosting || (p.nitroT ?? 0) > 0) ct.boostHeld = (ct.boostHeld ?? 0) + (this.clock?.lastDt ?? 1 / 60);
+    // BOOST RUN read two properties no car has: `p.boosting` is a LOCAL
+    // inside vehicles.js (`const boosting = this.boostTimer > 0`) and
+    // `p.nitroT` does not exist anywhere, so the guard was
+    // `undefined || (undefined ?? 0) > 0` — false on every frame of every
+    // race, and the feat was unearnable on the ~17 worlds that deal it. The
+    // accumulator was wrong too: THREE.Clock has no `lastDt`, so it always
+    // fell back to 1/60 and credited 3 s for a 6 s hold at 30 fps. Read
+    // `boostTimer`, which is what the HUD's own nitro pill reads, and bill
+    // the frame's real dt.
+    if ((p.boostTimer ?? 0) > 0) ct.boostHeld = (ct.boostHeld ?? 0) + dt;
+    // SOS CALLS ARE COUNTED, NOT CHARGES. `player.sos` is refilled at the
+    // start line and never spent — CORRIDOR §10 made recovery unlimited and
+    // deleted the ration — so NO BEACON and CLEAN HANDS, which both asked
+    // `sos >= maxSos`, passed on every finish however often the player
+    // called the rescue. `unstuckCool` is set only where the rescue actually
+    // fires and otherwise decays, so a rise is one call; observing it keeps
+    // this function to state vehicles.js already exposes, as above.
+    const cool = p.unstuckCool ?? 0;
+    if (cool > (ct.prevUnstuck ?? 0) + 1e-4) ct.rescues = (ct.rescues ?? 0) + 1;
+    ct.prevUnstuck = cool;
     // ON RAILS: a wheel off the tarmac ends it. `lateral` against the world's
     // own width profile, so a pinched section is judged by ITS width and not
     // by a constant — and never while airborne, since a jump is not a mistake.
@@ -7720,12 +7849,14 @@ class Game {
     if ((this.comboT ?? 0) > 0) {
       ct.comboMax = Math.max(ct.comboMax, Math.min(4, 1 + (this.comboN ?? 0) * 0.25));
     }
-    for (const c of this.contracts) {
-      if (!c.done && !c.atFinish && c.check && c.check(this, ct, this.playerRank, c.need)) {
-        this._completeContract(c);
+    if (this.contracts?.length) {
+      for (const c of this.contracts) {
+        if (!c.done && !c.atFinish && c.check && c.check(this, ct, this.playerRank, c.need)) {
+          this._completeContract(c);
+        }
       }
+      this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
     }
-    this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
   }
 
   _completeContract(c) {
@@ -7775,7 +7906,16 @@ class Game {
   /** Lap `lapNo` just completed — resolve the lap-boundary contracts. */
   _lapContracts(lapNo) {
     const ct = this._ct;
-    if (!this.contracts?.length || !ct) return;
+    // The slate clause bought nothing and cost SURE-FOOTED: `cleanLaps` is
+    // incremented nowhere else, so a player who declined a world's contracts
+    // drove a flawless lap and the feat stayed unticked forever. Both
+    // _tryContract calls below already no-op on an empty slate
+    // (`this.contracts?.find(...)` finds nothing), so only the tally and the
+    // `lapDamaged` reset were being skipped. This is safe only together with
+    // the ungated damage detector in _updateContracts above — with that
+    // detector still slate-gated, an unconditional tally would hand the feat
+    // over on a lap that cost half the hull.
+    if (!ct) return;
     if (!ct.lapDamaged) ct.cleanLaps = (ct.cleanLaps ?? 0) + 1;
     this._tryContract('cleanlap');
     ct.lapDamaged = false;
@@ -8135,6 +8275,34 @@ class Game {
     saveJSON(this._pkey('career'), this.career);
     if (won.length) this._renderQuests?.();
     return won;
+  }
+
+  /** WRECKED OUT BREAKS A STREAK, and nothing else. IRONMAN's `test` returns
+   *  `false` when `g.raceOver`, expecting _checkQuests to wipe `keys` — but
+   *  _checkQuests is only ever reached from finishRace, and a wreck-out goes
+   *  through _raceOver, which deliberately never calls finishRace. So the
+   *  `false` arm was unreachable in play and IRONMAN degraded to "finish 5
+   *  races, ever": three clean finishes, wreck out of ten races, two more
+   *  finishes, and it paid the free ARMOR level plus 1600 CR. This is the
+   *  break driven from the wreck-out path instead. It pays nothing and banks
+   *  nothing — _raceOver's whole point is that being destroyed rewards none
+   *  of a finish — and it leaves a quest already claimed alone, since a
+   *  later wreck must not silently un-claim a part the player was given. */
+  _breakStreakQuests() {
+    if (this.freeRoam || this.missionMode) return;
+    const q = (this.career.quests ??= {});
+    let hit = false;
+    for (const def of QUESTS) {
+      if (!def.streak) continue;
+      const rec = q[def.id];
+      if (!rec || rec.done || !rec.keys?.length) continue;
+      rec.keys = [];
+      hit = true;
+    }
+    if (hit) {
+      saveJSON(this._pkey('career'), this.career);
+      this._renderQuests?.();
+    }
   }
 
   /** The quest board, in the GARAGE tab beside the parts it pays for. */
@@ -10038,9 +10206,21 @@ class Game {
     if (!t?.center?.length) return 0;
     _dv.set(x, 0, z);
     const i = t.nearestIndex(_dv);
-    const lat = Math.abs(t.lateralOffset(_dv, i));
+    // THE SIGNED LATERAL IS THE THIRD ARGUMENT, and it was being thrown away.
+    // groundHeightAtPos(pos, i, lateral) forwards `lateral` to bankOffset,
+    // which ends in `v * clamp(lateral, -w, w)` — and THREE's clamp is
+    // max(min, min(max, value)), so a missing argument comes back NaN rather
+    // than 0. On every banked station (circumcircle R <= 30 with >= 2% grade,
+    // i.e. every mountain hairpin) this returned NaN, `f.mesh.position.y <=
+    // gy` was false, and the piece fell through the tarmac until the y < -3
+    // cull deleted it — against a comment two hundred lines up promising it
+    // "comes to rest where it stopped … a real obstacle for every car".
+    // _settleDebris could also write position.y = NaN, which NaNs the
+    // bounding sphere and drops a still-solid collider out of the frustum.
+    const slat = t.lateralOffset(_dv, i);
+    const lat = Math.abs(slat);
     const half = t.widthAt ? t.widthAt(i) : 9;
-    if (lat <= half + 1.5 && t.groundHeightAtPos) return t.groundHeightAtPos(_dv, i) + 0.18;
+    if (lat <= half + 1.5 && t.groundHeightAtPos) return t.groundHeightAtPos(_dv, i, slat) + 0.18;
     return (t.terrainHeight ? t.terrainHeight(x, z) : 0) + 0.18;
   }
 
@@ -10807,8 +10987,16 @@ class Game {
     // race contracts: fresh slate + counters every race (picked in startRace)
     this.contracts = [];
     this.contractCredits = 0;
+    // EVERY COUNTER A PREDICATE READS IS INITIALISED HERE. `topKph`,
+    // `boostHeld` and `leftRoad` were missing, and a missing counter is not
+    // a harmless zero: ON RAILS asks `!ct.leftRoad`, and `!undefined` is
+    // true, so the feat banked its 400 CR on a lap driven entirely in the
+    // scenery. Spelling them out means an unwritten counter reads as "not
+    // achieved" rather than "achieved". `rescues` counts SOS calls (see the
+    // detector in _updateContracts) and `prevUnstuck` is its baseline.
     this._ct = { props: 0, rivalKills: 0, drafts: 0, bigAirs: 0, closeCalls: 0,
       livestock: 0, comboMax: 1, cleanLaps: 0, weaponFired: false, lapDamaged: false,
+      topKph: 0, boostHeld: 0, leftRoad: false, rescues: 0, prevUnstuck: 0,
       prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
     this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
@@ -11182,6 +11370,7 @@ class Game {
     this.player.finished = true;
     this.player.outOfHulls = true;      // stops the respawn tick in PlayerCar.update
     this.raceOver = true;               // read by the HUD and by the results dressing
+    this._breakStreakQuests();          // the only place a streak can break
     for (const e of this.enemies) e.finished = true;
     document.getElementById('result-place').textContent = 'DESTROYED';
     document.getElementById('r-score').textContent = this.score.toLocaleString();
@@ -13228,7 +13417,7 @@ class Game {
         this._updateRolledRocks(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
-        this._updateContracts();
+        this._updateContracts(dt);
         this._updateTaunts();
         this._beginSweep(); // [MISSIONS] shared swept-pickup segment for this frame
         this._updateRoamStars(time);

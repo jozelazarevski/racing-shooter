@@ -126,10 +126,20 @@ async function storeExtras(source) {
   const cache = await caches.open(CACHE);
   let done = 0;
   for (const url of EXTRA) {
+    // `done++` used to run unconditionally, outside the try — so a preview
+    // whose fetch threw was swallowed by the catch and still counted. The run
+    // therefore always finished by reporting done === EXTRA.length whatever
+    // actually reached the cache, which is the same lie the status handler
+    // below was telling by counting entries instead of membership, reached
+    // from the other side: offline.js paints '✈ OFFLINE READY' off
+    // `done >= total - 1`, so two or more 404'd previews claimed a complete
+    // art store. Counting only what is now genuinely in the cache lets the
+    // PARTIAL branch survive, and the status handler's own tolerance of two
+    // missing previews still forgives the odd bad file.
     try {
       if (!(await cache.match(url, { ignoreSearch: true }))) await cache.add(url);
+      done++;
     } catch (err) { /* a missing preview must never abort the run */ }
-    done++;
     source?.postMessage({ type: 'ignite-store-progress', done, total: EXTRA.length });
   }
 }
@@ -186,13 +196,53 @@ self.addEventListener('message', async (e) => {
   const have = await cache.keys();
   // `playable` is the honest offline answer: the game RUNS once CORE is in.
   // `ready` means the world art is stored too — nice to have, not required.
-  const n = have.length;
+  //
+  // MEMBERSHIP, NOT CARDINALITY. These flags used to compare `have.length`
+  // against the CORE/ASSETS thresholds, which only works if the cache holds
+  // nothing but CORE+EXTRA — and it holds far more than that. The fetch
+  // handler above writes every same-origin `basic` response it fetches into
+  // this same cache, so opening /admin/, /dustline/, /404.html or robots.txt
+  // each adds an entry, and storeExtras adds 58 previews in one go. Install
+  // meanwhile tolerates per-file failure on purpose (Promise.allSettled, then
+  // only console.warn, then skipWaiting), so CORE can be incomplete while the
+  // count is large. The two facts combine into a lie: with three.module.min.js
+  // alone missing the cache holds 37 of the 38 CORE files, `37 >= 38 - 1`
+  // passed, offline.js auto-stored the art, the count reached 95 of 96 and the
+  // badge painted "✈ OFFLINE READY — the game runs with no signal" over a
+  // cache with no renderer in it. Offline boot was a blank canvas. Five CORE
+  // files missing plus six incidental navigations reached `playable` the same
+  // way with no art stored at all, so the PARTIAL branch was not merely
+  // unreachable after an art store, it was defeatable by browsing.
+  //
+  // So intersect the cache with the two lists instead of counting it. Compare
+  // on pathname because the fetch handler serves with `{ ignoreSearch: true }`
+  // — `/src/main.js?v=r437` genuinely satisfies './src/main.js', so matching
+  // the way we serve is the accurate test, not a sloppy one. `cached` has to
+  // become the membership count too: offline.js renders it as the numerator of
+  // `STORING ${d.cached}/${d.core}`, and leaving it as the raw entry count
+  // prints "✈ STORING 45/38" on exactly the branch this repair restores. The
+  // one-stray slack on CORE is gone (all 38 files exist in this repo, so a
+  // device short one file should say so); EXTRA keeps its tolerance of two,
+  // which still forgives a 404'd preview.
+  const here = (u) => new URL(u, self.location.href).pathname;
+  const set = new Set(have.map((r) => new URL(r.url).pathname));
+  const coreHave = CORE.filter((u) => set.has(here(u))).length;
+  const extraHave = EXTRA.filter((u) => set.has(here(u))).length;
   e.source?.postMessage({
     type: 'ignite-offline-status',
-    cached: n,
+    cached: coreHave + extraHave,
+    // ...and the CORE figure on its own, because `cached` is the wrong
+    // numerator for the one branch that pairs it with `core`. offline.js
+    // paints `STORING ${d.cached}/${d.core}` only when the game is NOT yet
+    // playable, i.e. while coreHave < CORE.length — but `cached` counts the
+    // previews too, so a device holding all 58 previews and 30 of 38 CORE
+    // files would read "✈ STORING 88/38". The two readouts want different
+    // numbers: the READY line totals everything stored, the STORING line
+    // tracks progress toward a runnable game.
+    coreCached: coreHave,
     total: ASSETS.length,
     core: CORE.length,
-    playable: n >= CORE.length - 1,          // tolerate one stray
-    ready: n >= ASSETS.length - 2,
+    playable: coreHave >= CORE.length,
+    ready: coreHave >= CORE.length && extraHave >= EXTRA.length - 2,
   });
 });
