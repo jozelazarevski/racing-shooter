@@ -11,3 +11,8 @@ node_modules
 # overwritten several times WITHIN one run — every instanced mesh sharing a name
 # writes the same file — so they are a live read-out, never a record.
 tools-scratch/tex-*.png
+
+# transient module-goal parse copy written by tests/test-static.mjs. It is
+# removed after the walk, but a run killed mid-walk leaves it at the repo
+# root, where a blanket `git add -A` would commit it.
+/.parsecheck.mjs
