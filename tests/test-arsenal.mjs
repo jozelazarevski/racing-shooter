@@ -23,7 +23,7 @@ const ok = (cond, msg, extra = '') => {
   if (cond) { pass++; console.log('PASS ', msg); }
   else { fail++; console.log('FAIL ', msg, extra); }
 };
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 // A TOUCH CONTEXT, deliberately: the ammo readouts that matter most live on
 // the touch buttons, because `body.touch` hides the weapon panel entirely and

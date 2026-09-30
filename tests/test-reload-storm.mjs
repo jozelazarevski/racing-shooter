@@ -44,7 +44,7 @@ copyFileSync(join(process.env.REPO ?? process.cwd(), 'src/offline.js'), join(wor
 const srv = execSync(`nohup python3 -m http.server ${PORT} --directory ${work} > /tmp/offline-harness-srv.log 2>&1 & echo $!`).toString().trim();
 await new Promise((r) => setTimeout(r, 500));
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox'] });
 const errors = [];
 

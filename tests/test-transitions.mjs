@@ -8,7 +8,7 @@
 import { chromium } from 'playwright-core';
 
 const B = 'http://127.0.0.1:8901/index.html';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await b.newPage({ viewport: { width: 412, height: 800 }, hasTouch: true });
 const errors = [];

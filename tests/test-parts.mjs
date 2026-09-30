@@ -26,7 +26,7 @@ const check = (name, ok, note = '') => {
   ok ? pass++ : fail++;
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true, isMobile: true });
 const page = await ctx.newPage();

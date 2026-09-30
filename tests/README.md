@@ -11,8 +11,26 @@ python3 -m http.server 8901        # from the repo root, in another shell
 node tests/<suite>.mjs
 ```
 
-Requires `playwright-core` and a Chromium at `/opt/pw-browsers/chromium`
-(override the `executablePath` at the top of each file if yours differs).
+Setup, once:
+
+```bash
+npm install                        # playwright-core, from the repo package.json
+```
+
+Requires a Chromium. Every suite looks at `$CHROMIUM` first and falls back to
+`/opt/pw-browsers/chromium`, which is where the Linux dev box keeps it — so on
+any other machine, point the variable at your own build and nothing else
+changes:
+
+```bash
+export CHROMIUM="$HOME/.cache/ms-playwright/chromium-1228/chrome-linux/chrome"
+CHROMIUM=/path/to/chrome node tests/<suite>.mjs     # or per-run
+```
+
+That variable was already the convention in `dustline/tools/*` and
+`test-equivalence.mjs`; the other 133 suites hardcoded the Linux path instead,
+so a checkout anywhere else failed to launch and the only documented remedy was
+editing every file by hand.
 
 ## Playtests — broad sweeps that hunt for gameplay bugs
 

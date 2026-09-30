@@ -7,7 +7,7 @@
 // count it does not compute is the same defect as a gate that does.
 import { chromium } from 'playwright-core';
 
-const LAUNCH = { executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] };
+const LAUNCH = { executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] };
 // BASE, so this can be pointed at a pristine baseline on another port. It
 // hardcoded localhost:8901 in seven places — the fourth file in this suite with
 // that defect, and HANDOVER lists it as a trap precisely because a gate you

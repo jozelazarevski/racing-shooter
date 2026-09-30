@@ -10,7 +10,7 @@
 // suite checks the properties that calculation must have.
 import { chromium } from 'playwright-core';
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await b.newPage({ viewport: { width: 480, height: 360 } });
 const errors = [];

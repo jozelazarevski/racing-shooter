@@ -25,7 +25,7 @@ const spec = arg('--worlds', '1-21');
 const OUT = arg('--out', 'pace-dump.json');
 const [lo, hi] = spec.includes('-') ? spec.split('-').map(Number) : [Number(spec), Number(spec)];
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 400, height: 300 } });
 page.setDefaultTimeout(600000);

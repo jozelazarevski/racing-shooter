@@ -2,7 +2,7 @@
 // Checks per world: AI progress/stuck, NaN, falling through terrain, lap
 // detection, pickup reachability, hazard sanity, and page errors.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const bugs = [];
 const note = (lvl, name, detail) => { bugs.push({ lvl, name, detail }); console.log(`  BUG  L${lvl} ${name}: ${detail}`); };
 

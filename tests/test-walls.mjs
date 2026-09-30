@@ -22,7 +22,7 @@ const ok = (cond, msg, extra = '') => {
   else { fail++; console.log('FAIL ', msg, extra); }
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
 for (const lv of WORLDS) {

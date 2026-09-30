@@ -27,7 +27,7 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 const WORLDS = (process.env.WORLDS ?? '1,3,10,19').split(',').map(Number);
 const SECS = Number(process.env.SECS ?? 60);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 480, height: 320 } });
 page.setDefaultTimeout(600000);

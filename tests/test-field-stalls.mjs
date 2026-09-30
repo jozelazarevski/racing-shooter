@@ -39,7 +39,7 @@
  */
 import { chromium } from 'playwright-core';
 let fail = 0;
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 480, height: 320 } });
 page.setDefaultTimeout(900000);
