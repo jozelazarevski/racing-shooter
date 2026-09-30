@@ -9158,9 +9158,13 @@ class Game {
       // throttle simply outruns anything dropped behind it.
       const d = M.def;
       // THE ENGAGEMENT RULE: you are only SURVIVING while something is
-      // actually shooting at you. A gunship tops out at 46 u/s and a flat-out
-      // car does ~55, so without this the mission is "drive a circle for 70 s"
-      // and never take a scratch — measured, hull untouched the whole run.
+      // actually shooting at you. A gunship cruises at ~37 u/s, not the 46
+      // MAX_SPEED names: thrust runs before drag, so self-propelled flight
+      // settles at ACCEL/0.9 - ACCEL*dt, which is 36.1 to 37.5 across our dt
+      // range, and 46 only clamps the shockwave knockback impulse. A flat-out
+      // car does ~55, so the gap is wider than 46 implied, and without this
+      // the mission is "drive a circle for 70 s" and never take a scratch —
+      // measured, hull untouched the whole run.
       // Bank time by staying in the fight; run and the clock simply stops.
       M.engaged = this.choppers.some((c) => c.alive
         && (c.pos.x - p.pos.x) ** 2 + (c.pos.z - p.pos.z) ** 2 < 80 * 80);
@@ -9897,10 +9901,12 @@ class Game {
 
   // ---------- choppers ----------
   /** `intercept` drops the gunship in the player's PATH instead of on a random
-   *  bearing. [MISSIONS] SURVIVOR needs it: a chopper tops out at 46 u/s and a
-   *  flat-out car does ~55, so one spawned 80 u away on a random bearing can
-   *  never close and the whole assault turns into scenery you outrun. An
-   *  interceptor lands ahead and off to one side, so the player drives into
+   *  bearing. [MISSIONS] SURVIVOR needs it: a chopper cruises at ~37 u/s under
+   *  its own thrust (MAX_SPEED's 46 clamps shockwave knockback, it is not the
+   *  cruise ceiling) and a flat-out car does ~55, so one spawned 80 u away on
+   *  a random bearing can never close — the deficit is ~18 u/s, not the ~9 the
+   *  46 figure implied — and the whole assault turns into scenery you outrun.
+   *  An interceptor lands ahead and off to one side, so the player drives into
    *  gun range and has to actually fight or break the line. */
   _spawnChopper(intercept = false) {
     const p = this.player.pos;

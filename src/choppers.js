@@ -6,7 +6,18 @@ import * as THREE from 'three';
 
 const HOVER_ALT = 7;      // hover height above the ground (bob ±0.8 on top)
 const ORBIT_R = 14;       // offset of the orbit point from the player
-const MAX_SPEED = 46;     // slower than a flat-out car — you can outrun it
+// MAX_SPEED is the knockback clamp, not the cruise speed. Thrust is applied
+// and drag only afterwards, so self-propelled flight settles at the fixed
+// point ACCEL/0.9 - ACCEL*dt: 37.2 u/s at dt = 1/60, 37.5 at 144 fps, 36.1 at
+// the 0.05 dt clamp in the frame loop, and 37.78 in the limit. A gunship
+// therefore cruises around 37, well under a flat-out car's ~55 — you can
+// outrun it, by a wider margin than 46 ever suggested. 46 is still live and
+// load-bearing because fireShockwave (weapons.js) writes a radial impulse of
+// up to 24 u/s straight into c.vel, bypassing thrust and drag; raw velocity
+// measured 51 to 59 u/s right after a blast, and this clamp is what stops a
+// blasted chopper being flung off the stage before the orbit chase reels it
+// back in.
+const MAX_SPEED = 46;     // ceiling on shockwave knockback; cruise is ~37
 const ACCEL = 34;         // horizontal thrust toward the orbit point
 const BURST_GAP_MIN = 2.2; // seconds between 4-round bursts
 const BURST_GAP_VAR = 1.0; // ...plus up to this much
