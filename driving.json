@@ -69,7 +69,8 @@
     "coastProfFadeU": 320,
     "coastProfReachU": 900,
     "coastProfSmoothPasses": 4,
-    "retainMaxDepthU": 26
+    "retainMaxDepthU": 26,
+    "bankTuck": 0.36
   },
   "route": {
     "streetPadM": 2,

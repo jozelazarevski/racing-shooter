@@ -7597,7 +7597,11 @@ export class Track {
     // once they wander past it.
     this.worldBounds = 1400;
     // Baked contact-shadow specs {x, z, r, y} collected by every builder and
-    // realized as ONE instanced decal mesh at the end of _buildEnvironment.
+    // realized as ONE instanced decal mesh by _buildContactShadows, which
+    // runs in this constructor after _conformTrees and _treelineLaw (and
+    // before _applyShadowLaw), not at the end of _buildEnvironment: the
+    // bake filters this queue against the cull result, dropping the decal of
+    // every tree those two passes scaled away, so it has to run after them.
     this._shadows = [];
     this._buildRoad();
     // dirt shoulder aprons under the road edges: they bury themselves where
@@ -7621,6 +7625,28 @@ export class Track {
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
     this._treelineLaw();     // r407: nothing grows inside a wall, nothing on the ice
+    // THE BAKE RUNS AFTER THE CULLS, not at the tail of _buildEnvironment.
+    // Both passes above scale a rejected tree to 0.0001 and set `tr.culled`,
+    // and neither touches `this._shadows` or the baked mesh — so a decal baked
+    // before them was left sitting at 0.4 opacity on bare ground under a tree
+    // that is no longer there. `_conformTrees`' own docstring (WR-7.6) demands
+    // a culled tree be "scaled away, collider off, never left half-buried",
+    // and the decal is the visual half of exactly that. Moved here, the bake
+    // can read the cull result — see _buildContactShadows, where the filter
+    // lives; moving it alone would be inert, because nothing between the old
+    // call site and this one changes a terrain height or an instance matrix
+    // the bake reads.
+    //
+    // Still BEFORE _applyShadowLaw, and no later: that law's NONE regex
+    // matches the literal name 'contact-shadows', which the bake assigns just
+    // before adding the mesh to this.group, so the mesh must already exist
+    // when the law traverses. This also leaves the r405/r406/r410 trio below
+    // in its documented order. Safe to move across the two culls: the lowest
+    // _addShadow call site in the file is 8414, well clear of them, so the
+    // move neither skips a producer nor newly admits one, and the bake draws
+    // no Math.random and no rnd(), so the shared stream that _clearIceCarpet's
+    // note warns every later world re-rolls from is untouched.
+    this._buildContactShadows();
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
     this._clearRoadSolids();  // r406: no collider left biting the carriageway
     this._pruneGhostTrees();  // r410: no collider left standing where no tree is
@@ -9292,19 +9318,53 @@ export class Track {
     // the hillside. The tuck is now DEEPEST under the road and eases out to
     // nothing at the far edge of the blend, so the ribbon always has clear air
     // beneath it and there is nothing to fight with.
-    const tuck = 0.55 * (1 - THREE.MathUtils.smoothstep(d, 12, 30))
+    let tuck = 0.55 * (1 - THREE.MathUtils.smoothstep(d, 12, 30))
       + (this.T.retainingWalls || this.T.shelfRoad
         ? 0.75 * THREE.MathUtils.smoothstep(d, 2, 11) : 0);
     // W-CURVE-01.7 (r400): where the road banks, the corridor datum follows
     // the BANKED surface at this point's own signed lateral — the verge
     // conforms to the twisted ribbon (7.11's no-step law holds on both
-    // edges), and the tuck stays a constant clearance under it, so the
-    // inside edge can drop without the terrain poking through.
+    // edges), and the tuck is taken from it, deepened by the cross-slope
+    // below because a flat one was measurably not enough, so the inside
+    // edge can drop without the terrain poking through.
     let datum = roadY;
     if (this._bank9 && bi !== undefined) {
       const cs9 = this.center[bi], nv9 = this.nrm[bi];
       datum += this.bankOffset(bi,
         (x - cs9.x) * nv9.x + (z - cs9.z) * nv9.z);
+      // A CONSTANT TUCK UNDER A TWISTED DECK IS NOT A CONSTANT CLEARANCE once
+      // the 10 u terrain facets interpolate across it, and since `_roadCeil`
+      // follows the bank this tuck is all that holds those vertices down: the
+      // ceiling used to clamp the raised side to c.y - 0.35 off the UNBANKED
+      // datum, and with that gone the vertices became blend-bound. Censused
+      // on GLACIER COL over 22194 probes (every banked station and its 4
+      // neighbours, 81 laterals across the drivable width each), drawn
+      // terrain above the drawn deck, read off the built 'terrain-near'
+      // vertices (`_drawnGroundY` agrees at every probe): 480 with the
+      // unbanked ceiling, 522 with the banked one and no deepening, 42 of them
+      // new, worst +0.167 u at station 475 lateral 3.105, clustered at
+      // 250, 255-257, 474-481 and 509-512. 40 of the 42 sit where the deck is
+      // banked DOWN at the probe, so the excess is not confined to the raised
+      // verge, and the deepening takes the cross-slope's magnitude on both
+      // sides (a raised-half-only form was not measured). Swept on that
+      // world: bankTuck 0.2 leaves 8 new, 0.3 leaves 3, 0.35 and 0.351 leave
+      // 1 (station 477, lateral -4.304), 0.352 is the first with none. 0.36
+      // ships (driving.json patch02b): 435 intrusions, 0 new and 45 cleared
+      // against the unbanked baseline, and 0 new on SUMMIT CLIMB, FALKEN
+      // RIDGE, COL DE SARANNE, BRIDGE RUN and OLIVE PASS, whose totals
+      // (0, 0, 34, 0, 0) do not move. The apron gains stay: the r392 skirt
+      // metric is 53 (61 unbanked), lip > face > toe violations 3 (8).
+      //
+      // What it costs is the physics verge, because `terrainHeight` shares
+      // this function: over 2290 GLACIER COL probes at widthAt + 0..2 on both
+      // edges of the 229 banked stations, mean |terrain - banked surface|
+      // goes 1.808 u -> 2.014 u (1.862 unbanked), and probes within 7.11's
+      // 0.15 m step 9 -> 6 (13 unbanked) — non-compliant before and after.
+      // Inside this branch only, so a world that never banks is untouched:
+      // PINE VALLEY's 25 drawn mesh groups hash identical to the build
+      // before this term.
+      const D9 = (typeof window !== 'undefined' && window.__DRIVING?.patch02b) || {};
+      tuck += Math.abs(datum - roadY) * (D9.bankTuck ?? 0.36);
     }
     let h;
     if (d <= near) h = datum - tuck;
@@ -11361,8 +11421,10 @@ export class Track {
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
     // The nearest sample is already in hand, so the floor no longer re-scans
-    // for it — and it is now the SAME sample the mesh clamps against.
-    return Math.min(h, this._roadCeil(bi, nd));
+    // for it — and it is now the SAME sample the mesh clamps against. (x, z)
+    // go with it so the ceiling reads the cross-slope at this point's own
+    // signed lateral, off the same station `_blendHeight` was handed above.
+    return Math.min(h, this._roadCeil(bi, nd, x, z));
   }
 
   /** THE HEIGHT THE GROUND IS ACTUALLY DRAWN AT, at any (x, z).
@@ -11477,7 +11539,11 @@ export class Track {
       if (d2 < best) { best = d2; bi = i; }
     }
     const d = Math.sqrt(best);
-    return Math.min(h, this._roadCeil(bi, d));
+    // Consistency rather than correctness: nothing calls `_roadFloor` today —
+    // grep over src, index.html, tests and tools-scratch finds only this
+    // definition — but if the third consumer is ever revived it must not be
+    // the one silently unbanked sibling of the other two.
+    return Math.min(h, this._roadCeil(bi, d, x, z));
   }
 
   /** The highest the ground may be at distance `d` from road sample `bi`.
@@ -11493,12 +11559,26 @@ export class Track {
    *  the road edge.
    *
    *  A cone fixes it by construction: full clearance right across the visible
-   *  ribbon, then a straight ramp away at a bounded gradient. Because the
-   *  ceiling is linear in `d`, interpolating between two vertices that both
-   *  satisfy it cannot produce a point that violates it — which is exactly the
-   *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
-   *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
-  _roadCeil(bi, d) {
+   *  ribbon, then a straight ramp away at a bounded gradient. It bounds the
+   *  VERTICES exactly and very nearly bounds the chords between them — but the
+   *  claim that used to stand here, that linearity in `d` makes a violating
+   *  chord between two satisfying vertices impossible, was already false
+   *  before the cross-slope term below was added, and measurably so. Three
+   *  kinks break it: `Math.max(0, d - edge)` is convex, so a chord across the
+   *  knee lies above the cone; `bankOffset` clamps its lateral at
+   *  widthAt + 1.5 while `edge` is widthAt + 3.5, leaving a 2 u band where the
+   *  ceiling is flat sideways; and `bi` switches discontinuously between
+   *  neighbouring lattice vertices, as does the `d > 34` step to Infinity.
+   *  Sampled on GLACIER COL across the 21 lattice cells near a banked station
+   *  that belong wholly to ONE station (so only the kinks remain), 16 of 210
+   *  chord points stood above the unbanked ceiling, worst 1.47 u at station
+   *  257 by the d > 34 cliff; with the bank term, 1 of 210, worst 0.12 u.
+   *  What actually keeps the ribbon clear is the corridor tuck in
+   *  `_blendHeight` — 0.55 u, 1.29 u on a shelfRoad world, plus bankTuck x
+   *  the cross-slope where the road banks — and not an exact
+   *  interpolation guarantee. 0.5 still lets a hillside climb 10 u within
+   *  20 u of the verge, so cuttings still read as cuttings. */
+  _roadCeil(bi, d, x, z) {
     // FAR FROM THE ROAD THERE IS NO CEILING. This guard used to live in
     // `_roadFloor` — that is, in the physics only — while the mesh applied the
     // ceiling at any distance. The tunnel branch below ignores `d` entirely,
@@ -11518,7 +11598,48 @@ export class Track {
     // the ribbon as DRAWN, not as driven — the fringe is part of the road
     const ribbon = drivable + (WALL_OFF + 0.6 - ROAD_HALF);
     const edge = ribbon + 1.5;
-    return this.center[bi].y - 0.35 + Math.max(0, d - edge) * 0.5;
+    // W-CURVE-01.7 (r400) FINISHED HERE. The ceiling was derived from the
+    // UNBANKED `center[bi].y`, so it threw away the entire positive half of
+    // the cross-slope `_blendHeight` had just applied (its datum, 9326). On
+    // GLACIER COL station 293 the blend offered c.y + 0.537 on the raised side
+    // and this clamped it to c.y - 0.350: 0.887 u discarded, worst 0.890 at
+    // station 477, across 229 banked stations and 365 of 1832 raised-side
+    // probes. The physics consequence is the sharper one — `groundHeightAt`
+    // (8630) DOES bank the surface the car drives on, so the ground under the
+    // outer wheels was held up to 2.18 u below the tarmac instead of the
+    // intended 0.35 u, two elevation systems disagreeing about the same edge.
+    // Same datum and same signed lateral as the blend's, so the two cannot
+    // drift apart; taking (x, z) rather than a precomputed lateral keeps the
+    // dot product in ONE place. The guard tests BOTH coordinates, in the
+    // Number.isFinite style used nearby: the first cut tested `x !==
+    // undefined` alone, so a caller passing x without z got NaN ground
+    // rather than the promised fallback. Latent — every live caller passes
+    // both — but omitting either now leaves the old unbanked answer for any
+    // caller that has no point in hand.
+    //
+    // Re-measured on a live GLACIER COL boot over 2290 probes spanning both
+    // edges of all 229 banked stations: the two systems agree more closely at
+    // 334 of them (best 0.881 u, which is the discarded cross-slope coming
+    // back) and less closely at 33 (worst 0.317 u). Every one of those 33 is
+    // in the pre-existing hairpin-stack set, where the nearest centreline
+    // sample belongs to a DIFFERENT leg of the lap and the ceiling therefore
+    // follows that leg's bank — a cross-leg case `_roadClampY` guards and this
+    // cone never did. The count of probes inside 7.11's 0.15 m step is 76
+    // before and 76 after, so nothing new crosses the law.
+    //
+    // The `this._bank9 &&` short-circuit is load-bearing, not decoration:
+    // `_terrainMeshHeight` runs this 201x201 = 40401 times per terrain build
+    // and `terrainHeight` once per physics query, and a world that never
+    // banks (six do; see the apron note in `_buildRoadSkirts`) must not pay
+    // two multiplies and two subtracts for a guaranteed zero. It sits BELOW
+    // the `d > 34` guard and the bore branch on purpose: that branch returns
+    // the hill standing over a carriageway, which has no cross-slope to
+    // follow.
+    const cs = this.center[bi];
+    const bank = (this._bank9 && Number.isFinite(x) && Number.isFinite(z))
+      ? this.bankOffset(bi, (x - cs.x) * this.nrm[bi].x + (z - cs.z) * this.nrm[bi].z)
+      : 0;
+    return cs.y + bank - 0.35 + Math.max(0, d - edge) * 0.5;
   }
 
   /** Is this point inside a tunnel bore, and if so what is the bore there?
@@ -11615,8 +11736,12 @@ export class Track {
     }
     // and the same hard ceiling the physics height uses — this is the function
     // that actually feeds the rendered vertices, so without it the ground can
-    // still be DRAWN through the carriageway even when the car drives level
-    h = Math.min(h, this._roadCeil(bi, d));
+    // still be DRAWN through the carriageway even when the car drives level.
+    // (x, z) for the same reason the blend above takes them: without the
+    // cross-slope here the drawn mesh and the physics ground diverge on the
+    // raised edge of a banked curve, which is the exact failure the two
+    // functions were unified to prevent.
+    h = Math.min(h, this._roadCeil(bi, d, x, z));
     return h;
   }
 
@@ -11790,12 +11915,58 @@ export class Track {
         const face = mix(faceFull, 0.5);
         const latToe = Math.min(wOff + face + mix(steep ? 1.1 : 2.8, 0.3), maxLat);
         const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
+        // W-CURVE-01.7 (r400) REACHES THE APRON TOO, in the same change as
+        // `_roadCeil`'s cross-slope term: once the ceiling follows the bank,
+        // the ground beside a raised edge may stand up to the banked surface,
+        // and an apron hung off the UNBANKED c.y no longer meets the ribbon it
+        // is supposed to skirt. The lip itself is never what shows. latLip is
+        // wOff + 0.55 = widthAt + 1.95 and the ribbon is drawn to
+        // widthAt + 2.0, so row 0 always sits 0.05 u inside the opaque ribbon
+        // (0 of 1802 row-0 vertices outside it, before this change and after).
+        // An earlier cut of this note counted "38 of the 392 row-0 vertices"
+        // unhidden; that count excluded at widthAt + 1.2, the r392 post-pass
+        // threshold below, not at the ribbon's drawn width, and was wrong. The
+        // first VISIBLE row is row 1, latFace.
+        //
+        // So the case for banking all three rows is what the review's A/B on
+        // GLACIER COL measured: the r392 skirt metric (vertices more than
+        // 0.05 u above the DRAWN deck of whatever leg they land on, 900
+        // stations x 2 sides x 3 rows) 61 -> 53; lip > face > toe row-order
+        // violations 8 -> 3; drawn terrain standing above row 1 at 1007 -> 990
+        // of 1760 row-1 vertices, worst 6.368 -> 5.107 u; and a 1.89 u gap
+        // closed that predates this change, between the banked ribbon edge and
+        // the unbanked lip hanging off it. None of those gets worse, and the
+        // r392 post-pass needs no matching change. Re-read from the built
+        // 'road-skirt' meshes with this code: GLACIER COL 3 row-order
+        // violations and a worst 5.107 u of drawn ground over row 1, the
+        // review's after-values; row 0 outside the ribbon 0 of 1802 on all
+        // six banking worlds. Each row takes the offset
+        // at its OWN lateral, which is why the laterals are hoisted out of
+        // `rowSpec` here, and BOTH arms of the toe `mix` take it, or the toe
+        // stays on the unbanked datum under a face that has moved.
+        //
+        // SIX worlds bank, not one. Read off `_bank9`: SUMMIT CLIMB (id 6) 61
+        // stations, FALKEN RIDGE (21) 19, COL DE SARANNE (22) 57, BRIDGE RUN
+        // (55) 20, OLIVE PASS (61) 57, GLACIER COL (66) 229. On GLACIER COL sf
+        // is 0 at every banked station (29 span stations, none banked), so
+        // `mix` collapses to its off-value there; that does NOT hold
+        // everywhere — SUMMIT CLIMB reaches sf 1 at a banked station. What
+        // holds on all six is that this change leaves sf alone: A/B'ing
+        // `_roadCeil` with and without its (x, z), sf changed at 0 of the
+        // 886 banked station-sides, worst |dsf| 0, matching the review's
+        // count on the other five. The review attributes that to the blend
+        // binding rather than the ceiling at latFull, so the cross-slope term
+        // never reaches the terrain sample the drop-detector arm reads.
+        const bankAt = (lat) => this.bankOffset(j, lat * side);
+        const latLip = Math.min(wOff + 0.55, maxLat);
+        const latFace = Math.min(wOff + face, maxLat);
         // on a bridge span the apron collapses to a hair under the deck edge
-        const toeY = mix(Math.min(c.y - 2.9, ground - 0.6), c.y - 1.6);
+        const toeY = mix(Math.min(c.y + bankAt(latToe) - 2.9, ground - 0.6),
+          c.y + bankAt(latToe) - 1.6);
         const rowSpec = [
-          [Math.min(wOff + 0.55, maxLat), c.y - mix(0.06, 0.34), dirt],
-          [Math.min(wOff + face, maxLat),
-            c.y - mix(steep ? 1.5 : 2.1, 1.0) - Math.sin(17 * t - side) * 0.35 * (1 - sf), dirt],
+          [latLip, c.y + bankAt(latLip) - mix(0.06, 0.34), dirt],
+          [latFace, c.y + bankAt(latFace)
+            - mix(steep ? 1.5 : 2.1, 1.0) - Math.sin(17 * t - side) * 0.35 * (1 - sf), dirt],
           [latToe, toeY, dark],
         ];
         for (let r = 0; r < rows; r++) {
@@ -13803,10 +13974,13 @@ export class Track {
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     // LAST OF THE SCENERY, so an authored tree or boulder always wins its spot
-    // over anything the world scattered there — and still BEFORE the contact
-    // shadows, which have to see it to ground it.
+    // over anything the world scattered there. The contact-shadow bake used to
+    // follow on the next line, and the note that used to stand here — "still
+    // BEFORE the contact shadows, which have to see it to ground it" — was the
+    // one-directional reasoning that produced the orphan-decal defect: the bake
+    // also has to see what got scaled AWAY, and the tree culls do not run until
+    // after this function returns. It is called from the constructor now.
     this._buildEditProps();                          // trees and rocks the owner planted
-    this._buildContactShadows();                     // baked AO under everything
   }
 
   /** OUTBACK RED DIRT: the dry creek beds, drawn from the wash polylines
@@ -20925,7 +21099,10 @@ export class Track {
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
    *  world units (≈1.3× the object footprint). Pass y for objects sitting on
    *  the road/cliff (quad stays flat there); omit it for terrain objects —
-   *  the decal then samples terrainHeight and tilts to the local slope. */
+   *  the decal then samples terrainHeight and tilts to the local slope. An
+   *  entry queued at the exact (x, z) of a tree that a later cull scales away
+   *  is dropped by the bake, unless a live tree, solid, building or prop
+   *  stands on the same coordinates (see _buildContactShadows). */
   _addShadow(x, z, r, y = null) {
     this._shadows.push({ x, z, r, y });
   }
@@ -20937,6 +21114,62 @@ export class Track {
   _buildContactShadows() {
     const specs = this._shadows;
     if (!specs.length) return;
+    // A CULLED TREE TAKES ITS DECAL WITH IT. `_conformTrees` and
+    // `_treelineLaw` scale a rejected tree to 0.0001 and turn its collider
+    // off, and neither knows this queue exists, so the AO decal stayed behind
+    // on bare ground — a dark 0.4-opacity ring under nothing at all.
+    //
+    // The pairing is re-derived here from the tree record's own coordinates
+    // rather than threaded through `_addShadow`: at all 13 tree sites that
+    // queue a decal, the x/z handed to _addShadow are the SAME expressions
+    // reading the SAME object as the record's x/z with no arithmetic between
+    // them, so the two are bit-identical doubles and the string key matches
+    // exactly. That keeps every registration site and _addShadow's ~60 callers
+    // out of the blast radius. Neither cull mutates tr.x or tr.z (the cull
+    // block writes r, solid and culled; the seating branch writes tr.y), so
+    // the key is still the value that was registered.
+    //
+    // A key is a POSITION, though, not a tree, and a position is not owned by
+    // the tree alone. The first cut of this seeded `live` from `this.trees`
+    // only and claimed a live object's shadow could not be blanked; review
+    // falsified that on CANYON RUN with an editor-authored boulder and pine
+    // at x 868.9, z 316.5 (src/editor.js serialises nature props to 0.1 u,
+    // so exact coincidence is ordinary authoring, not a freak): the pine was
+    // culled, the boulder kept its stone collider and lost its decal, and
+    // the only trace was `retracted` exceeding `keys`. Reproduced on the
+    // tree-only seeding by pushing a stone solid and a decal onto a culled
+    // tree's exact coordinates and re-baking: 0 decals left at that point,
+    // retracted 108 against 107 keys on CANYON RUN, 10 against 9 on GLACIER
+    // COL. With the seeding below the same probe keeps both decals, shared 1,
+    // over 0, on both worlds.
+    //
+    // So `live` is every position something still stands on — the surviving
+    // trees AND every solid, building and prop — and a culled key that any of
+    // them shares is dropped, both decals kept. The worst case degrades to
+    // the old orphan rather than to a standing object with no shadow, and
+    // `shared` counts each such drop, tree-on-tree and tree-on-other alike,
+    // so the one way this scheme can miss an orphan is countable. `over`
+    // publishes retracted - keys: more decals retracted than culled positions
+    // means an entry nobody culled lost its shadow, so a positive `over` is
+    // the alarm (negative is benign: a culled tree whose builder queued no
+    // decal). The wider seeding does not swallow ordinary retractions: on
+    // CANYON RUN, GLACIER COL and COL DE SARANNE no culled tree's key
+    // coincides with any solid, building or prop, so the extra seeding
+    // removes no key there, and keys equals retracted at 107, 9 and 1.
+    // `this.solids` is still the whole build-time list here —
+    // `_clearRoadSolids` trims it only after this bake — which is the right
+    // one, since a collider it later drops keeps its mesh. The
+    // Number.isFinite guards match the cull passes' own and keep a NaN
+    // coordinate from ever producing a key.
+    const gone = new Set(), live = new Set();
+    for (const tr of this.trees ?? []) {
+      if (!Number.isFinite(tr?.x) || !Number.isFinite(tr.z)) continue;
+      (tr.culled ? gone : live).add(tr.x + ',' + tr.z);
+    }
+    for (const reg of [this.solids, this.buildings, this.props]) for (const o of reg ?? [])
+      if (Number.isFinite(o?.x) && Number.isFinite(o.z)) live.add(o.x + ',' + o.z);
+    let shared = 0;
+    for (const key of live) if (gone.delete(key)) shared++;
     const geo = new THREE.PlaneGeometry(2, 2);       // scale r → radius r
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
@@ -20948,8 +21181,14 @@ export class Track {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    let k = 0;
+    let k = 0, retracted = 0;
     for (const s of specs) {
+      // retracted FIRST, so a decal whose tree has been scaled away never
+      // reaches the terrain sample, the slope conform or the road walk below.
+      // Capacity is unaffected: the mesh is allocated at specs.length and
+      // `mesh.count = k` already publishes the shortfall, so skipping more
+      // entries only lowers k, exactly as the r253 `drop` path already does.
+      if (gone.size && gone.has(s.x + ',' + s.z)) { retracted++; continue; }
       let y = s.y;
       if (y === null) {
         y = this.terrainHeight(s.x, s.z);
@@ -21014,6 +21253,17 @@ export class Track {
       m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(rr, 1, rr));
       mesh.setMatrixAt(k++, m4);
     }
+    // Build telemetry, the same family as _treesConformed, _treelineCull,
+    // _solidTrim, _shadowLaw and _ghostTreesPruned: `retracted` is how many
+    // decals the culls took with them, `keys` how many culled-tree positions
+    // were unambiguous, a non-zero `shared` is the only way an orphan can
+    // survive this pass, and a positive `over` flags a live object's decal
+    // taken with them. NOT covered, and deliberately so: `applyRouteDensity`
+    // culls from main.js after the Track constructor has returned, so its
+    // orphans outlive any bake position inside it — retracting those needs
+    // the final instance index recorded per spec here and a zero-scale
+    // setMatrixAt at cull time, which is a larger change.
+    this._shadowRetract = { keys: gone.size, shared, retracted, over: retracted - gone.size };
     mesh.count = k;                    // ...so the skipped ones are not drawn
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';

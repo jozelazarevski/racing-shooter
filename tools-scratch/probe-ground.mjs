@@ -4,7 +4,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
 const [id, X, Z] = process.argv.slice(2);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 480, height: 300 } });
 page.setDefaultTimeout(600000);
@@ -14,13 +14,13 @@ const r = await page.evaluate(({ X, Z }) => {
   const t = window.__game.track;
   const at = (x, z) => {
     const ns = t._nearestSample(x, z);
-    const blend = t._blendHeight(ns.d, t.center[ns.i].y, x, z);
+    const blend = t._blendHeight(ns.d, t.center[ns.i].y, x, z, ns.i);
     return { d: +ns.d.toFixed(2), i: ns.i, roadY: +t.center[ns.i].y.toFixed(2),
       hill: +t._hillNoise(x, z).toFixed(2), blend: +blend.toFixed(2),
       valley: +t._valleyWall(ns.d).toFixed(2),
       gorge: +((t._gorgeCut?.(x, z)) ?? 0).toFixed(2),
       ridge: t._tunnels?.length ? +(t._tunnelRidge(x, z, 0) ).toFixed(2) : 0,
-      ceil: +t._roadCeil(ns.i, ns.d).toFixed(2),
+      ceil: +t._roadCeil(ns.i, ns.d, x, z).toFixed(2),
       th: +t.terrainHeight(x, z).toFixed(2), mh: +t._terrainMeshHeight(x, z).toFixed(2) };
   };
   const out = { at: at(X, Z), grid: [] };

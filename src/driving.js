@@ -226,6 +226,16 @@ export const DRIVING = {
     coastProfReachU: 900,
     coastProfSmoothPasses: 4,
     retainMaxDepthU: 26,
+    // W-CURVE-01.7 (r400): extra corridor tuck per unit of cross-slope, read
+    // by `_blendHeight` in track.js, which deepens the tuck by
+    // bankTuck x |bankOffset| at every ground sample under a banked road. A
+    // flat 0.55 u tuck let the 10 u terrain facets surface through the
+    // twisted deck once `_roadCeil` followed the bank: 42 new drawn-terrain-
+    // above-deck probes on GLACIER COL. 0.352 is the smallest value with
+    // none there and 0.36 the first hundredth past it; the other five
+    // banking worlds gain none at 0, 0.36, 0.4, 0.5 or 0.7. Census at the
+    // consumer.
+    bankTuck: 0.36,
   },
 
   // RALLY_CORRIDOR_REFACTOR v2.0 §14 — the route constants, complete as the
