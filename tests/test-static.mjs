@@ -64,9 +64,8 @@ check(!!ver && sw.includes(ver), 'sw.js CACHE name carries the version', `lookin
 
 // 4. every module PARSES AS A MODULE.
 //
-// `node --check src/track.js` is not this check. The repo's package.json
-// declares no `type` (deliberately, and its own description says why), so node
-// parses a bare `.js` file in the SCRIPT goal, which is sloppy mode
+// `node --check src/track.js` was not this check. With no package.json in the
+// repo, node parsed a bare `.js` file in the SCRIPT goal, which is sloppy mode
 // — and in sloppy mode an object literal that is missing its closing brace
 // degenerates into a chain of labelled statements and blocks, which is valid.
 // Merging the four new worlds left exactly that: two element kits unclosed.
@@ -77,6 +76,12 @@ check(!!ver && sw.includes(ver), 'sw.js CACHE name carries the version', `lookin
 // Copying to a `.mjs` extension forces the MODULE goal, which is what the
 // browser does, and reports the file and line. Cheap, and it is the difference
 // between catching this here in 200 ms and catching it after a deploy.
+//
+// The repo now has a package.json declaring `"type": "module"`, so node parses
+// a bare `.js` in the module goal too and a direct `node --check` would catch
+// the same fault. The copy stays anyway: `.mjs` forces the module goal
+// whatever package.json says, so this check cannot be quietly disarmed by a
+// later edit to that file, which is exactly how it was disarmed before.
 const tmp = join(ROOT, '.parsecheck.mjs');
 const badParse = [];
 for (const f of walk(ROOT)) {
