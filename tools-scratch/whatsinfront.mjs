@@ -10,7 +10,7 @@
  *   LEVEL=66 STATION=0.5 node whatsinfront.mjs
  */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 400, height: 700 } });
 p.setDefaultTimeout(600000);

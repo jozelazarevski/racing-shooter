@@ -23,7 +23,7 @@ const CAMS = (process.env.CAMS ?? '0,2,3').split(',').map(Number);
 const STATIONS = process.env.STATIONS
   ? process.env.STATIONS.split(',').map(Number)
   : Array.from({ length: +(process.env.NSTA ?? 24) }, (_, i) => i / +(process.env.NSTA ?? 24));
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 430, height: 800 } });
 p.setDefaultTimeout(600000);

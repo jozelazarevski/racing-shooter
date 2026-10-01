@@ -3,7 +3,7 @@ const LVL=Number(process.env.LVL??2);
 const C=[Number(process.env.CX),Number(process.env.CY),Number(process.env.CZ)];
 const T=[Number(process.env.TX),Number(process.env.TY),Number(process.env.TZ)];
 const PX=Number(process.env.PX??580), PY=Number(process.env.PY??190);
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await browser.newPage({ viewport:{ width:900, height:520 } });
 p.setDefaultTimeout(300000);

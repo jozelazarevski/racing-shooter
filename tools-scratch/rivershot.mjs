@@ -14,7 +14,7 @@ import { promises as fs } from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const DIR = process.env.DIR ?? '/tmp';
 const W = +(process.env.W ?? 900), H = +(process.env.H ?? 560);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: W, height: H } });
 p.setDefaultTimeout(900000);

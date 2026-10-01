@@ -3,7 +3,7 @@
  * unlock flags, nothing primed. */
 import { chromium } from 'playwright-core';
 const URL0 = process.env.URL0 ?? 'https://jozelazarevski.github.io/racing-shooter/';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true, isMobile: true });
 const p = await ctx.newPage(); p.setDefaultTimeout(600000);

@@ -2,7 +2,7 @@
  * §4: 52-58%), measured through the real frame loop on a portrait viewport. */
 import { chromium } from 'playwright-core';
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await browser.newPage({ viewport: { width: 390, height: 844 } });

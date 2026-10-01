@@ -4,7 +4,7 @@
  * test-river's 4.1 u ceiling. Print water surface, terrain and bed either side
  * of it, on both trees, walking along the river. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 400, height: 260 } });
 page.setDefaultTimeout(900000);

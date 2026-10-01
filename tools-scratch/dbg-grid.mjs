@@ -3,7 +3,7 @@
  * Reports every slot's world position, the gap between rows in metres, the
  * total front-to-back depth, and which slot the player takes. */
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 320, height: 200 } });
 p.setDefaultTimeout(600000);

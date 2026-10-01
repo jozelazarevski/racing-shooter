@@ -1,6 +1,6 @@
 /* Analytic: player top-speed range vs the live grid, across worlds. */
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await browser.newPage({ viewport:{ width:320, height:200 } });
 p.setDefaultTimeout(600000);

@@ -2,7 +2,7 @@
  * from center[0] plus traffic spawn distances, per level. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const lvl of (process.env.LVLS ?? '1,31,70,71,22').split(',')) {
   const p = await browser.newPage({ viewport: { width: 480, height: 320 } });

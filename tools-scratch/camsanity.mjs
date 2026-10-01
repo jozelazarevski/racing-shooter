@@ -32,7 +32,7 @@ const check = (name, state, d) => {
     + ` camAspErr ${d.camAspectErrPct}% screenW ${d.screenW} overX ${d.overX}`
     + `${boxOk ? '' : '   BOX DOES NOT COVER THE SCREEN'}`);
 };
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 // ONE PAGE, ROTATED — not one page per size. Building the track costs about
 // ninety seconds under swiftshader, so three sizes meant three builds and the

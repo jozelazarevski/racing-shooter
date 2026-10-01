@@ -8,7 +8,7 @@
  *   LEVEL=1 node wedgetest.mjs
  */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 let bad = 0;
 for (const lvl of (process.env.LEVELS ?? '1,4').split(',')) {

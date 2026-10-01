@@ -4,7 +4,7 @@
  * collider lists how much is now INSIDE the drivable width. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8920';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 640, height: 400 } });
 page.setDefaultTimeout(300000);

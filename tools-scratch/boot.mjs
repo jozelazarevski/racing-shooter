@@ -4,7 +4,7 @@
  * on any page error rather than reporting a count of zero. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 let bad = 0;
 for (const [lvl, mode] of [[1, 'race'], [6, 'race'], [6, 'missions'], [1, 'roam']]) {

@@ -9,7 +9,7 @@ import { promises as fs } from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const OUT = process.env.OUT ?? '/tmp/roadshot.png';
 const [id, tx, tz, back = 24] = process.argv.slice(2).map(Number);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 760, height: 500 } });
 page.setDefaultTimeout(900000);

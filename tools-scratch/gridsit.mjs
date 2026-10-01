@@ -4,7 +4,7 @@
  * drives. This reports where the car actually is against where the road is. */
 import { chromium } from 'playwright-core';
 const LEVELS = (process.env.LEVELS ?? '1,18').split(',');
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 for (const lvl of LEVELS) {
   const p = await b.newPage({ viewport: { width: 430, height: 800 } });

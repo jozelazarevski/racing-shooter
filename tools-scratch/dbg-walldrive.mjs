@@ -16,7 +16,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const IDS = (process.env.IDS ?? '45').split(',');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 console.log('world                  N   ridge%  wall%  bothWall%  maxFaceDeg  meanDrop10u');
 for (const id of IDS) {

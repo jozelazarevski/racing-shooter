@@ -15,7 +15,7 @@
 import { chromium } from 'playwright-core';
 const LEVELS = (process.env.LEVELS ?? '1,6,12,17,18').split(',');
 const MODES = (process.env.MODES ?? 'race,roam,missions').split(',');
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const found = new Map();
 for (const lvl of LEVELS) for (const mode of MODES) {

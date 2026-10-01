@@ -7,7 +7,7 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 const OUT = process.env.OUT ?? '/tmp/chapters.png';
 const RACED = +(process.env.RACED ?? 0);      // how many chapter-1 worlds raced
 const W = +(process.env.W ?? 460), H = +(process.env.H ?? 900);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: W, height: H }, hasTouch: true,
   isMobile: true, deviceScaleFactor: 2 });

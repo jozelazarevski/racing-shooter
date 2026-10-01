@@ -29,7 +29,7 @@
  */
 import { chromium } from 'playwright-core';
 const LEVELS = (process.env.LEVELS ?? '1,5,14').split(',');
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const rows = [];
 for (const lvl of LEVELS) {

@@ -5,7 +5,7 @@ const BASE='http://localhost:8901';
 const LVL=Number(process.env.LVL??1);
 const TOP=Number(process.env.TOP??0);          // 0 = leave the car alone
 const PARITY=process.env.PARITY!=='0';
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await browser.newPage({ viewport:{ width:640, height:400 } });
 p.setDefaultTimeout(400000);

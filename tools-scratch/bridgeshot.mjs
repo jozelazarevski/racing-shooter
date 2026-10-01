@@ -12,7 +12,7 @@ import { promises as fs } from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const DIR = process.env.DIR ?? '/tmp/claude-0/-home-user-racing-shooter/5dbf1129-99d6-5790-8c20-c8eb78d4cc72/scratchpad';
 const BACK = +(process.env.BACK ?? 26);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 640, height: 420 } });
 p.setDefaultTimeout(600000);

@@ -1,7 +1,7 @@
 /* FIX-3 / §7.12: every pickup within 0.5 u of surface height. */
 import { chromium } from 'playwright-core';
 const LEVELS = (process.env.LEVELS ?? '61,29,56,58').split(',').map(Number);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const lvl of LEVELS) {
   const p = await browser.newPage({ viewport: { width: 400, height: 300 } });

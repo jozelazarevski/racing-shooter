@@ -2,7 +2,7 @@
  * of seconds, shoot CAM=3 (and driver view where asked). */
 import { chromium } from 'playwright-core';
 const SHOTS = [ { lvl: 66, idx: 330, cam: 3, out: '/tmp/shot-fencefix.png' } ];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const s of SHOTS) {
   const p = await browser.newPage({ viewport: { width: 480, height: 854 } });

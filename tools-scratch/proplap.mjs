@@ -2,7 +2,7 @@
  * there is something beside the road in it. */
 import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '17';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext()).newPage(); p.setDefaultTimeout(600000);
 await p.goto(`http://localhost:8901/?level=${LV}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });

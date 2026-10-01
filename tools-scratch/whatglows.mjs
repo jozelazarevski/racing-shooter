@@ -9,7 +9,7 @@ const PORT = process.env.PORT ?? '8902';
 const LV = process.env.LV ?? '17';
 const MODE = +(process.env.MODE ?? 2);
 const F = +(process.env.F ?? 0.2);   // the report was taken 2.5s into lap 1, i.e. the START
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport: { width: 390, height: 844 },
   isMobile: true, hasTouch: true, deviceScaleFactor: 2 })).newPage();

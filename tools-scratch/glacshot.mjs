@@ -19,7 +19,7 @@ const PORT = process.env.PORT ?? '8912';
 // the side of the picture, which is how the first cut of this shot came back
 // with 0.00% of the frame drawn by a glacier that was plainly on the skyline.
 const FOV = +(process.env.FOV ?? 16);        // half-angle the slab must sit within
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 480, height: 800 } });
 p.setDefaultTimeout(900000);

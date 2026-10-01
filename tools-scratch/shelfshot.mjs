@@ -2,7 +2,7 @@
  * icons are judged at the 148 px they are actually drawn at rather than at the
  * 4x a probe finds convenient. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 430, height: 900 }, deviceScaleFactor: 2 });
 p.setDefaultTimeout(600000);

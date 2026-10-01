@@ -3,7 +3,7 @@
  * width and reports the chip's box, so "it fits" is measured, not eyeballed. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const [w, h, tag] of [[1280, 800, 'wide'], [420, 780, 'narrow'], [360, 740, 'phone']]) {
   const p = await browser.newPage({ viewport: { width: w, height: h } });

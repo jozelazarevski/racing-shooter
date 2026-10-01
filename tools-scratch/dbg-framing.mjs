@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const LEVELS = (process.env.LEVELS ?? '66').split(',').map(Number);
 const CAM = Number(process.env.CAM ?? 3);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const lvl of LEVELS) {
   const p = await browser.newPage({ viewport: { width: 480, height: 854 } });

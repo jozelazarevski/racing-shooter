@@ -3,7 +3,7 @@
 import { chromium } from 'playwright-core';
 const LVL = Number(process.env.LVL ?? 29);
 const OUT = process.env.OUT ?? `/tmp/coastview-${LVL}.png`;
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 900, height: 500 } });
 p.setDefaultTimeout(240000);

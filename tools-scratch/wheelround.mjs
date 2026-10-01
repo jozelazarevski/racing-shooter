@@ -12,7 +12,7 @@
  */
 import { chromium } from 'playwright-core';
 const PORT = process.env.PORT ?? 8901;
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 320, height: 480 } });
 p.setDefaultTimeout(600000);

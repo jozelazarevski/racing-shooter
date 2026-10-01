@@ -1,7 +1,7 @@
 /* JS update cost per frame (render stubbed), tree vs base: if the game LOOP
  * got heavier, a phone that was at 25 fps drops under the 20 fps slow-mo line. */
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const [name, base] of [['r307-tree', 'http://localhost:8901'], ['r294-base', 'http://localhost:8902']]) {
   const p = await browser.newPage({ viewport: { width: 480, height: 320 } });

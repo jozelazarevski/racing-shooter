@@ -20,7 +20,7 @@ import { writeFileSync } from 'node:fs';
 const PORT = process.env.PORT ?? 8914, LV = process.env.LEVEL ?? 66;
 const TAG = process.env.TAG ?? '';
 const W = '/tmp/claude-0/-home-user-racing-shooter/f9cadee5-74f9-591d-ae2a-5f09dba759d5/scratchpad/wt4';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 640, height: 400 } });
 p.setDefaultTimeout(900000);

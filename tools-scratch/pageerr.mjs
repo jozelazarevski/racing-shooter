@@ -6,7 +6,7 @@
  * never going to exist. Run this after ANY edit to main.js, before the
  * probe that takes two minutes to tell you nothing. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport:{width:400,height:300} })).newPage();
 p.setDefaultTimeout(30000);

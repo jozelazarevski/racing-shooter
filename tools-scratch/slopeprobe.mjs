@@ -3,7 +3,7 @@
  * drives at it flat out. Measured per angle: farthest uphill progress from
  * the foot, whether it holds/creeps at the top of its run, hull cost. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 640, height: 400 } });
 p.on('pageerror', (e) => console.log('ERR', String(e).slice(0, 120)));
 await p.goto('http://localhost:8901/?level=26&mode=roam&go=1&unlockall=1', { waitUntil: 'load', timeout: 300000 });

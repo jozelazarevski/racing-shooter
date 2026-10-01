@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 import { readFileSync } from 'fs';
 const file = process.argv[2];
 const pts = process.argv.slice(3).map((s) => s.split(',').map(Number));
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
 const p = await (await b.newContext()).newPage();
 console.log(JSON.stringify(await p.evaluate(async ([d, ps]) => {
   const img = new Image();

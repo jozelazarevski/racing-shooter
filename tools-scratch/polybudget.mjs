@@ -4,7 +4,7 @@
  * that decides it is this one. */
 import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '74';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 430, height: 830 } });
 const p = await ctx.newPage(); p.setDefaultTimeout(600000);

@@ -8,7 +8,7 @@ const LVLS = (process.env.LVLS ?? '29').split(',').map(Number);
 for (const LVL of LVLS) {
  let browser;
  try {
-  browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
     args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
   const p = await browser.newPage({ viewport: { width: 320, height: 200 } });
   p.setDefaultTimeout(240000);

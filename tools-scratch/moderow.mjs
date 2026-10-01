@@ -1,7 +1,7 @@
 /* The three mode chips: one row or a stack? Same `top` for all three means one
  * row. Also checks nothing overflows its own chip. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 for (const W of [320, 360, 390, 430, 620]) {
   const ctx = await b.newContext({ viewport: { width: W, height: 830 }, hasTouch: true, isMobile: true });

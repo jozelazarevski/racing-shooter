@@ -3,7 +3,7 @@
  * rise above the road surface there. */
 import { chromium } from 'playwright-core';
 const LEVELS = (process.env.LEVELS ?? '66').split(',').map(Number);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const lvl of LEVELS) {
   const p = await browser.newPage({ viewport: { width: 400, height: 300 } });
