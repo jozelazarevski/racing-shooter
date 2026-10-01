@@ -14,9 +14,33 @@ import { DRIVING, loadDrivingOverrides, nitroCeilingKmh, stageTemplate } from '.
 import { runStageValidator } from './stagecheck.js';
 import { installRally } from './telemetry.js';
 import { Route } from './route.js';
-// RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
-// — no file shipped means the defaults in driving.js ARE the tune.
-loadDrivingOverrides();
+// driving.json overrides src/driving.js AT BOOT (DRIVING_SPEC.md: "overridable
+// by driving.json at boot, per spec §13"), and no file shipped means the
+// defaults in driving.js ARE the tune.
+//
+// AWAITED, NOT FIRE-AND-FORGET. This used to be a bare call, and the comment
+// above it called that fire-and-forget on the authority of RALLY_DRIVING.md
+// §13 — a document that does not exist in the repo. The bare call defeated the
+// rule it cited: loadDrivingOverrides awaits a fetch, so the module ran on to
+// `new Game()`, which builds the world synchronously, before the JSON was ever
+// merged. Measured with a probe that watches for the first moment
+// window.__game exists: on 3 of 3 ordinary go=1 boots, with NO artificial
+// delay, the track was already built and __DRIVING.__droppedKeys (set last
+// by the loader) was still undefined. So every value in driving.json read
+// while a world is BUILT — the coast profile, the retaining-wall depth cap —
+// was silently ignored on the first world, and DRIVING was then rewritten
+// under a finished one, splitting the build-time and run-time tune.
+//
+// Bounded at 3 s so a fetch that HANGS (as opposed to one that fails, which
+// the loader already catches and returns false for) cannot stall the boot
+// forever; the #boot-screen watcher in index.html only polls for
+// window.__game, so it simply stays up a moment longer. A same-origin JSON
+// of a few KB arrives long before that cap. If it ever were hit, the world
+// would build from the driving.js defaults exactly as every boot did before.
+await Promise.race([
+  loadDrivingOverrides(),
+  new Promise((resolve) => setTimeout(resolve, 3000)),
+]);
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, AI_COLORS, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
