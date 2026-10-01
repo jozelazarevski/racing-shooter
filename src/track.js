@@ -7597,7 +7597,12 @@ export class Track {
     // once they wander past it.
     this.worldBounds = 1400;
     // Baked contact-shadow specs {x, z, r, y} collected by every builder and
-    // realized as ONE instanced decal mesh at the end of _buildEnvironment.
+    // realized as ONE instanced decal mesh by _buildContactShadows, which
+    // runs in this constructor after _conformTrees and _treelineLaw (and
+    // before _applyShadowLaw), not at the end of _buildEnvironment: the
+    // bake filters this queue against the cull result, dropping the decal of
+    // each tree those two passes scaled away unless something live shares its
+    // point, so it has to run after them.
     this._shadows = [];
     this._buildRoad();
     // dirt shoulder aprons under the road edges: they bury themselves where
@@ -7621,6 +7626,31 @@ export class Track {
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
     this._treelineLaw();     // r407: nothing grows inside a wall, nothing on the ice
+    // THE BAKE RUNS AFTER THE CULLS, not at the tail of _buildEnvironment.
+    // Both passes above scale a rejected tree to 0.0001 and set `tr.culled`,
+    // and neither touches `this._shadows` or the baked mesh — so a decal baked
+    // before them was left sitting at 0.4 opacity on bare ground under a tree
+    // that is no longer there. `_conformTrees`' own docstring (WR-7.6) demands
+    // a culled tree be "scaled away, collider off, never left half-buried",
+    // and the decal is the visual half of exactly that. Moved here, the bake
+    // can read the cull result — see _buildContactShadows, where the filter
+    // lives; moving it alone would be inert, because nothing between the old
+    // call site and this one changes a terrain height or an instance matrix
+    // the bake reads.
+    //
+    // Still BEFORE _applyShadowLaw, and no later: that law's NONE regex
+    // matches the literal name 'contact-shadows', which the bake assigns just
+    // before adding the mesh to this.group, so the mesh must already exist
+    // when the law traverses. This also leaves the r405/r406/r410 trio below
+    // in its documented order. Safe to move across the two culls because
+    // neither of them queues a decal: _conformTrees, _treelineLaw and the
+    // _clearIceCarpet pass it calls never reach _addShadow or touch
+    // this._shadows, directly or through anything they call (_distToTrack,
+    // _cliffProfile, _terrainMeshHeight are height queries). So the move
+    // neither skips a producer nor newly admits one, and the bake draws
+    // no Math.random and no rnd(), so the shared stream that _clearIceCarpet's
+    // note warns every later world re-rolls from is untouched.
+    this._buildContactShadows();
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
     this._clearRoadSolids();  // r406: no collider left biting the carriageway
     this._pruneGhostTrees();  // r410: no collider left standing where no tree is
@@ -13803,10 +13833,13 @@ export class Track {
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     // LAST OF THE SCENERY, so an authored tree or boulder always wins its spot
-    // over anything the world scattered there — and still BEFORE the contact
-    // shadows, which have to see it to ground it.
+    // over anything the world scattered there. The contact-shadow bake used to
+    // follow on the next line, and the note that used to stand here — "still
+    // BEFORE the contact shadows, which have to see it to ground it" — was the
+    // one-directional reasoning that produced the orphan-decal defect: the bake
+    // also has to see what got scaled AWAY, and the tree culls do not run until
+    // after this function returns. It is called from the constructor now.
     this._buildEditProps();                          // trees and rocks the owner planted
-    this._buildContactShadows();                     // baked AO under everything
   }
 
   /** OUTBACK RED DIRT: the dry creek beds, drawn from the wash polylines
@@ -20925,7 +20958,12 @@ export class Track {
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
    *  world units (≈1.3× the object footprint). Pass y for objects sitting on
    *  the road/cliff (quad stays flat there); omit it for terrain objects —
-   *  the decal then samples terrainHeight and tilts to the local slope. */
+   *  the decal then samples terrainHeight and tilts to the local slope. An
+   *  entry queued at the exact (x, z) of a tree that _conformTrees or
+   *  _treelineLaw scales away is dropped by the bake, unless something live
+   *  in a point-recorded registry stands on the same coordinates. Culls that
+   *  run after the constructor (applyRouteDensity, the stage validator) do
+   *  NOT drop it; see _buildContactShadows for what is and is not covered. */
   _addShadow(x, z, r, y = null) {
     this._shadows.push({ x, z, r, y });
   }
@@ -20937,6 +20975,85 @@ export class Track {
   _buildContactShadows() {
     const specs = this._shadows;
     if (!specs.length) return;
+    // A CULLED TREE TAKES ITS DECAL WITH IT. `_conformTrees` and
+    // `_treelineLaw` scale a rejected tree to 0.0001 and turn its collider
+    // off, and neither knows this queue exists, so the AO decal stayed behind
+    // on bare ground — a dark 0.4-opacity ring under nothing at all.
+    //
+    // The pairing is re-derived here from the tree record's own coordinates
+    // rather than threaded through `_addShadow`: at all 13 tree sites that
+    // queue a decal, the x/z handed to _addShadow are the SAME expressions
+    // reading the SAME object as the record's x/z with no arithmetic between
+    // them, so the two are bit-identical doubles and the string key matches
+    // exactly. That keeps every registration site and _addShadow's ~60 callers
+    // out of the blast radius. Neither cull mutates tr.x or tr.z (the cull
+    // block writes r, solid and culled; the seating branch writes tr.y), so
+    // the key is still the value that was registered.
+    //
+    // A key is a POSITION, though, not a tree, and a position is not owned by
+    // the tree alone. The first cut of this seeded `live` from `this.trees`
+    // only and claimed a live object's shadow could not be blanked; review
+    // falsified that on CANYON RUN with an editor-authored boulder and pine
+    // at x 868.9, z 316.5 (src/editor.js serialises nature props to 0.1 u,
+    // so exact coincidence is ordinary authoring, not a freak): the pine was
+    // culled, the boulder kept its stone collider and lost its decal, and
+    // the only trace was `retracted` exceeding `keys`. Reproduced on the
+    // tree-only seeding by pushing a stone solid and a decal onto a culled
+    // tree's exact coordinates and re-baking: 0 decals left at that point,
+    // retracted 108 against 107 keys on CANYON RUN, 10 against 9 on GLACIER
+    // COL. With the seeding below the same probe keeps both decals, shared 1,
+    // over 0, on both worlds.
+    //
+    // So `live` seeds every POINT-RECORDED registry that can own a decal — the
+    // surviving trees, solids, buildings and props, and obstacles, tyre
+    // stacks, banners and bushes — and a culled key that any of them shares
+    // is dropped with both decals kept. Seeding is safe to widen in one
+    // direction only: an extra live key can only PREVENT a retraction, never
+    // cause one, so the worst it can do is leave a culled tree's orphan where
+    // something else stands, which is the conservative trade already taken
+    // for two trees on one coordinate.
+    //
+    // What this does NOT protect, stated so nobody relies on it: `barriers`
+    // are segments (x1/z1 to x2/z2) with no single point to key on, and some
+    // decals are queued with no registry behind them at all — gantry legs,
+    // and boulders too small to be given a solid. A culled tree landing on one
+    // of those exact coordinates would still take that decal with it. Review
+    // reproduced the mechanism by pushing a banner onto a culled cactus on
+    // CANYON RUN; it has not occurred on its own on any world measured.
+    //
+    // Nor is this the only cull. It covers `_conformTrees` and `_treelineLaw`,
+    // the two that run before this bake. `applyRouteDensity` and the stage
+    // validator's cullTree/cullSolid (src/stagecheck.js) run AFTER the
+    // constructor, on an already-baked decal mesh, and leave their own
+    // orphans — trees and stone solids alike. Review counted 127 tree decals
+    // and 18 solid decals left that way across 71 worlds (OASIS AMBUSH alone
+    // 39), against 2829 this bake retracted. `_shadowRetract` sees none of
+    // those, so it is not a census of orphans, only of this pass.
+    //
+    // `over` publishes retracted - keys and is a SIGNAL, not a proof. More
+    // decals retracted than culled positions means something nobody culled
+    // lost its shadow — but the figure is net, so a culled tree whose builder
+    // queued no decal (redwood saplings, jungle leaf plants, vine panels)
+    // subtracts one and can cancel a wrongful retraction exactly. A positive
+    // `over` is a certain defect; a zero is not a clean bill.
+    //
+    // `this.solids` here is untrimmed by `_clearRoadSolids`, which runs only
+    // after this bake — the right list, since a collider that pass later
+    // drops keeps its mesh. (It is not literally the whole build-time list:
+    // `_buildOldTown` filters out its own horizon-ring solids earlier, which
+    // is harmless, as those rings queue no decal.) The Number.isFinite guards
+    // match the cull passes' own and keep a NaN coordinate from ever making a
+    // key.
+    const gone = new Set(), live = new Set();
+    for (const tr of this.trees ?? []) {
+      if (!Number.isFinite(tr?.x) || !Number.isFinite(tr.z)) continue;
+      (tr.culled ? gone : live).add(tr.x + ',' + tr.z);
+    }
+    for (const reg of [this.solids, this.buildings, this.props,
+      this.obstacles, this.tireStacks, this.banners, this.bushes]) for (const o of reg ?? [])
+      if (Number.isFinite(o?.x) && Number.isFinite(o.z)) live.add(o.x + ',' + o.z);
+    let shared = 0;
+    for (const key of live) if (gone.delete(key)) shared++;
     const geo = new THREE.PlaneGeometry(2, 2);       // scale r → radius r
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
@@ -20948,8 +21065,14 @@ export class Track {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    let k = 0;
+    let k = 0, retracted = 0;
     for (const s of specs) {
+      // retracted FIRST, so a decal whose tree has been scaled away never
+      // reaches the terrain sample, the slope conform or the road walk below.
+      // Capacity is unaffected: the mesh is allocated at specs.length and
+      // `mesh.count = k` already publishes the shortfall, so skipping more
+      // entries only lowers k, exactly as the r253 `drop` path already does.
+      if (gone.size && gone.has(s.x + ',' + s.z)) { retracted++; continue; }
       let y = s.y;
       if (y === null) {
         y = this.terrainHeight(s.x, s.z);
@@ -21014,6 +21137,23 @@ export class Track {
       m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(rr, 1, rr));
       mesh.setMatrixAt(k++, m4);
     }
+    // Build telemetry, the same family as _treesConformed, _treelineCull,
+    // _solidTrim, _shadowLaw and _ghostTreesPruned: `retracted` is how many
+    // decals the two build-time culls took with them, `keys` how many
+    // culled-tree positions were unambiguous, and `shared` how many culled
+    // trees kept an orphan because something live stands on the same point —
+    // within THIS pass, the only way a culled tree's decal survives. `over`
+    // is the net signal described above: positive is a certain defect, zero
+    // is not proof, since a decal-less culled tree cancels one.
+    //
+    // NOT covered, and deliberately so: the culls that run after the
+    // constructor has returned — `applyRouteDensity` from main.js and the
+    // stage validator's cullTree/cullSolid (src/stagecheck.js) on the first
+    // race frame — act on a mesh that is already baked, so their orphans
+    // outlive any bake position inside it, and nothing here counts them.
+    // Retracting those needs the final instance index recorded per spec here
+    // and a zero-scale setMatrixAt at each cull site, which is a larger change.
+    this._shadowRetract = { keys: gone.size, shared, retracted, over: retracted - gone.size };
     mesh.count = k;                    // ...so the skipped ones are not drawn
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';
