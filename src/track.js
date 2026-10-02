@@ -5521,7 +5521,7 @@ const PROP_SPECS = {
   volcano: [['barrel', 18], ['crate', 16], ['cone', 14]],
   alpine: [['hay', 20], ['crate', 16], ['cone', 14]],
   glacial: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  jungle: [['crate', 14], ['barrel', 12], ['cone', 12], ['hay', 14]],
+  jungle: [['crate', 14], ['barrel', 12], ['cone', 12]],   // no straw (r104); no hayColor either
   dunes: [['barrel', 16], ['crate', 16], ['cone', 14]],
   ravine: [['crate', 14], ['barrel', 14], ['cone', 12], ['rock', 8]],
   oasis: [['crate', 16], ['barrel', 12], ['hay', 14], ['cone', 10]],
@@ -5529,7 +5529,7 @@ const PROP_SPECS = {
   flume: [['hay', 26], ['crate', 16], ['barrel', 12]],   // hay = cut-log rounds here
   wildfire: [['barrel', 18], ['crate', 14], ['cone', 12]],
   sheetice: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12], ['hay', 10]],
+  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12]],   // no straw (r104); no hayColor either
   neon: [['barrel', 18], ['crate', 16], ['cone', 14]],
   undercity: [['crate', 18], ['barrel', 18], ['cone', 12]],
   pass: [['hay', 20], ['crate', 16], ['cone', 14], ['rock', 8]],
@@ -7977,7 +7977,13 @@ export class Track {
   }
 
   /** Dev sanity check: warn if the centerline passes too close to itself
-   *  (any two non-adjacent samples nearer than the full road ribbon width). */
+   *  (any two non-adjacent samples nearer than the full road ribbon width).
+   *  A designed crossing is exempt: one leg on a registered overpass deck AND
+   *  the legs grade-separated by LAW 4's 6 u (test-roadclear). Without that it
+   *  reported the bridge itself on every overpass world, and — printing only
+   *  the global minimum — hid a real at-grade clash behind it (HANDOVER item
+   *  3: SEA CLIFF RUN's stack was masked by its legitimate overpass). Planned
+   *  overpasses are already baked into `center[].y` when this runs. */
   _checkLayout() {
     const minGap = (WALL_OFF + 0.6) * 2;
     let worst = Infinity, wi = -1, wj = -1;
@@ -7987,7 +7993,10 @@ export class Track {
         const dx = this.center[i].x - this.center[j].x;
         const dz = this.center[i].z - this.center[j].z;
         const d2 = dx * dx + dz * dz;
-        if (d2 < worst) { worst = d2; wi = i; wj = j; }
+        if (d2 >= worst) continue;
+        if (Math.abs(this.center[i].y - this.center[j].y) >= 6 &&
+          (this._onOverpass(i) || this._onOverpass(j))) continue;
+        worst = d2; wi = i; wj = j;
       }
     }
     const d = Math.sqrt(worst);
@@ -13527,7 +13536,7 @@ export class Track {
     switch (type) {
       case 'hay': {
         if (!this._hayPropMat) {
-          this._hayPropMat = new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 });
+          this._hayPropMat = new THREE.MeshStandardMaterial({ color: this.T.hayColor ?? 0xd8b95e, roughness: 1 });
         }
         const m = new THREE.Mesh(A.geo.hay, this._hayPropMat);
         m.castShadow = true;
@@ -28152,8 +28161,10 @@ export class Track {
     const hayGeo = rectHay
       ? new THREE.BoxGeometry(1.7, 0.95, 0.95)
       : (() => { const g = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10); g.rotateZ(Math.PI / 2); return g; })();
+    // The worlds r104 cleared of straw (hayCount: 0) define no hayColor; the
+    // mesh is still built, and an undefined colour warns and renders white.
     const hay = new THREE.InstancedMesh(
-      hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), Math.max(hayCount, 1)
+      hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor ?? 0xd8b95e, roughness: 1 }), Math.max(hayCount, 1)
     );
     hay.castShadow = true;
     let hk = 0;

@@ -1777,6 +1777,23 @@ class Game {
     // RATIO is what buys the shadow contrast, so exposure is the right lever to
     // put the brightness back without flattening it again.
     this.renderer.toneMappingExposure = 1.46;
+    // A LOST-AND-RESTORED CONTEXT (mobile backgrounding, a driver reset) comes
+    // back with every GPU object gone. three rebuilds its own state and
+    // re-uploads image textures by itself, but the PMREM environment is a
+    // render target baked ONCE per world: it came back unbacked, and every
+    // standard material ran without its IBL until the next world load. The
+    // test browser loses its contexts on a cold first boot, which is how it
+    // was seen — the env target read back 0.0713 on a clean boot, 0 after a
+    // loss. three's own listener was added first, so its state is live here.
+    // The dead target is DROPPED, not disposed: its dispose handler belongs to
+    // three's pre-loss texture manager and would delete handles that died
+    // with the old context (WebGL: "delete: object does not belong to this
+    // context", once per handle).
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      if (!this.track) return;
+      this._envRT = null;
+      this._bakeEnvironment(this.track.theme);
+    });
 
     this.scene = new THREE.Scene();
     // CLEAR AIR (r406, owner: "Make blues skies and sun no fog"). The fog
@@ -3378,45 +3395,61 @@ class Game {
         }
       }
     }
-    // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
-    // Standard materials pick up soft sky reflections (glossy wet roads, car
-    // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
-    {
-      // dimmer than it was: the IBL is a THIRD ambient term on top of the
-      // hemisphere, and at the old strength it re-filled every shadow the
-      // key/fill rebalance had just opened up. It is here for sheen on paint
-      // and wet road, not for lighting the world.
-      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
-      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
-      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
-      const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
-      const cx = cnv.getContext('2d');
-      const gr = cx.createLinearGradient(0, 0, 0, 64);
-      gr.addColorStop(0, '#' + top.getHexString());
-      gr.addColorStop(0.5, '#' + hor.getHexString());
-      gr.addColorStop(0.56, '#' + gnd.getHexString());
-      gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
-      cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
-      const envTex = new THREE.CanvasTexture(cnv);
-      envTex.colorSpace = THREE.SRGBColorSpace;
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(10, 16, 12),
-        new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
-      const envScene = new THREE.Scene();
-      envScene.add(dome);
-      // fromScene hands back a render target the CALLER owns — pmrem.dispose()
-      // frees only the generator's own ping-pong target and blur material.
-      // Keeping just `.texture` orphaned the previous world's 768x1024
-      // HalfFloat target and its depth buffer on every swapLevel and every
-      // editor APPLY (r160's cube-UV size works out near 9 MB). Hold the
-      // target and free the old one once the new texture is in place.
-      const envRT = pmrem.fromScene(envScene, 0.06);
-      this._envRT?.dispose();
-      this._envRT = envRT;
-      this.scene.environment = envRT.texture;
-      pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
-    }
+    this._bakeEnvironment(th);
+  }
+
+  // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
+  // Standard materials pick up soft sky reflections (glossy wet roads, car
+  // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
+  // Its own method so a restored WebGL context can re-bake it (see the ctor).
+  _bakeEnvironment(th) {
+    // dimmer than it was: the IBL is a THIRD ambient term on top of the
+    // hemisphere, and at the old strength it re-filled every shadow the
+    // key/fill rebalance had just opened up. It is here for sheen on paint
+    // and wet road, not for lighting the world.
+    const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
+    const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
+    const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
+    const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
+    const cx = cnv.getContext('2d');
+    const gr = cx.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#' + top.getHexString());
+    gr.addColorStop(0.5, '#' + hor.getHexString());
+    gr.addColorStop(0.56, '#' + gnd.getHexString());
+    gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
+    cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
+    const envTex = new THREE.CanvasTexture(cnv);
+    envTex.colorSpace = THREE.SRGBColorSpace;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(10, 16, 12),
+      new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
+    const envScene = new THREE.Scene();
+    envScene.add(dome);
+    // fromScene hands back a render target the CALLER owns — pmrem.dispose()
+    // frees only the generator's own ping-pong target and blur material.
+    // Keeping just `.texture` orphaned the previous world's 768x1024
+    // HalfFloat target and its depth buffer on every swapLevel and every
+    // editor APPLY (r160's cube-UV size works out near 9 MB). Hold the
+    // target and free the old one once the new texture is in place.
+    //
+    // Blur sigma 0.04, not 0.06. three's PMREM blur takes
+    // 1 + floor(3 * sigma / (PI / 510)) samples at the 256 cube LOD and caps
+    // them at 20, so 0.06 asked for 30 and was CLIPPED — printing "sigmaRadians,
+    // 0.06, is too large and will clip, as it requested 30 samples when the
+    // maximum is set to 20" twice (one per blur pass) on every world. The
+    // clip is energy-conserving — r160 normalises the weights over the 20
+    // taps it applies — so it cut the Gaussian's tails, not its light. 0.04
+    // is inside the widest sigma rendered whole (0.04107). Measured: the
+    // baked target's mean RGB matches the clipped 0.06 to 1e-4 on PINE
+    // VALLEY, GREENWATER RAPIDS and AVALANCHE ALLEY. (Do not "compensate" it:
+    // a 0.916 tint, from reading that normalisation as over all 30 taps,
+    // darkened the IBL 8.4 % and was caught by that same measurement.)
+    const envRT = pmrem.fromScene(envScene, 0.04);
+    this._envRT?.dispose();
+    this._envRT = envRT;
+    this.scene.environment = envRT.texture;
+    pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
   }
 
   /** Fade to black, then navigate — used for level changes. Saves the menu's
