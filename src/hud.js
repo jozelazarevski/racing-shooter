@@ -1,6 +1,13 @@
 // DOM HUD: circular speedometer, standings, weapon status. (NO minimap — hard rule.)
 const $ = (id) => document.getElementById(id);
 const SUFFIX = ['ST', 'ND', 'RD', 'TH', 'TH', 'TH', 'TH', 'TH'];
+// World units per second to the km/h the SPEEDOMETER shows. The working spec
+// fixes every speed ceiling in this displayed unit ("the spec's numbers come
+// from recordings of the HUD"), so anything that quotes a speed to the player
+// must use this factor or it promises a number the gauge can never read.
+// Exported for exactly that: the garage quoted top speed at x3.6 and so
+// overstated it by 16% against the needle.
+export const HUD_KMH = 3.1;
 
 export function fmtTime(s) {
   if (!isFinite(s)) return '–:––.–';
@@ -100,7 +107,14 @@ export class Hud {
     return Math.max(1, Math.min(5, Math.floor((floor - top - 8) / ROW)));
   }
 
-  show() { this.el.hud.classList.add('on'); }
+  // show() is called once per race, from startRace, so it is where the hull
+  // watch re-baselines. _lastHealth used to survive from the last finished
+  // frame of the previous race: after a garage swap to a lower-hull car, or
+  // on a world whose kit cuts the hull, the first countdown frame read the
+  // lower start figure as a hit and flashed the bar, pulsed the vignette and
+  // floated a damage number over a car nothing had touched. With null here
+  // the first update takes the new start hull as its baseline (drop = 0).
+  show() { this._lastHealth = null; this.el.hud.classList.add('on'); }
   hide() { this.el.hud.classList.remove('on'); }
 
   // HARD RULE (user): NO MINIMAPS — ever. Do not reintroduce a map overlay
@@ -241,7 +255,7 @@ export class Hud {
   // ---------- per-frame update ----------
   update(dt) {
     const g = this.game, p = g.player;
-    const kmh = Math.round(Math.abs(p.speedAlong) * 3.1);
+    const kmh = Math.round(Math.abs(p.speedAlong) * HUD_KMH);
     // r302 (user): the gauge is BACK — the corner number is deleted, the
     // dial carries speed, revs and gear. Porsche discipline: the tach is
     // the hero, speed is digits inside it. Redrawn at ~30 Hz, not per

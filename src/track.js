@@ -7739,7 +7739,14 @@ export class Track {
         part.setMatrixAt(tr.id, m4);
         touched.add(part);
       }
-      tr.r = 0; tr.solid = false; tr.culled = true;
+      // `dead` as well as `culled`, the way applyRouteDensity and stagecheck's
+      // cullTree retire a tree. Every runtime consumer - the car's tree loop,
+      // the cannon raycast, blastWorld, the camera sightline, smashTree - tests
+      // only `dead`, and `solid = false` is ignored by the car step, which
+      // decides solidity by size: a grown tree culled here was an invisible
+      // trunk on the canyon floor, a sapling one a full-size stand-in flung
+      // out of empty air. restoreSmashed skips `culled`, so it stays down.
+      tr.r = 0; tr.solid = false; tr.culled = true; tr.dead = true;
       if (why === 1) wall++; else ice++;
     }
     for (const part of touched) part.instanceMatrix.needsUpdate = true;
@@ -7917,7 +7924,11 @@ export class Track {
         part.setMatrixAt(tr.id, m4);
         touched.add(part);
       }
-      tr.r = 0; tr.solid = false; tr.culled = true;
+      // `dead` too: the runtime colliders, the cannon, blastWorld, the camera
+      // and smashTree all read `dead` alone, so a tree culled here within
+      // rCrown + 7 of the road still crashed the car with nothing on screen.
+      // See _treelineLaw; restoreSmashed's `culled` guard keeps it down.
+      tr.r = 0; tr.solid = false; tr.culled = true; tr.dead = true;
       culled++;
     };
     // BURIAL-GATED, and ONLY burial. The first cut of this pass also
@@ -12200,7 +12211,15 @@ export class Track {
     // checkered strip on the road
     const strip = new THREE.Mesh(
       new THREE.PlaneGeometry(ROAD_HALF * 2 + 2, 4),
-      new THREE.MeshBasicMaterial({ map: checkerTexture(), transparent: true, opacity: 0.92 })
+      // Out-biased past the road's polygonOffset -4 (_buildRoad), as the car's
+      // AO blob is at -6: a 0.04 u lift alone is worth only about two depth
+      // slope steps from the TOP-DOWN rig, so the biased road won the test and
+      // the strip dropped out or flickered. No depth write, like every other
+      // decal on the carriageway.
+      new THREE.MeshBasicMaterial({
+        map: checkerTexture(), transparent: true, opacity: 0.92, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
+      })
     );
     strip.material.map.repeat.set(5, 1);
     strip.rotation.order = 'YXZ';
@@ -13022,6 +13041,11 @@ export class Track {
           // reflectance right down without needing its own decal system
           map: tex, transparent: true, depthWrite: false,
           roughness: this.T.puddleRough ?? 0.25, metalness: this.T.puddleMetal ?? 0.08,
+          // -6 beats the road's polygonOffset -4; the 0.04 u lift below is
+          // worth only about two slope steps from the TOP-DOWN rig, so without
+          // it the road's biased depth rejected the puddle while its grip and
+          // splash in track.puddles still fired on a patch nobody could see
+          polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
         })
       );
       m.rotation.order = 'YXZ';
@@ -13068,6 +13092,9 @@ export class Track {
     });
     const mat = new THREE.MeshStandardMaterial({
       map: tex, transparent: true, roughness: 1, metalness: 0, depthWrite: false,
+      // out-biased past the road's -4 like the puddles: a 0.035 u lift cannot
+      // carry it, and the patch lost the depth test to the carriageway
+      polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
     });
     const stoneGeo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
     const stones = new THREE.InstancedMesh(
@@ -13459,6 +13486,10 @@ export class Track {
       ggeo.setIndex(gidx);
       const gloom = new THREE.Mesh(ggeo, new THREE.MeshBasicMaterial({
         color: 0x03130a, transparent: true, opacity: 0.34, depthWrite: false,
+        // -6 out-biases the road's polygonOffset -4; at a 0.05 u lift the road
+        // won the depth test, so the gloom showed on the verges with a clear
+        // hole down the carriageway it was laid to darken
+        polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
       }));
       gloom.renderOrder = 1;
       this.group.add(gloom);
@@ -20894,7 +20925,18 @@ export class Track {
       rg.addColorStop(1, 'rgba(255,180,110,0)');
       cx2.fillStyle = rg;
       cx2.fillRect(0, 0, 64, 64);
-      return new THREE.CanvasTexture(cv);
+      // Colour art, so sRGB like every textures.js make() map: left at
+      // NoColorSpace the stops were read as linear and re-encoded on output,
+      // (255,198,132) coming out near (255,228,190), and the warm sodium
+      // pools washed to pale cream. And `shared`, because this memo outlives
+      // the Track: disposeSubtree's freeTex honours only userData.shared, so
+      // every world swap freed the static's texture and the next tunnel
+      // re-uploaded it. Never cloned (the material holds it by reference), so
+      // the tag cannot leak onto a per-Track copy the way SHARED_ASSETS warns.
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.userData.shared = true;
+      return t;
     })());
     const poolGeo = new THREE.PlaneGeometry(17, 20);
     poolGeo.rotateX(-Math.PI / 2);
@@ -27537,8 +27579,12 @@ export class Track {
       const y = this._seatY(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
       // carry the instance so a knocked-loose stone can actually be SEEN to go
+      // ...and its snow cap, which is a separate instance at the same index in
+      // `caps`. Every path that retires a boulder edits `ob.im` alone, so on
+      // the snow and glacial worlds a culled or punted rock left its white cap
+      // hanging over bare ground. `cap` is null on capless themes.
       if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone',
-        inst: rk, im: rocks, sc: s });
+        inst: rk, im: rocks, sc: s, cap: caps, capInst: rk });
       const rot = Math.random() * Math.PI * 2;
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
@@ -27805,7 +27851,32 @@ export class Track {
       tr.hp = undefined;                 // re-derived from size on the next hit
       trees++;
     }
-    return { buildings, trees };
+    // Tyre stacks and sponsor boards are the same class of smashable and
+    // were never stood back up: resetRace reuses this Track, so every chicane
+    // stack and board knocked flat in race 1 was still missing in race 2,
+    // neither drawn nor solid. Only a stack with its smash-time m0 comes
+    // back; the gate-clear cull zeroes WITHOUT one and sets `culled`, and
+    // that cull is permanent.
+    let tires = 0, banners = 0;
+    for (const st of this.tireStacks ?? []) {
+      if (!st.dead || st.culled || !st.m0 || !this._tireMesh) continue;
+      st.ids.forEach((id, k) => this._tireMesh.setMatrixAt(id, st.m0[k]));
+      this._tireMesh.instanceMatrix.needsUpdate = true;
+      st.dead = false;
+      tires++;
+    }
+    for (const b of this.banners ?? []) {
+      if (!b.dead) continue;
+      if (b.kind === 'fence') {
+        if (!b.m0 || !this._guardFenceMesh) continue;
+        this._guardFenceMesh.setMatrixAt(b.id, b.m0);
+        this._guardFenceMesh.instanceMatrix.needsUpdate = true;
+      } else if (b.group) b.group.visible = true;
+      else continue;
+      b.dead = false;
+      banners++;
+    }
+    return { buildings, trees, tires, banners };
   }
 
   /** CORRIDOR §6 DENSITY RULE — obstacles are rationed around the route.
@@ -27880,6 +27951,12 @@ export class Track {
         _m4.makeScale(0, 0, 0);
         ob.im.setMatrixAt(ob.inst, _m4);
         ob.im.instanceMatrix.needsUpdate = true;
+        // the boulder's snow cap goes with it (see _buildGroundCover): left
+        // alone it floated above the empty seat, which is not instance-honest
+        if (ob.cap && ob.capInst !== undefined) {
+          ob.cap.setMatrixAt(ob.capInst, _m4);
+          ob.cap.instanceMatrix.needsUpdate = true;
+        }
         ob.r = 0; ob.culled = true;
         culled.solids++;
       }
@@ -28319,6 +28396,9 @@ export class Track {
     // guard-fence bay: zero its instance and hand back a loose bay to fling
     if (b.kind === 'fence') {
       if (!this._guardFenceMesh) return null;
+      // keep the pristine bay transform so restoreSmashed can stand it back
+      // up on a restart (same pattern as smashBuilding's p.m0)
+      if (!b.m0) { b.m0 = new THREE.Matrix4(); this._guardFenceMesh.getMatrixAt(b.id, b.m0); }
       _m4.makeScale(0, 0, 0);
       this._guardFenceMesh.setMatrixAt(b.id, _m4);
       this._guardFenceMesh.instanceMatrix.needsUpdate = true;
@@ -28333,10 +28413,16 @@ export class Track {
     const board = new THREE.Mesh(b.board.geometry, b.board.material);
     board.position.y = 2.6;
     g.add(board);
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7),
-      new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 })
-    );
+    // One post geometry and material per Track, like the loose tyres below.
+    // A fresh pair per smash leaked: the flung post becomes debris, and
+    // resetRace and the DEBRIS_MAX cap only detach debris, so each board's
+    // cylinder buffers stayed registered with the renderer for the session.
+    // Track.dispose frees the shared pair.
+    if (!this._smashPostGeo) {
+      this._smashPostGeo = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
+      this._smashPostMat = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 });
+    }
+    const post = new THREE.Mesh(this._smashPostGeo, this._smashPostMat);
     post.position.set(0, 1.7, -0.1);
     g.add(post);
     g.position.set(b.x, b.y, b.z);
@@ -28349,6 +28435,11 @@ export class Track {
   smashTireStack(st) {
     if (!st || st.dead || !this._tireMesh) return null;
     st.dead = true;
+    // keep the pristine transforms for restoreSmashed: the stack was laid
+    // with per-tyre jitter, so it cannot be rebuilt from st.x/st.z alone
+    if (!st.m0) st.m0 = st.ids.map((id) => {
+      const m = new THREE.Matrix4(); this._tireMesh.getMatrixAt(id, m); return m;
+    });
     _m4.makeScale(0, 0, 0);
     for (const id of st.ids) this._tireMesh.setMatrixAt(id, _m4);
     this._tireMesh.instanceMatrix.needsUpdate = true;
@@ -29735,6 +29826,12 @@ export class Track {
    *  cache on every swap. */
   dispose() {
     disposeSubtree(this.group);
+    // The smash stand-ins' shared assets live under neither subtree once
+    // resetRace or the debris cap has detached every piece that used them,
+    // so free them by hand. A repeat dispose (worldLayer's walk got there
+    // first) is harmless: r160's dispose listener removes itself.
+    this._smashPostGeo?.dispose(); this._smashPostMat?.dispose();
+    this._looseTireGeo?.dispose(); this._looseTireMat?.dispose();
     this.scene.remove(this.group);
     // drop the world-sized lookup tables too — these are the big retained
     // arrays (900 centreline samples, every collider, the river grid)

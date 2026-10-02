@@ -406,7 +406,12 @@ function applyCobbleRoad(g, w, h, spec) {
     g.lineTo(x + rr, y + hh);
     g.quadraticCurveTo(x, y + hh, x, y + hh - rr);
     g.lineTo(x, y + rr);
-    g.quadraticCurveTo(x, y, x, y + rr);
+    // the top-left curve has to land on the path's start point (x+rr, y), as
+    // the other three land on the next edge. Ending it on (x, y+rr), the point
+    // it set out from, made it a zero-area spike, and closePath then cut a
+    // straight 45-degree chamfer across that corner of every stone, crown and
+    // foot shadow, so no sett was the rounded rectangle the docblock promises
+    g.quadraticCurveTo(x, y, x + rr, y);
     g.closePath();
     g.fill();
   };

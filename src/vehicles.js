@@ -136,6 +136,12 @@ function _solarRoofTexture() {
   x.lineWidth = 6;
   x.strokeRect(3, 3, 122, 122);
   _solarTex = new THREE.CanvasTexture(c);
+  // A CanvasTexture is born NoColorSpace in r160, so these sRGB canvas bytes
+  // were sampled as if linear and then sRGB-encoded again at output: the
+  // #0e1a2e cells came out a pale slate. Tagging it the way textures.js make()
+  // tags every colour canvas lets the sampler decode it once. It is a colour
+  // map (MeshBasicMaterial.map on the SLEEK roof), never a data map.
+  _solarTex.colorSpace = THREE.SRGBColorSpace;
   return _solarTex;
 }
 
@@ -159,6 +165,10 @@ function _roundelTexture(num) {
   x.fillText(key, 64, 68);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
+  // Colour map: without the sRGB tag the black number (#1c1a18) and the red
+  // pin-ring were double-encoded to mid-grey and salmon. Set before the first
+  // upload, and the texture is cached, so no needsUpdate is required.
+  tex.colorSpace = THREE.SRGBColorSpace;
   _roundelCache.set(key, tex);
   return tex;
 }
@@ -207,6 +217,10 @@ function _sponsorPanelTexture(brand, c1, c2) {
   x.fillText('MOTOR OIL', 295, 86);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
+  // Colour map: untagged, the livery red #d8342a and green #2f9e44 chevrons
+  // were double-encoded to coral and mint and no longer matched the body
+  // stripes painted from the same hex through THREE.Color.
+  tex.colorSpace = THREE.SRGBColorSpace;
   _sponsorCache.set(key, tex);
   return tex;
 }
@@ -4573,7 +4587,12 @@ export class Car {
     this.mesh.rotation.x = pitch - this.jumpPitch;
     // spin wheels + steer the front pair
     if (dt > 0 && this.mesh.userData.wheels) {
-      const spin = this.speedAlong * dt / 0.78;
+      // Rolling angle is distance over this car's own radius. A fixed 0.78
+      // turned the 0.62 crown/alpine/pit/sleek wheels at 79% of their true
+      // rate (tyres looked to skid at launch and in the garage) and the 0.85
+      // brawler's at 109%. buildVoxelRacer publishes the radius it built the
+      // tyre with as rig.wheelR; the TIRES upgrade scales X only, so it holds.
+      const spin = this.speedAlong * dt / (this.mesh.userData.rig?.wheelR ?? 0.78);
       for (const w of this.mesh.userData.wheels) w.rotation.x += spin;
     }
     if (this.mesh.userData.frontWheels) {

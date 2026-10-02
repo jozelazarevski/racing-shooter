@@ -145,7 +145,20 @@ export class Weapons {
       const idx = t.nearestIndex(p, car.trackIndex);
       const lat = THREE.MathUtils.clamp(t.lateralOffset(p, idx), -5.5, 5.5);
       const c = t.pointAt(idx, lat);
-      p.set(c.x, c.y + 0.3, c.z);
+      // pointAt's y is the flat centreline profile, but the drawn road is
+      // banked through graded hairpins (W-CURVE-01.7: up to 8 deg, which
+      // works out to ±0.77 u at the 5.5 u lateral clamp). Seated on c.y a mine on the
+      // outside line was wholly under the tarmac, ring and all, and on the
+      // inside line it hovered. groundHeightAt is the surface the cars and
+      // the unguided missiles ride, so seat it there.
+      p.set(c.x, (t.groundHeightAt?.(idx, lat) ?? c.y) + 0.3, c.z);
+      // ...and roll the group to the bank, or the flat 4.2 u ring still
+      // sinks into the high side of the tilted road even at lateral 0.
+      // bankOffset(idx, 1) is the cross-slope per unit lateral; tan x nrm
+      // is +Y, so a positive turn about tan lifts the +nrm side, matching
+      // bankOffset's sign. tan is horizontal and unit length.
+      const slope = t.bankOffset?.(idx, 1) ?? 0;
+      if (slope) g.rotateOnWorldAxis(t.tan[idx], Math.atan(slope));
     }
     g.position.copy(p);
     this.game.scene.add(g);
@@ -708,10 +721,13 @@ export class Weapons {
         g.flashLight(m.pos);
         if (g.blastWorld) g.blastWorld(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null);
         else g.smashPropsNear?.(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null, 22);
-        // anything that drives over a live mine sets it off, not just the cars
-        // in the race — a raider rolling straight over one and shrugging is not
-        // what a mine is for
-        for (const car of [g.player, ...g.enemies, ...(g.hostiles ?? [])]) {
+        // Race cars only. Ground hostiles belong in the TRIGGER loops above,
+        // but blastWorld has already dealt them its h.damage(70); passing them
+        // on to onEnemyHit as well hit them twice (by the arithmetic a Raider
+        // at 100 hp dies to one mine at 4 u: 70 + 36.8) and ran the rival-car path on them: a popped part
+        // never restored, rivalKills/+250/nitro credit and a second DESTROYED
+        // feed line. The missile splash leaves hostiles to blastWorld too.
+        for (const car of [g.player, ...g.enemies]) {
           if (!car.alive || car.invuln > 0) continue;
           const d = m.pos.distanceTo(car.pos);
           if (d < 9.5) {
@@ -759,12 +775,24 @@ export class Weapons {
   }
 
   reset() {
-    for (const b of this.bullets) b.active = false;
+    // Park every slot as well as deactivating it. Only update() writes the
+    // zero matrix for an idle slot, and resetRace hands over to 'countdown'
+    // or 'title', where update never runs: rounds in flight at a pause ->
+    // RESTART hung as glowing slivers through the whole countdown, and on
+    // the menu backdrop indefinitely. Same parking as the constructor's.
+    for (let i = 0; i < MAX_BULLETS; i++) {
+      this.bullets[i].active = false;
+      this.mesh.setMatrixAt(i, this._zero);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
     for (const m of this.missiles) this.game.scene.remove(m.mesh);
     for (const m of this.mines) {
       this.game.scene.remove(m.mesh);
       m.lampMat.dispose();
       m.ringMat.dispose();
+      // the beacon's material is cloned per mine too; the cap retire and the
+      // detonation both dispose it, and this path was the one that did not
+      m.beaconMat?.dispose();
     }
     for (const s of this.shocks) {
       this.game.scene.remove(s.mesh);
