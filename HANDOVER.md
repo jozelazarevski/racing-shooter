@@ -4171,6 +4171,231 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r438 — THE FIX WAS ALREADY IN THE FILE, JUST NOT EVERYWHERE
+
+Not an owner-report build. This one is a review: the whole tree read for
+defects, each candidate put to independent reviewers whose only job was to
+refute it, and nothing repaired that did not survive. 109 raw candidates, 64
+distinct locations, 57 confirmed, 56 repaired; 7 rejected and 1 attempted twice
+and deliberately not merged. Two more were found while fixing and are repaired
+too. The ledger, with the reasoning for every rejection, is in the r438 audit
+report; the commits on `fix/bug-hunt-r438` carry the evidence one by one.
+
+### The pattern
+
+The finding worth carrying forward is not any one bug. It is that most of the
+worst ones were a correct idiom that already existed in the file and had not
+been applied everywhere — the same shape as THE ONE DEFECT THIS REPO KEEPS
+SHIPPING above, one level up.
+
+- **Six teardown sites called `scene.remove` on objects parented to
+  `worldLayer`**, which is a silent no-op. The right idiom,
+  `x.parent?.remove(x)`, was already in the file five times — including the
+  debris sweep two lines below two of the broken calls. Collected stars kept
+  glowing, a mission retry rebuilt every previous attempt's gates on top of the
+  old ones, the six-husk cap stopped bounding the scene, and retired choppers
+  hung in the sky.
+- **133 test suites hardcoded `/opt/pw-browsers/chromium`**, while
+  `dustline/tools/*` and `test-equivalence.mjs` already read
+  `process.env.CHROMIUM || ...`. Every suite and all 628 `tools-scratch` probes
+  now use the existing convention; an unset variable keeps the dev box exactly
+  as it was.
+- **r104 took the straw out of four worlds and missed the prop table**, so
+  two of them kept spawning straw bales — white, since their colour key had
+  gone too (see the runtime census below).
+- **A suite agreed with the bug.** RALLY COPILOT was missing from the garage
+  bay table, so the eleventh upgrade had no card and the pacenote system was
+  unreachable. `test-parts` checked the ladder count against a hardcoded `10`.
+  It now derives the count from the roster.
+
+### What the rest were
+
+Of the 57 confirmed: 24 wrong arithmetic, 16 state that outlived its owner,
+8 dead code, 6 wrong identifiers, 2 crashes, 1 persistence. The ones a player
+sees or feels:
+
+- the HUD's only threat arrow tested `m.active`, a field missiles never have,
+  so it had never drawn once;
+- the hull bar used raw hull points as a CSS percentage, and no car has 100;
+- `_pruneGhostTrees` read matrix element 0 as the x scale — it is
+  sx·cos(yaw), and the carpet yaw is uniform, so half of every world's live
+  tree records went;
+- off-road gravity was sampled along the TRAVEL direction and applied to the
+  FORWARD axis, so reverse gear was pulled up hills;
+- the pause menu's STEERING button full-healed the car mid-race;
+- the offline precache omitted two static imports, so an offline boot was a
+  blank page — `test-static` now walks the module graph and requires every hop;
+- a culled tree left its contact-shadow decal on bare ground (3,065 retracted
+  across all 78 worlds, none wrongly);
+- the cloud reset compared against snapshot time, which is always "now", so a
+  second device resurrected a reset career within seconds.
+
+### Found while fixing
+
+**`driving.json` raced the world build on every boot.** It is the boot override
+for `src/driving.js` (DRIVING_SPEC.md: "overridable by driving.json at boot").
+`main.js` called the loader without `await`, citing RALLY_DRIVING.md §13 — a
+file that does not exist — so `new Game()` built the world before the JSON was
+merged. A probe watching for the first moment the game exists caught it on
+3 of 3 ordinary boots. Awaited now, bounded at 3 s so a hung fetch cannot stall
+the boot. No shipped value differs from its default, so no world built today
+changes; what returns is the contract that tuning lives in that file.
+
+### The graphics pass
+
+A second sweep, graphics only: ten read-only finders across the render
+pipeline, textures, instancing, depth, GPU memory, particles, lighting,
+runtime errors, vehicle visuals and the HUD DOM; 45 candidates, 36 distinct
+defects after independent refutation, every graphics claim checked against
+the vendored r160 source. The ones that change what a player sees:
+
+- **The race was never anti-aliased.** `antialias: true` reaches only the
+  default framebuffer; RenderPass draws into EffectComposer's own HalfFloat
+  target, built with `samples: 0`. Desktop now gets 4x MSAA there; touch
+  keeps 0.
+- **Auto-quality saved nothing.** EffectComposer copies the pixel ratio once,
+  so lowering it shrank only the final blit. The composer follows it now.
+- **Low-sun shadows were clipped** by a shadow-camera near plane 158 u in
+  front of the target (now -200 / 600, bias halved for the doubled range).
+- Liveries and tunnel lamp pools lacked SRGBColorSpace; road decals lost the
+  depth test to the road's polygonOffset; every swapLevel leaked ~9 MB of
+  PMREM target; build-time-culled trees still collided (decision 1's
+  invisible wall); garage top speed quoted x3.6 against the needle's x3.1.
+
+The commit message lists all 36.
+
+### The runtime census
+
+Then every world in the roster was booted, counted down and raced for 10 s
+with the console captured, and every message traced to a line by a stack
+taken AT the warning. No NaN, no transition threw, every world ended in a
+valid state. Four things printed, all fixed:
+
+- **"sigmaRadians, 0.06, is too large and will clip"** — twice, on all 78.
+  The PMREM blur caps at 20 taps; 0.06 asked for 30. Sigma is 0.04 now
+  (0.04107 is the widest rendered whole). The clip conserves energy, so the
+  light did not change: the baked target's mean RGB matches to 1e-4.
+- **`color: undefined` on four worlds was r104 left half-done.** r104 took
+  the straw bales out of the rainforest, the snowfield, the igloos and the
+  sheet ice, and their hayColor with them — but jungle and avalanche kept
+  `'hay'` in their smashable-prop mix, so GREENWATER RAPIDS and AVALANCHE
+  ALLEY still spawned straw bales, in plain white. Gone.
+- **`_checkLayout` reported bridges.** Six of its nine warnings were
+  registered overpasses; and printing only the global minimum, it hid SEA
+  CLIFF RUN's real stack (item 3 above) behind that world's legitimate
+  bridge. A pair with one leg on a deck AND |dy| >= 6 (LAW 4's separation)
+  is exempt now; the 22 u at-grade floor the switchback authors design
+  against is untouched. Three warnings remain and all three are true.
+- **A lost WebGL context took the world's IBL with it.** three restores its
+  state and re-uploads image textures, but the PMREM environment is a render
+  target baked once per world: after a forced loss and restore it read back
+  0, against 0.0713 before, and every standard material ran unlit by the sky
+  until the next world load. The bake re-runs on `webglcontextrestored` now.
+
+### Not merged: the road ceiling
+
+`_roadCeil` ignores superelevation and clamps terrain below the raised edge of
+a banked curve. Six worlds bank, not the one everyone had assumed (SUMMIT
+CLIMB 61 stations, FALKEN RIDGE 19, COL DE SARANNE 57, BRIDGE RUN 20, OLIVE
+PASS 57, GLACIER COL 229). Two attempts, both measured against committed HEAD:
+
+- ceiling only: terrain drawn THROUGH the road on GLACIER COL, 42 new points,
+  mostly inside the driving line;
+- ceiling plus a deeper corridor tuck: the deck came back clean (480 -> 435,
+  none new) but the road-edge step the change existed to fix got WORSE on all
+  six banking worlds, the apron toes started floating (68 -> 89, worst 3.36 u),
+  and the seeded dressing re-rolled.
+
+Each version moved the discontinuity instead of removing it, and the remaining
+options reopen a class this repo already fights — splitting the drawn mesh
+from the physics ground is the two-elevation-systems fault of E-34. The cure is
+§3.8, conforming the ribbon to the heightfield. The attempt, its harness and
+every number are on `attempt/roadceil-banktuck`.
+
+### Verification
+
+The deploy gate, run on a frozen worktree of the final commit (4bf4203)
+with the gate's own `judge()`: **12 green, 1 waived, 0 blocked.** boot,
+stagerules, nothing-floats (1513 s), nothing-on-road (1239 s), drift,
+shortcut, patch02, killspos, camstable (4/0), finish, reset, airace green;
+test-phase4 WAIVED on F7 alone, both worlds byte-identical to the previous
+build (PINE 32 %, GLACIER COL 46 %) — see "F7 is measuring trees" below.
+The waiver judge was itself repaired here: a waived marginal used to block
+its own suite through the exit code.
+
+The 78-world runtime census, re-run on the same frozen commit: **72 worlds
+print nothing at all** (0 before), and the roster's distinct console
+messages fell from 15 to 7, none new. The six that still print are worlds
+1, 27 and 53 — the first world of each fresh test browser, i.e. the
+SwiftShader cold-boot race — and the three true layout warnings on MOUNTAIN
+TO SEA, SEA CLIFF RUN and GLACIER COL. No NaN, no transition threw, every
+world ended in a valid state. Separately measured: the baked IBL matches the
+pre-fix build to 1e-4 on three worlds, and survives a forced context loss.
+
+### Open, for whoever is next
+
+- **Contact-shadow orphans from the culls that run after the constructor.**
+  `applyRouteDensity` and the stage validator's cullTree/cullSolid act on an
+  already-baked decal mesh. Review counted 127 tree and 18 solid decals left
+  under nothing across 71 worlds (OASIS AMBUSH alone 39). The fix needs the
+  final instance index recorded per spec and a zero-scale write at each cull.
+- **§3.8, the road ribbon conformed to the heightfield** — the real fix for the
+  ceiling above.
+- **GLACIER COL, stations 456/498.** A hairpin whose two legs pass 8.3 u
+  apart in plan and 12.6 u apart in height, with no deck between them — the
+  last of the three layout warnings, and the only one not already on LAW 4's
+  known list (its dy puts it outside LAW 4's 6 u). A heightfield cannot hold
+  both legs there; it is an authoring fix, so it is the owner's.
+- **F7 is measuring trees, not grass** (test-phase4 WAIVED). The
+  `_pruneGhostTrees` fix alone moves PINE's off-road top from 59 to 32 % and
+  GLACIER COL's from 69 to 46 %, against the 55-75 % band; the grass itself
+  is unchanged (0-30 km/h identical). The tree records are right now, so
+  the runway is the thing in the way: rule 7.15's brush and trunks stand on
+  it. Either the probe finds a clear runway, or the band moves, or the waiver
+  says what it is — but the old thrust-equilibrium waiver no longer
+  describes this failure.
+- **The test browser loses every WebGL context on a cold first boot**,
+  about 6 s in. Pre-existing on the base build; the GPU process survives;
+  not the watchdog (`--disable-gpu-watchdog` keeps it), not readPixels
+  (stubbed, keeps it); verbose GPU logging makes it vanish. Read it as a
+  SwiftShader race. Before the restore fix every suite whose FIRST page was
+  world 1 measured that world with no IBL; now it re-bakes about 6 s in.
+- **For the owner:** `src/world/` is ~6,400 lines the live game never imports;
+  delete it or wire it in. Code comments cite RALLY_DRIVING.md as an authority
+  and it does not exist; DRIVING_SPEC.md is what is actually there.
+
+### Notes for probe writers
+
+Three ways this build nearly shipped something wrong, each caught only because
+the result was checked against bytes rather than against a tool's report:
+
+- **Git Bash `sed -i` rewrites CRLF files as LF.** It did so to 133 test files
+  here, after an agent had done the same to `src/main.js`. `git diff` hides it
+  under core.autocrlf; `git ls-files --eol` and a byte count do not. Nothing
+  reached history, but rewrite with something that preserves endings.
+- **A zero-context patch can apply "successfully" in the wrong function.**
+  Splitting the ceiling attempt from the shadow fix with `git diff -U0` /
+  `git apply --unidiff-zero` put shadow code inside `_element`, a method
+  neither change touched, and reported success. Diff the result against the
+  source branch before trusting it.
+- **An empty result is not a zero.** A check that printed nothing was first
+  read as "no content change"; it meant the command had failed. Verify with a
+  check that can print the answer you do not want.
+- **Measure a correction before you ship it.** Reading the minified PMREM
+  weight loop as normalised over all 30 requested taps "proved" the clip
+  had dimmed every world's IBL 8.4 %, and a 0.916 compensation went in. The
+  loop runs to 20. Reading the baked target back from the GPU showed the
+  uncompensated fix matching the old build to 1e-4 and the compensated one
+  8.4 % DARK. Without that readback the cleanup would have relit the game.
+- **Do not `await` inside a `webglcontextlost` listener and then restore.**
+  Chrome records "restore allowed" only after the lost-event dispatch
+  returns; an await continuation runs at the microtask checkpoint INSIDE it,
+  so `restoreContext()` is refused (a console warning, not an error) and
+  the probe reports a restore bug the game does not have. Defer one task.
+- **Read the env target back only on a warm page.** On the first page of a
+  fresh browser the harness has already lost its contexts, and a lost
+  target reads back 0 — a probe that starts there measures the loss.
+
 ## r437 — A STRAIGHT LINE CANNOT FOLLOW A LOOP, AND A RETAINING WALL RETAINS
 
 Three owner reports, two root causes, and both causes turned out to be a model
