@@ -1,0 +1,15 @@
+{
+  "name": "ignite-rally",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ignite Rally. THE GAME NEEDS NO BUILD AND NO PACKAGES — index.html and the ES modules under src/ are served as they are, and that stays true. This manifest exists so the TEST HARNESS can be installed reproducibly: the suites drive a headless browser through playwright-core, and with nothing declaring that dependency a fresh checkout ran `node tests/validation.mjs` straight into ERR_MODULE_NOT_FOUND on every suite. `type` is `module` because every .js in the repo is an ES module (none uses require or module.exports); without it node warned on each node-side import of src/*.js and reparsed it. The field affects node only — the browser never reads this file, so it changes nothing about how the game, or the classic sw.js worker, loads.",
+  "scripts": {
+    "gate": "node tests/validation.mjs",
+    "static": "node tests/test-static.mjs",
+    "economy": "node tests/test-economy.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
+  }
+}
