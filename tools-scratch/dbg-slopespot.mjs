@@ -1,7 +1,7 @@
 /* r346 — what did slopegrip T1 pick at 2x? Terrain vs game ground vs solids. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 480, height: 320 } });
 await p.goto(`${BASE}/?level=12&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });

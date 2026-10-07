@@ -18,7 +18,7 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 const ONLY = process.env.LEVELS ? process.env.LEVELS.split(',').map(Number) : null;
 const MIN = +(process.env.MIN ?? 2.0);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 480, height: 300 } });
 page.setDefaultTimeout(600000);

@@ -35,7 +35,15 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
   const src = readFileSync(new URL('../src/track.js', import.meta.url), 'utf8');
   // DATA only: trailing // comments (the route shapes document their
   // real-circuit inspiration, which is a dev note, not stage data) come off
-  const dataLines = src.split('\n')
+  //
+  // ...ON EVERY CHECKOUT, NOT ONLY AN LF ONE. This split on '\n' alone, so on a
+  // CRLF working copy (core.autocrlf on Windows) every line kept a trailing
+  // '\r'. `.` does not match '\r' and `$` without the m flag matches only at
+  // the very end, so /\/\/.*$/ found no match and NO comment came off: the
+  // eight GRAND CIRCUITS dev notes were scanned as stage data and Q18 failed
+  // on a tree that was clean. The owner's LF checkout never saw it, which is
+  // why it read as a data fault. Splitting on /\r?\n/ strips the '\r' first.
+  const dataLines = src.split(/\r?\n/)
     .map((l) => l.replace(/\/\/.*$/, ''))
     .filter((l) => /name: '|route: '|theme: '|^  [a-zA-Z]+: \[/.test(l));
   const banned = ['spa-francorchamps', 'silverstone', "'monaco'", "'suzuka'", "'monza'",
@@ -52,7 +60,7 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 }
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 

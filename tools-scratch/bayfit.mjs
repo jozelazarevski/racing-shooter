@@ -3,7 +3,7 @@
  * 7 m up a 3/4 angle — near end vs far end differ by a factor of three — so
  * the framing multiplier is picked from this sweep, not from the algebra. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 420, height: 900 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const p = await ctx.newPage(); p.setDefaultTimeout(600000);

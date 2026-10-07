@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const [id, name] of [[19, 'GOTTHARD'], [6, 'SUMMIT CLIMB'], [1, 'PINE VALLEY']]) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });

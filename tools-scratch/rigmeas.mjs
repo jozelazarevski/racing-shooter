@@ -31,7 +31,7 @@ import { writeFileSync } from 'fs';
 const TAG = process.env.TAG ?? 'x';
 const CARS = (process.env.CARS ?? 'brawler').split(',');
 const SCALE = +(process.env.SCALE ?? 4);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 430, height: 900 } });
 p.setDefaultTimeout(600000);

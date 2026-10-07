@@ -11,7 +11,7 @@
 import { chromium } from 'playwright-core';
 
 const WORLDS = [57, 59, 55, 32, 37, 54, 56, 60];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
 const measure = async (page, base, id) => {

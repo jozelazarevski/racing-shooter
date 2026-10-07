@@ -1,7 +1,7 @@
 /* Where the bar actually sits, at four scroll depths — the number that matters
  * is bar.top: anything above 0 is a strip of list showing over the header. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true, isMobile: true });
 const p = await ctx.newPage(); p.setDefaultTimeout(600000);

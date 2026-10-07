@@ -136,6 +136,12 @@ function _solarRoofTexture() {
   x.lineWidth = 6;
   x.strokeRect(3, 3, 122, 122);
   _solarTex = new THREE.CanvasTexture(c);
+  // A CanvasTexture is born NoColorSpace in r160, so these sRGB canvas bytes
+  // were sampled as if linear and then sRGB-encoded again at output: the
+  // #0e1a2e cells came out a pale slate. Tagging it the way textures.js make()
+  // tags every colour canvas lets the sampler decode it once. It is a colour
+  // map (MeshBasicMaterial.map on the SLEEK roof), never a data map.
+  _solarTex.colorSpace = THREE.SRGBColorSpace;
   return _solarTex;
 }
 
@@ -159,6 +165,10 @@ function _roundelTexture(num) {
   x.fillText(key, 64, 68);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
+  // Colour map: without the sRGB tag the black number (#1c1a18) and the red
+  // pin-ring were double-encoded to mid-grey and salmon. Set before the first
+  // upload, and the texture is cached, so no needsUpdate is required.
+  tex.colorSpace = THREE.SRGBColorSpace;
   _roundelCache.set(key, tex);
   return tex;
 }
@@ -207,6 +217,10 @@ function _sponsorPanelTexture(brand, c1, c2) {
   x.fillText('MOTOR OIL', 295, 86);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
+  // Colour map: untagged, the livery red #d8342a and green #2f9e44 chevrons
+  // were double-encoded to coral and mint and no longer matched the body
+  // stripes painted from the same hex through THREE.Color.
+  tex.colorSpace = THREE.SRGBColorSpace;
   _sponsorCache.set(key, tex);
   return tex;
 }
@@ -1267,12 +1281,40 @@ export function buildPartIcon(kind, id) {
     tyre.rotation.z = Math.PI / 2;
     const hub = add(new THREE.CylinderGeometry(0.44, 0.44, 0.66, 16),
       cls === 2 ? M.chrome : M.alloy, 0, 0, 0);
+    // THE WHEEL'S AXLE IS X, AND THESE TWO LOOPS BUILT THEIR RING ABOUT Z.
+    // three.js cylinders are built about +Y, so the rotation.z = PI/2 carried
+    // by the tyre above, by the hub and by the ROAD slick band swings that
+    // axis onto X and lays the disc in the Y-Z plane, rubber spanning
+    // x in [-0.31, +0.31]. The spoke and tread loops were the only
+    // circumference features that never got it: they place (cos a, sin a, 0)
+    // and turn about Z, which is a ring in the X-Y plane whose axle is Z —
+    // square to the wheel it is supposed to ride on. The numbers leave no
+    // doubt: a gravel block at a = 0 landed at x = 1.02 with the sidewall at
+    // x = 0.31, so 10 of the 12 blocks (and all 22 snow sipes, whose 16.36
+    // deg step never hits +-90 deg at all) hung up to 0.71 u clear of the
+    // tyre in open air, while a spoke at a = 0 ran x = -0.01 -> 0.69 and
+    // speared out through the sidewall. Parenting both loops to a group
+    // turned about Y puts the ring's axle on X to match, and leaves every
+    // radius and rotation.z below exactly as tuned: local Z — the 0.7 the
+    // blocks were sized in — becomes the across-the-tread direction. Turning
+    // the group about Z instead would have achieved nothing, since Rz maps
+    // the X-Y plane onto itself and only shifts the phase.
+    const face = new THREE.Group();
+    face.rotation.y = Math.PI / 2;
+    g.add(face);
     // five spokes, so a wheel reads as a wheel and not as a washer
     for (let i = 0; i < 5; i++) {
       const a2 = (i / 5) * Math.PI * 2;
-      const sp = add(new THREE.BoxGeometry(0.7, 0.12, 0.24), M.alloy,
+      // 0.68 ALONG THE AXLE, NOT 0.24. In the wheel's own plane a spoke is
+      // inside a SOLID opaque rubber cylinder of radius 1.0, so at 0.24 deep
+      // and centred on x = 0 all five sat between x = -0.12 and +0.12 and
+      // were buried whole — the washer the line above says not to ship. At
+      // 0.68 they stand 0.03 u proud of the 0.62-wide rubber on each face,
+      // which is the same margin the 0.66-wide hub already uses to show.
+      const sp = add(new THREE.BoxGeometry(0.7, 0.12, 0.68), M.alloy,
         Math.cos(a2) * 0.34, Math.sin(a2) * 0.34, 0);
       sp.rotation.z = a2;
+      face.add(sp);
     }
     hub.rotation.z = Math.PI / 2;
     const blocks = cls === 0 ? 0 : cls === 1 ? 12 : 22;
@@ -1282,6 +1324,7 @@ export function buildPartIcon(kind, id) {
         cls === 2 ? M.chrome : M.rubber,
         Math.cos(a) * 1.02, Math.sin(a) * 1.02, 0);
       t.rotation.z = a;
+      face.add(t);
     }
     if (cls === 0) {                                  // a slick band, so ROAD is not a bare disc
       const band = add(new THREE.CylinderGeometry(1.03, 1.03, 0.2, 26), M.gunmetal, 0, 0, 0);
@@ -1841,6 +1884,27 @@ export class Car {
     this.y = gy; this.vy = 0; this.airborne = false;
     this.pos.y = gy;
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
+    // ...AND THE SLOPE-LAW GUARD'S HISTORY, which was the one vertical
+    // variable this method left holding the OLD elevation. The r394 guard
+    // clamps a rise to `_roadYPrev + cap` with cap = max(0.22, planar speed
+    // x dt x 0.75), and placeAt has just zeroed `vel`, so cap is exactly the
+    // 0.22 floor on the placement frame. An uphill relocation therefore read
+    // the ground it came from: a second SOS press hops 14 stations, and at
+    // the r340 segLen of 6.6-8.7 u that is ~98 m, which on KARVEN's ascent
+    // (425 u of road range over the lap) is ~10 u of rise — so the grounded
+    // branch snapped the car to a phantom gY ~9.8 u under the surface
+    // placeAt had just seated it on and it climbed out at 0.22 u/frame for
+    // most of a second, buried in the road with the chase camera and every
+    // ground-relative term reading the old height. The 40-station rescue and
+    // the rival pit-lift (14-60 stations) are worse. Clearing to undefined
+    // rather than to `gy` is deliberate: the guard already short-circuits on
+    // undefined, so the guard's own write re-seeds the history from the same
+    // continuous `groundHeightAtPos` read it compares against, whereas `gy`
+    // comes from the staircase `groundHeightAt` sampler and would itself
+    // trigger a frame of clamping wherever the two disagree by over 0.22 u.
+    // A teleport is the same discontinuity as a landing, which the guard
+    // already resets for; this was the case the reset missed.
+    this._roadYPrev = undefined;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
     // r358 (iterate round): a placement is a fresh start for the §3.6 wedge
@@ -1992,17 +2056,36 @@ export class Car {
     }
     if (offRoad && !this.airborne) {
       const tk = this.game.track;
-      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
       if (tk?.terrainHeight) {
-        // Below walking pace the velocity direction is noise, and the old
-        // `v2h > 1` guard simply skipped the sample — so a car crawling up
-        // a 55° face read grade 0, felt NO gravity, got its drive back and
-        // CREPT to any summit at 1 u/s (measured, slopeprobe.mjs — the
-        // recording-A wall climb's quiet enabler). The car still FACES
-        // somewhere: at a crawl the grade reads along the heading.
-        const slow = v2h <= 1;
-        const dirx = slow ? Math.sin(this.heading) : this.vel.x / Math.sqrt(v2h);
-        const dirz = slow ? Math.cos(this.heading) : this.vel.z / Math.sqrt(v2h);
+        // A much older revision skipped this sample entirely below walking
+        // pace (a `v2h > 1` guard), so a car crawling up a 55° face read
+        // grade 0, felt NO gravity, got its drive back and CREPT to any
+        // summit at 1 u/s (measured, slopeprobe.mjs — the recording-A wall
+        // climb's quiet enabler). The car still FACES somewhere, so the grade
+        // is read along the heading, and that holds at every speed:
+        //
+        // ALONG THE HEADING, ALWAYS — never along the travel direction.
+        // `terrGrade` feeds `vf -= GRADE * slope * dt`, and `vf` is the
+        // component of velocity on the FORWARD axis, so the grade must be the
+        // one the nose points up: gravity's pull along that axis is fixed by
+        // the car's attitude and does not care which way it happens to be
+        // moving. That is exactly what the on-road branch supplies — the
+        // comment on that line calls terrGrade "the same quantity slopeAt
+        // reports for the road", and slopeAt is a world-space tangent grade,
+        // independent of travel.
+        //
+        // Sampling along velocity above 1 u/s broke that equivalence at the
+        // crossover: whenever the car moved backwards (reverse gear, or a
+        // stalled climb starting to slide back) the sample was taken on the
+        // opposite side and terrGrade came back NEGATED, so gravity pushed the
+        // car further up the hill instead of down it. A car parked nose-up on
+        // a bank also chattered around 1 u/s forever, because the term flipped
+        // from "slide down" to "brake the descent" the moment it got moving —
+        // the hang that the r330 far-off-road body-push was bolted on to hide,
+        // and which that push never covered inside the rejoin band.
+        // Sampling the heading also drops the /sqrt(v2h) NaN at a dead stop.
+        const dirx = Math.sin(this.heading);
+        const dirz = Math.cos(this.heading);
         const LOOK = 4;
         const h0 = tk.terrainHeight(this.pos.x, this.pos.z);
         terrGrade = THREE.MathUtils.clamp(
@@ -2194,7 +2277,6 @@ export class Car {
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     let vf = this.vel.dot(fwd);
     let vl = this.vel.dot(side);
-    const sliding = Math.abs(vl) > 5.5;
 
     const boosting = this.boostTimer > 0;
     if (boosting) this.boostTimer -= dt;
@@ -2367,7 +2449,7 @@ export class Car {
       slope = offRoad ? terrGrade : (this.game.track.slopeAt?.(this.trackIndex) ?? 0);
       if (slope !== 0) vf -= GRADE * slope * dt;
     }
-    // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
+    // drag (rough going adds a bit off-road)
     // TWO DRAGS, NOT ONE (r288): the 0.55/s coefficient is really the
     // hidden top-speed governor — thrust equals drag at ~62 u/s — and it
     // stays, but only UNDER POWER, where it is invisible. On a lifted
@@ -2385,6 +2467,21 @@ export class Car {
     // rivals together, PINE's crests to 1 launch, GLACIER COL's control
     // from 6 to 1. This restores the average the tuning assumed; the top
     // speed itself is clamped at vCap, so only mid-range punch returns.
+    // ...AND THE EASE THE NOTE ABOVE DESCRIBES IS NOW GONE. r293's adoption
+    // of DRIVING_SPEC.md §6/12.1 dropped drag 0.50 -> dragPower 0.122 /
+    // dragCoast 0.14, both far under the 0.40 ceiling, so the old
+    // `sliding ? Math.min(0.40, dragK) : dragK` had two arithmetically
+    // identical arms: Math.min(0.40, 0.122) is 0.122 and Math.min(0.40,
+    // 0.14) is 0.14, on every path, since nothing else writes dragK and
+    // driving.json:5-6 overrides to the same pair. It was the one branch
+    // `sliding` fed, so that local went with it. (The suite comments at
+    // tests/test-goat.mjs:479 and tests/test-jumps.mjs:159 still blame low
+    // ambient slip for the ease being absent; since r293 it did nothing even
+    // when the car WAS sliding.) Not revived as a dragK multiplier either:
+    // r379 ("DRIFTS COST SPEED") named this 0.40 ease as one of the three
+    // reasons drifts were free, alongside driftReward handing half the
+    // scrub back — a drift pays driftForwardScrub below now, and drag is
+    // throttle-and-surface only.
     const dragK = inputs.throttle > 0.05 ? DRIVING.dragPower : DRIVING.dragCoast;
     // MEADOW TOURING (r292, from the player's alpine photo): in FREE ROAM
     // the off-road drag halves — a safari car wandering a high meadow
@@ -2396,7 +2493,7 @@ export class Car {
     // (drag - 1)/0.35 ratio; blended over the same 0.4 s as everything else.
     const offDrag = (this.game.freeRoam ? DRIVING.dragOffRoadRoam : DRIVING.dragOffRoad)
       * ((row9.drag - 1) / 0.35) * offB;
-    vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + offDrag) * dt;
+    vf -= vf * (dragK + offDrag) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
     // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
@@ -4490,7 +4587,12 @@ export class Car {
     this.mesh.rotation.x = pitch - this.jumpPitch;
     // spin wheels + steer the front pair
     if (dt > 0 && this.mesh.userData.wheels) {
-      const spin = this.speedAlong * dt / 0.78;
+      // Rolling angle is distance over this car's own radius. A fixed 0.78
+      // turned the 0.62 crown/alpine/pit/sleek wheels at 79% of their true
+      // rate (tyres looked to skid at launch and in the garage) and the 0.85
+      // brawler's at 109%. buildVoxelRacer publishes the radius it built the
+      // tyre with as rig.wheelR; the TIRES upgrade scales X only, so it holds.
+      const spin = this.speedAlong * dt / (this.mesh.userData.rig?.wheelR ?? 0.78);
       for (const w of this.mesh.userData.wheels) w.rotation.x += spin;
     }
     if (this.mesh.userData.frontWheels) {
@@ -5540,10 +5642,26 @@ export class EnemyCar extends Car {
         }
       }
     }
-    // defense: leading the player with them tucked within ~10u at pace ->
-    // ONE deliberate line move onto their side. Committed once, held ~1.4s,
+    // defense: leading the car behind — player or rival, whoever the chaser
+    // scan above picked — with them tucked within ~10u at pace -> ONE
+    // deliberate line move onto THEIR side. Committed once, held ~1.4s,
     // and not re-armed until a corner passes — readable blocking, never
     // weaving, and only at speed (never engaged below 70% pace).
+    //
+    // The committed lane used to read `g.player.lateral` while every gate
+    // around it already read `chaser` — the un-generalised half of the edit
+    // that added the scan, and this wording is what hid it. Since the player
+    // is behind a rival only 0.5-2.1% of frames (measured above), nearly
+    // every firing stored an unrelated car's lane: a defender at +1.0 with a
+    // rival attacking from +2.5 committed to -5.0 because that is where the
+    // player sat 400 m up the lap — 7.5u away from the car it was triggered
+    // to cover, on a carriageway 7.4u half-wide, handing the attacker the
+    // inside. An unmotivated 1.4 s swerve that defends nothing. `chaser`
+    // is the car actually attacking, and it is the same number as before in
+    // the case the line was written for (chaser === g.player), so a chased
+    // player sees no change. Keep the ±7: `lateral` is unbounded off-road,
+    // so a rival that has speared into the scenery must not drag the steer
+    // target off the road before latLim below reins it in.
     if (this._blockT > 0) {
       this._blockT -= dt;
       targetLat = THREE.MathUtils.lerp(targetLat, this._blockLat, 0.85);
@@ -5566,7 +5684,7 @@ export class EnemyCar extends Car {
         if (c < CORNER_CURV) {
           this._blockUsed = true;
           this._blockT = 1.4;
-          this._blockLat = THREE.MathUtils.clamp(g.player.lateral, -7, 7);
+          this._blockLat = THREE.MathUtils.clamp(chaser.lateral, -7, 7);
         }
       }
     }

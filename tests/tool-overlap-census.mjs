@@ -33,7 +33,7 @@
  * `_planOverpasses` only fires on a true XZ segment INTERSECTION. Same defect,
  * two different ways of arriving at it. See HANDOVER item 1. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 480, height: 320 } });
 const BASE = process.env.BASE ?? 'http://localhost:8901';

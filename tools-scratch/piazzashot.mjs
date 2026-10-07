@@ -4,7 +4,7 @@ import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '74', K = +(process.env.K ?? 0);
 const BACK = +(process.env.BACK ?? 26), UP = +(process.env.UP ?? 2.4);
 const FACE = !!process.env.FACE;   // stand IN the square and look at its church
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport:{width:900,height:520} })).newPage();
 p.setDefaultTimeout(600000);

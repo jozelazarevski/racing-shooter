@@ -6,7 +6,7 @@
  * A gap is anything wider than a quarter of the block that precedes it. */
 import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '54';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport: { width: 500, height: 320 } })).newPage();
 p.setDefaultTimeout(600000);

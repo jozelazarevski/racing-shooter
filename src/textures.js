@@ -406,7 +406,12 @@ function applyCobbleRoad(g, w, h, spec) {
     g.lineTo(x + rr, y + hh);
     g.quadraticCurveTo(x, y + hh, x, y + hh - rr);
     g.lineTo(x, y + rr);
-    g.quadraticCurveTo(x, y, x, y + rr);
+    // the top-left curve has to land on the path's start point (x+rr, y), as
+    // the other three land on the next edge. Ending it on (x, y+rr), the point
+    // it set out from, made it a zero-area spike, and closePath then cut a
+    // straight 45-degree chamfer across that corner of every stone, crown and
+    // foot shadow, so no sett was the rounded rectangle the docblock promises
+    g.quadraticCurveTo(x, y, x + rr, y);
     g.closePath();
     g.fill();
   };
@@ -1724,10 +1729,19 @@ export function reflectiveTapeTexture(kind) {
       g.fillStyle = '#fffdf2';
       g.fillRect(0, h * 0.30, w, h * 0.24);
     } else if (kind === 'barrel') {
-      // two hoop bands, where a drum carries its markings
+      // two hoop bands, where a drum carries its markings. These used to be
+      // 0.18/0.70 at 0.11 tall while barrelTexture paints its hoops at
+      // 0.14/0.76 at 0.09 (below): on the shared 128 px canvas each band
+      // overlapped its hoop by 6.4 px of 14.1, so 45% of the glow lay on bare
+      // stave and a 5 px sliver of every hoop — 6 cm of a 1.5 m drum, both
+      // bands displaced toward the waist — stayed dark. Now the day painter's
+      // own rows verbatim, which is the relation the cone branch above already
+      // has to coneTexture and what the docblock's "same UV rows" promises.
+      // Costs 0.02 h of emissive area per band: a band taller than its hoop
+      // cannot sit on the marking at all.
       g.fillStyle = '#fff6d8';
-      g.fillRect(0, h * 0.18, w, h * 0.11);
-      g.fillRect(0, h * 0.70, w, h * 0.11);
+      g.fillRect(0, h * 0.14, w, h * 0.09);
+      g.fillRect(0, h * 0.76, w, h * 0.09);
     } else {
       // CRATE and anything else: hazard chevrons along the bottom edge, which
       // is what gets taped on site furniture. Diagonal, because a diagonal

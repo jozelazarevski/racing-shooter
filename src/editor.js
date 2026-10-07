@@ -836,15 +836,14 @@ export class WorldEditor {
     if (this.tool === 'smooth' || this.tool === 'flatten') {
       // pull the middle toward the ring height: for FLATTEN the ring is the
       // ground under the brush centre, for SMOOTH it is the average around it
-      const t = this.game.track;
-      const cur = t.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
+      const cur = this._groundY(p.x, p.z);
       let ref = cur;
       if (this.tool === 'smooth') {
         let s = 0, n = 0;
         for (let a = 0; a < 8; a++) {
           const an = (a / 8) * Math.PI * 2;
           const sx = p.x + Math.cos(an) * this.radius, sz = p.z + Math.sin(an) * this.radius;
-          s += t.terrainHeight(sx, sz) + this.delta.at(sx, sz); n++;
+          s += this._groundY(sx, sz); n++;
         }
         ref = s / n;
       } else {
@@ -892,10 +891,53 @@ export class WorldEditor {
 
   _clearPreview() { this._previewed.clear(); }
 
+  /** THE PART OF THE SCULPT THE BUILT WORLD DOES NOT ALREADY KNOW ABOUT.
+   *
+   *  Every overlay height used to read `terrainHeight(x, z) + this.delta.at(x,
+   *  z)`, which is right only until the first APPLY. `buildPayload` hands over
+   *  `delta: this.delta` by reference, `swapLevel` passes it to `new Track`,
+   *  and Track keeps it as `this._delta` — the same mutable object — so from
+   *  then on `terrainHeight` already sums it (`h += this._delta.at(x, z) *
+   *  smoothstep01(...)`, track.js:11302). Adding it again counted the sculpt
+   *  twice: raise a 30-unit hill, APPLY, and every footprint ring and
+   *  selection ring sat 30 units above the ground it was meant to mark, while
+   *  a house placed afterwards hovered the same 30 (previewElement already
+   *  seats its geometry on terrainHeight) — a plain HRD-8 levitation. The
+   *  correction post-APPLY is exactly zero, not "the dabs since APPLY": the
+   *  delta is shared, so a dab painted after an APPLY is inside terrainHeight
+   *  the instant `add()` returns.
+   *
+   *  `_stateRestore` and `_clearAll` do replace `this.delta` without
+   *  rebuilding the world, and then the world is still standing on the old
+   *  baked object — hence the difference rather than a flat zero, so an UNDO
+   *  after an APPLY does not stack the restored sculpt on top of the baked
+   *  one. Before the first APPLY there is no bake and this is the full delta,
+   *  which is what the drawn preview mesh shows. */
+  _pendingLift(x, z) {
+    const bake = this.game.track && this.game.track._delta;
+    if (bake === this.delta) return 0;
+    return this.delta.at(x, z) - (bake ? bake.at(x, z) : 0);
+  }
+
+  /** Ground level for an overlay: what the world says, plus whatever sculpt
+   *  the world has not been rebuilt with yet. */
+  _groundY(x, z) {
+    return this.game.track.terrainHeight(x, z) + this._pendingLift(x, z);
+  }
+
   /* --- element placing ---------------------------------------------------- */
   _place(p) {
     if (!this.preset) { this._status('pick a preset first'); return; }
     const q = this._snapped(p);
+    // A fresh tap is a fresh selection, `also` included. Without this line the
+    // rest of a group outlived the object it belonged to: lay a RUN of five
+    // cottages (`_placeRun` parks made.slice(1) — four of them — in `also`),
+    // click ONE, which only calls `_cancelRun`, then tap once more. The new
+    // cottage replaced `sel` while the four leftovers stayed in `also`, so
+    // `_selGroupEls` handed DELETE five objects and the avenue went with the
+    // one you meant to remove. Same leak fed nudge, ROTATE, DUPLICATE and a
+    // later PLACE -> SELECT drag.
+    this.also = [];
     this._act(`a ${this.preset}`, () => {
       const e = { preset: this.preset, x: q.x, z: q.z,
         rot: this._placeRot ?? 0, scale: this._placeScale ?? 1 };
@@ -917,6 +959,12 @@ export class WorldEditor {
     if (!EDIT_PROP_KINDS[kind]) { this._status('pick a tree or a rock first'); return; }
     const n = Math.max(1, this.natureCount | 0);
     const added = [];
+    // Planting replaces the selection too, and a scatter (n > 1) sets `sel` to
+    // null outright — leaving a stale `also` there was the worse half of the
+    // same leak, because `_selMark` bails on a null `sel` and so drew nothing
+    // at all while `_selGroupEls` still returned the old group for nudge and
+    // DUPLICATE to move.
+    this.also = [];
     this._act(n === 1 ? `a ${kind}` : `${n} ${kind}s`, () => {
       for (let i = 0; i < n; i++) {
         let x = p.x, z = p.z, s = this._placeScale ?? 1, rot = this._placeRot ?? 0;
@@ -1034,7 +1082,7 @@ export class WorldEditor {
       this.game.scene.add(this._lineGrp);
     }
     const f = this._lineFrom;
-    const y = this.game.track.terrainHeight(f.x, f.z) + this.delta.at(f.x, f.z);
+    const y = this._groundY(f.x, f.z);
     const g = new THREE.RingGeometry(3, 4.4, 20);
     g.rotateX(-Math.PI / 2);
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
@@ -1069,7 +1117,7 @@ export class WorldEditor {
     const t = this.game.track;
     const nature = kind === 'prop';
     const color = nature ? 0x7dff9b : 0xffc14a;
-    const lift = this.delta.at(e.x, e.z);
+    const lift = this._pendingLift(e.x, e.z);
     const y = t.terrainHeight(e.x, e.z) + lift;
 
     // WHAT YOU PLACED, VISIBLE NOW.
@@ -1210,9 +1258,16 @@ export class WorldEditor {
         if (this._isSculpt() && !this._orbiting) {
           const p = this._pick(e.clientX, e.clientY);
           if (p) {
-            this._flatY = this.game.track.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
+            this._flatY = this._groundY(p.x, p.z);
             this._painting = true;
             this._strokeFrom = this.delta.dabs.length;
+            // The real scene, before a single dab of this stroke. `_endStroke`
+            // used to synthesise the "before" by slicing dabs back to
+            // `_strokeFrom`, which is only honest while a stroke APPENDS —
+            // and `TerrainDelta.add` dedupes, so a second stroke over the same
+            // ground with the same tool, size and edge merges into dabs that
+            // sit below `_strokeFrom` instead. See `_endStroke`.
+            this._strokeBefore = this._stateSnapshot();
             this._dab(p);
           }
         } else if (this._tapPending && this.tool === 'route') {
@@ -1310,6 +1365,23 @@ export class WorldEditor {
           this._status(`moved ${moved.length > 1 ? `${moved.length} objects` : ''}`
             + ` — APPLY to build ${moved.length > 1 ? 'them' : 'it'} there`);
           this._syncInspector();
+        } else if (hid && this.sel) {
+          // THE DRAG THAT WENT NOWHERE STILL OWED THE WORLD A BUILDING BACK.
+          // `_onDown` blanks the instances the moment a drag arms, and only
+          // the `_act` above ever handed that blanking back (as the visual
+          // undo closure). A second tap on an already-applied object arms the
+          // drag and releases without moving, so this branch was empty and the
+          // hide had no owner at all: the house disappeared while its ring
+          // stayed, and nothing restored it — not deselecting, not switching
+          // tool, not UNDO (no history entry was pushed), and since neither
+          // `_adoptSelection` nor `_hideAround` sets `dirty`, exit() dropped
+          // you back into a drivable world with the hole still in it. Only a
+          // full APPLY healed it. EDITOR.md:135-139 pairs every blanking with
+          // a way to put it back; this restores that pairing. Guarded on
+          // `sel` because a DELETE keypress between down and up clears the
+          // selection and hides the same object for good — unhiding then would
+          // put a deleted building back on screen.
+          this._unhide(hid);
         }
       }
       this._tapPending = false;
@@ -1624,11 +1696,10 @@ export class WorldEditor {
     }
     const s = this.sel;
     if (!s) return;
-    const t = this.game.track;
     // the rest of a shift-tapped group gets a plainer ring: enough to see what
     // is coming with you, quiet enough that the primary still reads as primary
     for (const q of this.also) {
-      const qy = t.terrainHeight(q.x, q.z) + this.delta.at(q.x, q.z);
+      const qy = this._groundY(q.x, q.z);
       const qr = Math.max(2.5, 3.4 * (q.scale ?? 1));
       const m = new THREE.Mesh(new THREE.RingGeometry(qr, qr + 0.5, 26),
         new THREE.MeshBasicMaterial({ color: 0x5ad7ff, transparent: true,
@@ -1638,7 +1709,7 @@ export class WorldEditor {
       m.renderOrder = 1000;
       this._selGroup.add(m);
     }
-    const y = t.terrainHeight(s.x, s.z) + this.delta.at(s.x, s.z);
+    const y = this._groundY(s.x, s.z);
     const r = Math.max(2.5, (s.r ?? 3.4) * (s.scale ?? 1));
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(r, r + 0.7, 32),
@@ -1807,7 +1878,18 @@ export class WorldEditor {
     this.sel.x = p.x; this.sel.z = p.z;
     this.dirty = true;
     this._clearGhosts();
-    for (const e of this.elements) this._ghost(e);
+    // `_clearGhosts` empties the whole group, plants included, so rebuilding
+    // only `elements` here wiped every hand-planted tree, bush and rock out of
+    // the scene for the length of the drag — and when the thing under the
+    // finger was itself a built plant, its batched instance was blanked by
+    // `_onDown` too, so nothing but the cyan ring followed the pointer. A drag
+    // that ended back at its start did not even heal on release, because the
+    // `_refreshMarkers` that restores them only runs from `_act`. Same pair as
+    // `_refreshMarkers` uses; not that call itself, which would also rebuild
+    // zone, water, road, widen and warp marks on every pointer-move frame,
+    // none of which a selection drag can change.
+    for (const e of this.elements) this._ghost(e, 'element');
+    for (const e of this.props) this._ghost(e, 'prop');
     this._clearSelMarks();
     this._selMark();
   }
@@ -1922,21 +2004,47 @@ export class WorldEditor {
 
   /** A sculpt STROKE is one action, not forty. Dragging the brush lays a dab
    *  every frame; undoing them one at a time would take as long as painting.
-   *  The "before" state is SYNTHESISED from `_strokeFrom` rather than captured
-   *  at pointer-down, so a stroke driven straight through `_dab` (the tests do
-   *  exactly that) is as undoable as one painted with a finger. */
+   *
+   *  The "before" is the snapshot `_onDown` captured, and only falls back to
+   *  one SYNTHESISED from `_strokeFrom` when there is none — a stroke driven
+   *  straight through `_dab` (the tests do exactly that) never goes through
+   *  `_onDown`, and has to stay as undoable as one painted with a finger.
+   *
+   *  The synthesis cannot be the rule, because it assumes a stroke only ever
+   *  APPENDS dabs, and `TerrainDelta.add` dedupes: a dab within `r * 0.16` of
+   *  an existing one of the same mode, radius and edge is folded into it by
+   *  `e.dh += dab.dh`. So painting the same hill twice at the shipped defaults
+   *  (radius 40, so anything inside 6.4 units) merged wholly into the first
+   *  stroke's dabs. Measured at the brush centre with RAISE: stroke one 3.000,
+   *  stroke two 6.000 with `dabs.length` still 1 — so `n` was 0, the function
+   *  returned before recording anything, and one UNDO dropped the ground to
+   *  0.000 (both strokes) while the REDO restored only 3.000, losing the
+   *  second stroke's height with no way back. The partial-overlap case was
+   *  just as wrong the other way: slicing a snapshot taken AFTER the merge
+   *  kept the merged height, and undoing a stroke left the ground at 9.000
+   *  where it had been 6.000 before that stroke started — an undo that raised
+   *  a hill. Comparing the two snapshots also replaces the dab count as the
+   *  did-anything test, which is what the count was standing in for, and no
+   *  longer skips the `_redo` reset on a stroke that did change the model. */
   _endStroke() {
     const from = this._strokeFrom ?? this.delta.dabs.length;
     const n = this.delta.dabs.length - from;
-    if (n <= 0) { this._strokeFrom = null; return; }
     const after = this._stateSnapshot();
-    const pre = JSON.parse(after);
-    pre.dabs = pre.dabs.slice(0, from);
-    this._history.push({ label: `${n} dab${n > 1 ? 's' : ''}`,
-      before: JSON.stringify(pre), after });
+    let before = this._strokeBefore;
+    if (before == null) {
+      const pre = JSON.parse(after);
+      pre.dabs = pre.dabs.slice(0, from);
+      before = JSON.stringify(pre);
+    }
+    this._strokeFrom = null;
+    this._strokeBefore = null;
+    if (before === after) return;
+    // a stroke that merged entirely still moved the ground, and "0 dabs" is
+    // not a thing you can have done
+    const k = Math.max(1, n);
+    this._history.push({ label: `${k} dab${k > 1 ? 's' : ''}`, before, after });
     if (this._history.length > HISTORY_DEPTH) this._history.shift();
     this._redo.length = 0;
-    this._strokeFrom = null;
     this.dirty = true;
     this._saveDraft();
   }
@@ -2101,9 +2209,8 @@ export class WorldEditor {
    *  which is how you flood a valley rather than just puddle a field. */
   _waterAt(p) {
     if (!p) return;
-    const t = this.game.track;
     const r = this.radius;
-    const surf = t.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
+    const surf = this._groundY(p.x, p.z);
     // dig first: a bowl about a fifth as deep as it is wide, floored so a
     // huge brush does not punch a well through the world
     const depth = Math.min(9, Math.max(3, r * 0.22));
@@ -2255,7 +2362,17 @@ export class WorldEditor {
           : 'nowhere on this lap holds even a short bore — it is corners all the way');
         return;
       }
-      const fit = Math.round(t.tunnelFitAt(site, lenS) * 2 * t.segLen);
+      // THE LENGTH THE BUILDER WILL BORE, NOT THE LENGTH IT COULD. This read
+      // `tunnelFitAt(site, lenS) * 2 * segLen` and skipped the planner's own
+      // clamp, `half = Math.min(bestFit, lenS >> 1)` (track.js:10629) — so it
+      // reported how much bore the station COULD take rather than how much is
+      // asked for. At segLen 7 the default 80 u bore gives lenS 11 and
+      // lenS >> 1 = 5, while every non-zero fit is at least MIN = 6, so the
+      // clamp binds on every single tap: APPLY always cut 5 * 2 * 7 = 70 u
+      // while the status line claimed between 84 and 154 u. Exactly the
+      // request-vs-result drift the comments above exist to prevent.
+      const halfS = Math.min(t.tunnelFitAt(site, lenS), lenS >> 1);
+      const fit = Math.round(halfS * 2 * t.segLen);
       const f = site / n;
       this._act('a tunnel', () => { this.roadFeat.tunnels.push(f); });
       const moved = Math.round(t._circDist(site, i) * t.segLen);

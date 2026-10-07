@@ -2,7 +2,7 @@
  * in the compositor and never throw — so this checks they are actually
  * declared, actually running, and actually silenced when they should be. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const probe = async (reduced) => {
   const ctx = await b.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true,

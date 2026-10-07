@@ -1,7 +1,7 @@
 /* Raycast a handful of frame points and name what's there. */
 import { chromium } from 'playwright-core';
 const LVL=Number(process.env.LVL??7), ST=Number(process.env.ST??520);
-const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport:{ width:900, height:520 } });
 p.setDefaultTimeout(600000);

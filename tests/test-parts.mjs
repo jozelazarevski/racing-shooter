@@ -26,7 +26,7 @@ const check = (name, ok, note = '') => {
   ok ? pass++ : fail++;
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true, isMobile: true });
 const page = await ctx.newPage();
@@ -147,6 +147,14 @@ const R = await page.evaluate(() => {
     [g.cars.selected, g.carUpgrades(), g.carParts().fitted]);
   out.bays = document.querySelectorAll('.bay').length;
   out.ladders = document.querySelectorAll('.up-card').length;
+  // DERIVED, NOT HARDCODED. This count was compared against a literal 10, and
+  // that literal is why the check passed while RALLY COPILOT was missing from
+  // the BAYS table: the eleventh ladder had no bay, no card and no buy button,
+  // so the copilot could never be bought and the whole pacenote system was
+  // dead — and the suite that exists to catch exactly that agreed with the
+  // broken count. carUpgrades() zero-fills one key per UPGRADES entry, so it
+  // is the roster's own length and the check now moves with the roster.
+  out.upgradeKeys = Object.keys(g.carUpgrades()).length;
 
   // ---- the banner, once
   delete g.garage.partSeen;
@@ -187,7 +195,8 @@ check('...and no two parts share a picture', R.distinctArt === R.partCount,
   `${R.distinctArt} distinct of ${R.partCount}`);
 check('the shop floor is a live canvas, mounted and sized', R.stageMounted);
 check('...showing the build that is actually fitted', R.stageCarIsTheBuild);
-check('every upgrade ladder found a bay', R.ladders === 10, `${R.ladders} of 10 in ${R.bays} bays`);
+check('every upgrade ladder found a bay', R.ladders === R.upgradeKeys,
+  `${R.ladders} of ${R.upgradeKeys} in ${R.bays} bays`);
 check('an earned part is announced on the debrief', R.bannerFirst);
 check('...and only the once', !R.bannerRepeat);
 

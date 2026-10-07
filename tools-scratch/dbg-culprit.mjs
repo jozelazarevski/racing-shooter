@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 const LVL = 32, ST = 870;
 const OUT = process.env.OUT ?? '/tmp/culprit.png';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 900, height: 520 } });
 p.setDefaultTimeout(240000);

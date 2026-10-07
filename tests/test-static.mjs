@@ -7,7 +7,7 @@
 // menu had six mode chips instead of three. Cheap check, expensive miss.
 import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join, dirname, extname } from 'node:path';
+import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,8 +64,8 @@ check(!!ver && sw.includes(ver), 'sw.js CACHE name carries the version', `lookin
 
 // 4. every module PARSES AS A MODULE.
 //
-// `node --check src/track.js` is not this check. With no package.json in the
-// repo, node parses a bare `.js` file in the SCRIPT goal, which is sloppy mode
+// `node --check src/track.js` was not this check. With no package.json in the
+// repo, node parsed a bare `.js` file in the SCRIPT goal, which is sloppy mode
 // — and in sloppy mode an object literal that is missing its closing brace
 // degenerates into a chain of labelled statements and blocks, which is valid.
 // Merging the four new worlds left exactly that: two element kits unclosed.
@@ -76,6 +76,12 @@ check(!!ver && sw.includes(ver), 'sw.js CACHE name carries the version', `lookin
 // Copying to a `.mjs` extension forces the MODULE goal, which is what the
 // browser does, and reports the file and line. Cheap, and it is the difference
 // between catching this here in 200 ms and catching it after a deploy.
+//
+// The repo now has a package.json declaring `"type": "module"`, so node parses
+// a bare `.js` in the module goal too and a direct `node --check` would catch
+// the same fault. The copy stays anyway: `.mjs` forces the module goal
+// whatever package.json says, so this check cannot be quietly disarmed by a
+// later edit to that file, which is exactly how it was disarmed before.
 const tmp = join(ROOT, '.parsecheck.mjs');
 const badParse = [];
 for (const f of walk(ROOT)) {
@@ -92,6 +98,34 @@ for (const f of walk(ROOT)) {
 try { unlinkSync(tmp); } catch { /* already gone */ }
 check(badParse.length === 0, 'every module parses in the module goal (strict mode)',
   badParse.join('; '));
+
+// 5. THE PRECACHE COVERS THE WHOLE STATIC MODULE GRAPH.
+//
+// This suite already checks that sw.js carries the version, which says nothing
+// about whether it carries the FILES. It did not: `src/stagecheck.js` and
+// `src/sync.js` were imported at the top of src/main.js and absent from CORE,
+// and a static import missing from the precache does not degrade a feature —
+// the graph fails to resolve and an offline boot is a blank page. Walk the
+// graph from the entry point the way the browser does and require every hop.
+const graph = new Set();
+const walkImports = (file) => {
+  if (graph.has(file)) return;
+  graph.add(file);
+  let src;
+  try { src = readFileSync(file, 'utf8'); } catch { return; }
+  for (const m of src.matchAll(/(?:^|[\s;])(?:import|export)[^'"]*?from\s*['"](\.[^'"]+)['"]/g)) {
+    walkImports(resolve(dirname(file), m[1]));
+  }
+};
+for (const m of html.matchAll(/<script[^>]+type="module"[^>]*src="([^"?]+)/g)) {
+  walkImports(resolve(ROOT, m[1].replace(/^\.?\//, '')));
+}
+const uncached = [...graph]
+  .map((f) => f.slice(ROOT.length + 1).replace(/\\/g, '/'))
+  .filter((rel) => !sw.includes(`'./${rel}'`) && !sw.includes(`"./${rel}"`));
+check(uncached.length === 0,
+  `sw.js precaches every statically imported module (${graph.size} in the graph)`,
+  `not in CORE: ${uncached.join(', ')}`);
 
 console.log(fails ? `\n${fails} FAILED` : '\nall static checks passed');
 process.exit(fails ? 1 : 0);

@@ -15,7 +15,7 @@ import { chromium } from 'playwright-core';
 import { writeFileSync } from 'node:fs';
 const LV = process.env.LEVEL ?? 66, PORT = process.env.PORT ?? '8912';
 const ST = +(process.env.STATION ?? 206);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 480, height: 800 } });
 p.setDefaultTimeout(900000);

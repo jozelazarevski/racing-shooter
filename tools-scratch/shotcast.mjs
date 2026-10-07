@@ -4,7 +4,7 @@
  * build against a theme in the repo. */
 import { chromium } from 'playwright-core';
 const [file, x0, y0, x1, y1] = process.argv.slice(2);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
 const p = await (await b.newContext()).newPage();
 console.log(JSON.stringify(await p.evaluate(async ([f, a, c, d, e]) => {
   const img = new Image();

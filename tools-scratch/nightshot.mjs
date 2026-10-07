@@ -4,7 +4,7 @@ import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '17', F = +(process.env.F ?? 0.2);
 const HIDE = (process.env.HIDE ?? '').split(',').filter(Boolean);
 const CAM = process.env.CAM ?? 'chase';   // chase | front (oncoming, what a lamp looks like head on)
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport:{width:900,height:560} })).newPage();
 p.setDefaultTimeout(600000);

@@ -1,7 +1,7 @@
 // C-E: fraction of pixels above 0.9 luminance, per world, CAM=3 mid-lap.
 import { chromium } from 'playwright-core';
 const WORLDS = (process.argv[2] ?? '66,70,4,54').split(',').map(Number);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 for (const w of WORLDS) {
   const p = await browser.newPage({ viewport: { width: 480, height: 300 } });

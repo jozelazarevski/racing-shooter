@@ -7,7 +7,7 @@
  * every frame, at speed. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 // THE GAME AREA, NOT THE DEVICE. Safari's address bar and toolbar take ~130 px
 // of a 430x932 phone, so the canvas the player actually sees is about 430x800.

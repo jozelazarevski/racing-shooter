@@ -25,7 +25,7 @@ const ok = (cond, msg, extra = '') => {
   else { fail++; console.log('FAIL ', msg, extra); }
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
 page.setDefaultTimeout(600000);
@@ -122,7 +122,7 @@ await browser.close();
  * them all and the handicap is exactly 1, so every other suite's balance is
  * untouched for a player who has done the work.
  */
-const browser2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser2 = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page2 = await browser2.newPage({ viewport: { width: 640, height: 420 } });
 page2.setDefaultTimeout(600000);

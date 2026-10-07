@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const TAG = process.env.TAG ?? 'after';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 830 }, hasTouch: true, isMobile: true,
   deviceScaleFactor: 2 });

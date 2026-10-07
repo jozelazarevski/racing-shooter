@@ -6,7 +6,7 @@ const LEVEL = process.env.LEVEL ?? 32;
 const IDXS = (process.env.IDXS ?? '840,860,880,0,10,20,40').split(',').map(Number);
 const DIR = process.env.DIR ?? '/tmp/shots32b';
 mkdirSync(DIR, { recursive: true });
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 400, height: 780 } });
 p.on('pageerror', (e) => console.log('PAGEERR', String(e).slice(0, 140)));

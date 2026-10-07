@@ -3,7 +3,7 @@
  * foreground terrace occupies, so the game's facade luminance has something
  * measured to be compared against. */
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport: { width: 400, height: 300 } })).newPage();
 p.setDefaultTimeout(120000);

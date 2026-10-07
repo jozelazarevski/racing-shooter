@@ -3,7 +3,7 @@ import { chromium } from 'playwright-core';
 const LVL=Number(process.env.LVL??32), ST=Number(process.env.ST??0);
 const AHEAD=Number(process.env.AHEAD??45), UP=Number(process.env.UP??6);
 const PX=Number(process.env.PX??605), PY=Number(process.env.PY??310);
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await browser.newPage({ viewport:{ width:900, height:520 } });
 p.setDefaultTimeout(240000);

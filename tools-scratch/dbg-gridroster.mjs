@@ -5,7 +5,7 @@
 import { chromium } from 'playwright-core';
 const LEVELS = process.env.LEVELS ? process.env.LEVELS.split(',').map(Number)
   : [0, 5, 12, 21, 30, 41, 52, 63, 71, 77];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 320, height: 200 } });
 p.setDefaultTimeout(600000);

@@ -3,7 +3,7 @@
  * Run it against two ports to compare builds. */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 400, height: 260 } });
 page.setDefaultTimeout(600000);

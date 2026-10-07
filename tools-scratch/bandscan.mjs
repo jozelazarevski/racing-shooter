@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'fs';
 const file = process.argv[2];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
 const p = await (await b.newContext()).newPage();
 console.log(JSON.stringify(await p.evaluate(async (d) => {
   const img = new Image();

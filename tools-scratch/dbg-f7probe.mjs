@@ -1,7 +1,7 @@
 /* Replicate phase4's F7 grass run on a world and log what limits the car. */
 import { chromium } from 'playwright-core';
 const LVL = Number(process.env.LVL ?? 66);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 await p.goto(`http://localhost:8901/?level=${LVL}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });

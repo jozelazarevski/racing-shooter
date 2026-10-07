@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const WORLDS = (process.env.WORLDS ?? '1,2,3,4,5,6,7,8,9,11,22,32,41,44,50,60,66,73,76,78')
   .split(',').map(Number);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
 const errs = [];

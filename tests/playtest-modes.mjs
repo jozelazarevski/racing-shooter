@@ -1,7 +1,7 @@
 // MODES + HAZARDS PLAYTEST: free roam loop, pause menu, live hazards firing
 // during a real race, and mobile touch controls.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const bugs = [], ok = [];
 const check = (n, pass, d = '') => { (pass ? ok : bugs).push(`${n} :: ${d}`); console.log(`${pass ? 'PASS' : 'BUG '}  ${n}  ${d}`); };
 

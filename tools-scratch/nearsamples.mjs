@@ -18,7 +18,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const [lvl, ...samples] = process.argv.slice(2).map(Number);
 if (!lvl || !samples.length) { console.log('usage: nearsamples.mjs <level> <sample...>'); process.exit(1); }
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 400, height: 300 } });
 await page.goto(`${BASE}/?level=${lvl}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 120000 });

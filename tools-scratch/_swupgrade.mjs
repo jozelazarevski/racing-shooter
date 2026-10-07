@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 const SITE = '/tmp/claude-0/swtest/site';
 const ctx = await chromium.launchPersistentContext('/tmp/claude-0/swtest/profile', {
-  executablePath: '/opt/pw-browsers/chromium',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
 const p = await ctx.newPage();

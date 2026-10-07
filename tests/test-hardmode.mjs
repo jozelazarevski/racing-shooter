@@ -22,7 +22,7 @@ const ok = (cond, msg, extra = '') => {
   if (cond) { pass++; console.log('PASS ', msg); }
   else { fail++; console.log('FAIL ', msg, extra); }
 };
-const launch = () => chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
 /* ---- 1. EIGHT CARS ------------------------------------------------------ */

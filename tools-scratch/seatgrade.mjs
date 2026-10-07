@@ -18,7 +18,7 @@ const CAR = process.env.CAR || '';
 const LVL = process.env.LEVEL ?? '1';
 const DIR = process.env.DIR ?? '/tmp';
 const SHOT = process.env.SHOT || '';           // sample index to also save as a png
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 430, height: 830 }, hasTouch: true,
   isMobile: true, deviceScaleFactor: 2 });

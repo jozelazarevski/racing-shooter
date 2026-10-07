@@ -3,7 +3,7 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 const IDS = ['race-info','health-box','score-box','speed-box','feed','weapon-box',
   't-fire','t-missile','t-mine','t-shock','t-nitro','t-drift','t-brake',
   'cam-btn','view-btn','pause-btn'];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const p = await ctx.newPage();

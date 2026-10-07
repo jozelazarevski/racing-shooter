@@ -1,6 +1,6 @@
 // Climb the goat and photograph it: approach, mid-spiral, summit star.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 900, height: 600 } });
 p.setDefaultTimeout(300000);

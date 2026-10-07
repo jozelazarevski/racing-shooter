@@ -18,7 +18,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const IDS = (process.env.IDS ?? '57,58,59,60,50,51,52,53,54,62,73,75,76,77,49').split(',');
 const NOPULL = process.env.NOPULL === '1';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
 console.log(`world                 %lap<=60u  longestRun   min   median  boats<=200u  quay  ${NOPULL ? '(BASELINE, no pull)' : ''}`);

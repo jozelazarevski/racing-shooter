@@ -1,6 +1,6 @@
 // Destruction round: every weapon + contact must destroy props.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await b.newPage({ viewport: { width: 900, height: 600 } });
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 await page.goto('http://localhost:8901/', { waitUntil: 'load' });

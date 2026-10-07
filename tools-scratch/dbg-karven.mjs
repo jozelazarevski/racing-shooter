@@ -18,7 +18,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const LEVELS = (process.env.LEVELS ?? '19,10,20,21').split(',');
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
 console.log('world                 lapLen   medR   %<40u  %<25u   hairpins  climb  descent  roadYrange  segLen');

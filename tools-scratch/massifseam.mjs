@@ -28,7 +28,7 @@ const TAG = process.env.TAG ?? 'run';
 const SEED = process.env.SEED ?? '7';
 const W = +(process.env.W ?? 640), H = +(process.env.H ?? 420);
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await (await b.newContext({ viewport: { width: W, height: H } })).newPage();
 page.setDefaultTimeout(600000);

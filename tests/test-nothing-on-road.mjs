@@ -152,7 +152,7 @@ const KNOWN_HARD = {
   'SEA CLIFF RUN': { max: 4, why: '80 u of road stacked on road (HANDOVER item 3) — placement beside one leg lands in the other' },
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 480, height: 300 } });
 page.setDefaultTimeout(900000);

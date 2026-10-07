@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 900, height: 620 } });
 p.on('pageerror', e => console.log('pageerr:', e.message.slice(0, 140)));

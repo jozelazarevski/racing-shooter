@@ -6,7 +6,7 @@
  * with it hidden so the answer can be looked at rather than argued. */
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'fs';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 430, height: 900 } });
 p.setDefaultTimeout(600000);

@@ -18,7 +18,7 @@ const SIZES = (process.env.SIZES ?? 'iphone-landscape,phone-portrait').split(','
   'narrow-portrait': ['narrow-portrait', 360, 740, 3],
   'tiny-portrait': ['tiny-portrait', 320, 680, 2],
 }[n]));
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 let bad = 0;
 for (const [name, w, h, dpr] of SIZES) {

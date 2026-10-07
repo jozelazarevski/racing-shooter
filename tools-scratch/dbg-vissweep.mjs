@@ -3,7 +3,7 @@
 import { chromium } from 'playwright-core';
 const LVL = Number(process.env.LVL ?? 66);
 const IDX = (process.env.IDX ?? '0,80,160,240,320,400').split(',').map(Number);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 460, height: 900 } });
 await p.goto(`http://localhost:8901/?level=${LVL}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 300000 });

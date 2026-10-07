@@ -14,7 +14,7 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 const OUT = process.env.OUT ?? '/tmp/seat.png';
 const W = +(process.env.W ?? 430), H = +(process.env.H ?? 830);
 const LVL = process.env.LEVEL ?? '1';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: W, height: H }, hasTouch: true,
   isMobile: true, deviceScaleFactor: 2 });

@@ -115,7 +115,26 @@ const judge = (file, out, code) => {
   // of a FAILING suite, and it does not follow for a CRASHING one. runSuite
   // already captured `code`; the caller destructured only {out, secs} and threw
   // it away. A non-zero exit is an unhandled throw, which is never a pass.
-  if (code !== 0) hard.push(`suite exited ${code} (crash — not a verdict)`);
+  //
+  // ...BUT A NON-ZERO EXIT IS NOT ALWAYS A CRASH. Several suites end with
+  // `process.exit(fail ? 1 : 0)`, and `fail` counts WAIVED marginals too, so a
+  // suite that ran to the end and reported only waived failures exited 1 — and
+  // this line then added a crash on top of the waivers. test-phase4 is the
+  // case: its two F7 grass-top marginals are waived line by line above, and
+  // the suite still blocked the gate on every run, because the waiver could
+  // never reach the exit code. A WAIVERS entry that cannot un-block its own
+  // suite is not a waiver.
+  //
+  // So tell the two apart by how the output ENDS. A suite that finished prints
+  // its own verdict count last ("2 FAILED", "7 passed, 0 failed"); a crash
+  // always ends on a stack trace and node's version banner, never on a count
+  // line. Testing the LAST line rather than "a count line anywhere" matters:
+  // a suite that printed a count mid-run and then threw must still read as a
+  // crash. A finished suite's failures are then judged on their FAIL lines
+  // like any other — unwaived ones stay hard.
+  const tail = out.trim().split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
+  const finished = /^\d+ FAILED\b/.test(tail) || /\d+ passed, \d+ failed/.test(tail);
+  if (code !== 0 && !finished) hard.push(`suite exited ${code} (crash — not a verdict)`);
   // SECOND, POSITIVE EVIDENCE. tests/README rule 4 already says a check that
   // matches nothing passes forever; the same trap applies to a whole suite.
   // Green now requires a suite to show it actually asserted something, so an

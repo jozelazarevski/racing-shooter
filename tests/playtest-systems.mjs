@@ -2,7 +2,7 @@
 // respawn, upgrades, and the combo/pickup loops — the things a player
 // actually touches every race.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const bugs = [];
 const ok = [];
 const check = (name, pass, detail = '') => {

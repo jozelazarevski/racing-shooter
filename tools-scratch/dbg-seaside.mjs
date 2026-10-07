@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8931';
 const IDS = (process.env.IDS ?? '29,50,51,52,53,54,57,58,59,60,62,73,75,76,77,49').split(',');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const out = [];
 for (const id of IDS) {

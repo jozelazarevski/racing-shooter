@@ -14,9 +14,33 @@ import { DRIVING, loadDrivingOverrides, nitroCeilingKmh, stageTemplate } from '.
 import { runStageValidator } from './stagecheck.js';
 import { installRally } from './telemetry.js';
 import { Route } from './route.js';
-// RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
-// — no file shipped means the defaults in driving.js ARE the tune.
-loadDrivingOverrides();
+// driving.json overrides src/driving.js AT BOOT (DRIVING_SPEC.md: "overridable
+// by driving.json at boot, per spec §13"), and no file shipped means the
+// defaults in driving.js ARE the tune.
+//
+// AWAITED, NOT FIRE-AND-FORGET. This used to be a bare call, and the comment
+// above it called that fire-and-forget on the authority of RALLY_DRIVING.md
+// §13 — a document that does not exist in the repo. The bare call defeated the
+// rule it cited: loadDrivingOverrides awaits a fetch, so the module ran on to
+// `new Game()`, which builds the world synchronously, before the JSON was ever
+// merged. Measured with a probe that watches for the first moment
+// window.__game exists: on 3 of 3 ordinary go=1 boots, with NO artificial
+// delay, the track was already built and __DRIVING.__droppedKeys (set last
+// by the loader) was still undefined. So every value in driving.json read
+// while a world is BUILT — the coast profile, the retaining-wall depth cap —
+// was silently ignored on the first world, and DRIVING was then rewritten
+// under a finished one, splitting the build-time and run-time tune.
+//
+// Bounded at 3 s so a fetch that HANGS (as opposed to one that fails, which
+// the loader already catches and returns false for) cannot stall the boot
+// forever; the #boot-screen watcher in index.html only polls for
+// window.__game, so it simply stays up a moment longer. A same-origin JSON
+// of a few KB arrives long before that cap. If it ever were hit, the world
+// would build from the driving.js defaults exactly as every boot did before.
+await Promise.race([
+  loadDrivingOverrides(),
+  new Promise((resolve) => setTimeout(resolve, 3000)),
+]);
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, AI_COLORS, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
@@ -25,7 +49,7 @@ import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
 import { Particles, SkidMarks } from './particles.js';
-import { Hud, fmtTime } from './hud.js';
+import { Hud, fmtTime, HUD_KMH } from './hud.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
 import { glowTexture, contactShadowTexture } from './textures.js';
@@ -295,12 +319,13 @@ const UPGRADES = [
 // tires, weapons, looks engine v4-8-12, add spoilers etc. I would purchase
 // parts and race for other parts."
 //
-// The ten UPGRADES above are TUNING: one ladder per line, every rung strictly
-// better than the last, no decision to make beyond what to spend next. Parts
-// are the other half — a SLOT holds exactly one part, the options TRADE
-// against each other rather than stacking, and picking one is a real choice
-// about how the car drives. A V12 is not "a better engine"; it is more power
-// than the tyres can put down, and you buy a wing to get it back.
+// The eleven UPGRADES above are TUNING: one ladder per line, every rung
+// strictly better than the last, no decision to make beyond what to spend
+// next. Parts are the other half — a SLOT holds exactly one part, the
+// options TRADE against each other rather than stacking, and picking one is
+// a real choice about how the car drives. A V12 is not "a better engine"; it
+// is more power than the tyres can put down, and you buy a wing to get it
+// back.
 //
 // Every part is visible from the chase camera (see applyUpgradeKit): the
 // engine sets how many pipes come out of the tail, the spoiler is the
@@ -714,7 +739,11 @@ const TRACK_FEATS = [
     check: (g, ct) => ct.rivalKills >= 3 },
   { id: 'onrails', label: 'ON RAILS', icon: '⚙️', need: { key: 'handling', lvl: 2 }, pay: 400,
     desc: 'finish without once dropping a wheel off the road',
-    check: (g, ct) => !ct.leftRoad },
+    // `!ct.leftRoad` also passed when the counter was never written at all,
+    // which is how declining a world's contracts used to pay this feat for
+    // a lap spent in the scenery. The strict test demands the observation
+    // actually ran; resetRace initialises the flag to false.
+    check: (g, ct) => ct.leftRoad === false },
 ];
 
 /** The two feats this world asks for — FIXED to the world, not rerolled.
@@ -800,7 +829,10 @@ const QUESTS = [
     id: 'recovery', name: 'CLEAN HANDS', icon: '🆘',
     desc: 'Finish 4 different worlds without ever calling the SOS',
     count: 4, reward: { part: 'beacon', cr: 1000 },
-    test: (g) => (g.player.sos >= g.player.maxSos ? `w${g.level.id}` : null),
+    // Same stale test as the NO BEACON job: nothing spends `sos` since
+    // CORRIDOR §10, so this handed over the free part after any four
+    // finishes. Count the rescues actually called this race instead.
+    test: (g) => ((g._ct?.rescues ?? 0) === 0 ? `w${g.level.id}` : null),
   },
   {
     id: 'stuntman', name: 'STUNTMAN', icon: '🪂',
@@ -944,7 +976,12 @@ const JOB_POOL = [
     id: 'solo', label: 'NO BEACON', icon: '🆘', base: 480,
     line: () => 'finish without calling the rescue',
     atFinish: true,
-    check: (g) => (g.player.sos ?? 0) >= (g.player.maxSos ?? 1),
+    // `sos >= maxSos` was written when the rescue cost a charge. CORRIDOR §10
+    // made recovery free and unlimited and deleted the decrement, so the
+    // counter is refilled at the start line and never spent: this 480 CR job
+    // paid out however often the player hammered SOS. `_ct.rescues` counts
+    // the calls themselves (see _updateContracts).
+    check: (g, ct) => (ct?.rescues ?? 0) === 0,
   },
   {
     id: 'reel', label: 'STUNT REEL', icon: '🪂', base: 440,
@@ -1292,7 +1329,8 @@ const WORLD_TRAITS = (id) => {
  *  of the three limits the physics actually imposes, using that car's own
  *  constants:
  *
- *    vCap    the slope-aware speed ceiling  (vehicles.js: GRADE / DOWNHILL_CAP)
+ *    vCap    the slope-aware speed ceiling  (vehicles.js: the on-road grade
+ *            law, −2.5× the slope up, +1.5× down to DOWNHILL_CAP)
  *    vYaw    steering authority vs the corner's curvature
  *    vGrip   the speed at which the sustained slide (v²k/grip) still fits
  *            inside the road — this is where the car's grip and the surface,
@@ -1305,7 +1343,12 @@ const WORLD_TRAITS = (id) => {
 function paceEstimate(car, track) {
   if (!car?.stats || !track?.center) return null;
   const S = car.stats;
-  const GRADE = 16, DOWNHILL_CAP = 1.18, SLIDE = 4.0;
+  // MIRRORED FROM THE INTEGRATOR, AND IT HAD DRIFTED. DOWNHILL_CAP was 1.18
+  // against vehicles.js's 1.15, and the uphill term below was still the
+  // `GRADE 16 / 0.55` law that MASTER FIX-6 repudiated by name — so GRADE is
+  // gone from this file, because paceEstimate walks the centreline and has no
+  // off-road branch, which is the only thing GRADE still prices over there.
+  const DOWNHILL_CAP = 1.15, SLIDE = 4.0;
   const surf = track.T?.surface;
   const base = surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1;
   const gripEff = S.grip * (base + (1 - base) * 0.62 * S.offroad);
@@ -1319,8 +1362,14 @@ function paceEstimate(car, track) {
     const k = Math.abs(wrap(track.headingAt((i + 2) % N) - track.headingAt(i))) / ds;
     const slope = (c.y - a.y) / ds;
     let vCap = S.maxSpeed;
-    if (slope > 0) vCap = Math.max(S.maxSpeed * 0.55, S.maxSpeed - (GRADE * slope) / 0.55);
-    else if (slope < 0) vCap = Math.min(S.maxSpeed * DOWNHILL_CAP, S.maxSpeed + (GRADE * -slope) / 0.55);
+    // The old additive form priced a 10% climb at 16*0.1/0.55 = 2.9 u/s, a
+    // 5.3% loss off a ~55 u/s top, where the integrator takes a quarter of
+    // top speed at that grade — the climb axis was rated at a fifth of its
+    // real weight, and the downhill at a third (+5.3% against +15%). These
+    // are vehicles.js:2506 (specCap, the on-road branch) and vehicles.js:2519
+    // written out with S.maxSpeed as the top speed.
+    if (slope > 0) vCap = S.maxSpeed * Math.max(0.25, 1 - 2.5 * slope);
+    else if (slope < 0) vCap = S.maxSpeed * Math.min(DOWNHILL_CAP, 1 + 1.5 * -slope);
     // steering authority: yaw available must out-turn v*k (taper ignored here —
     // it only bites near top speed, where the corner limit already dominates)
     const vYaw = k > 1e-5 ? steerRate * (1 - steerTaper) / k : Infinity;
@@ -1728,6 +1777,23 @@ class Game {
     // RATIO is what buys the shadow contrast, so exposure is the right lever to
     // put the brightness back without flattening it again.
     this.renderer.toneMappingExposure = 1.46;
+    // A LOST-AND-RESTORED CONTEXT (mobile backgrounding, a driver reset) comes
+    // back with every GPU object gone. three rebuilds its own state and
+    // re-uploads image textures by itself, but the PMREM environment is a
+    // render target baked ONCE per world: it came back unbacked, and every
+    // standard material ran without its IBL until the next world load. The
+    // test browser loses its contexts on a cold first boot, which is how it
+    // was seen — the env target read back 0.0713 on a clean boot, 0 after a
+    // loss. three's own listener was added first, so its state is live here.
+    // The dead target is DROPPED, not disposed: its dispose handler belongs to
+    // three's pre-loss texture manager and would delete handles that died
+    // with the old context (WebGL: "delete: object does not belong to this
+    // context", once per handle).
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      if (!this.track) return;
+      this._envRT = null;
+      this._bakeEnvironment(this.track.theme);
+    });
 
     this.scene = new THREE.Scene();
     // CLEAR AIR (r406, owner: "Make blues skies and sun no fog"). The fog
@@ -1776,9 +1842,23 @@ class Game {
     // raised to pay for it — that is phone fill rate, and §6.7's budget is
     // measured in the gate.
     sc.left = -168; sc.right = 168; sc.top = 168; sc.bottom = -168;
-    sc.near = 10; sc.far = 400;
+    // The depth range has to hold the whole box, not just its middle. The
+    // light sits a fixed 168 u from the target (_applyTheme's D), so a
+    // ground point d u toward the sun lies at depth 168 - d*cos(el). On a
+    // sunEl 0.17 world (el 0.61) near = 10 cut it off from d ~ 193 u while
+    // the +-168 box runs to ~292 u, so trees and houses in the last third
+    // of the sun-side street cast nothing and a straight line marked where
+    // shadows began. An orthographic camera takes a negative near, and
+    // three builds the caster frustum from this same projection. At the
+    // el clamp floor (0.58) the sun-side ground corner sits at depth -88, a
+    // 40 u caster there at -161, the anti-sun corner at +424, so
+    // [-200, 600] holds the whole box with margin.
+    sc.near = -200; sc.far = 600;
     sc.updateProjectionMatrix();
-    sun.shadow.bias = -0.0004;
+    // Bias is in normalised depth, so the range going from 390 to 800 u
+    // halves it to keep the same ~0.16 u world offset; left at -0.0004 the
+    // contact shadows would creep away from their casters.
+    sun.shadow.bias = -0.0002;
     sun.shadow.normalBias = 0.035;   // kills the acne the raked sun exposes
     // A 1024 map stretched over a 144 u frustum is 0.14 u per texel, so a car
     // shadow is ~30 texels across and its edge steps visibly — a hard black
@@ -1797,7 +1877,21 @@ class Game {
     this._sunOffset = new THREE.Vector3(70, 130, 50);
 
     // post-processing: a whisper of bloom for lamps, tracers and explosions
-    this.composer = new EffectComposer(this.renderer);
+    //
+    // The scene pass needs its own multisampled target. `antialias: true` on
+    // the renderer only reaches the canvas's default framebuffer, and with a
+    // composer in front the only thing drawn there is OutputPass's
+    // full-screen quad: RenderPass draws into the composer's HalfFloat target,
+    // which the composer builds with samples 0. So the race was never
+    // anti-aliased — poles, fences and tree edges stair-stepped while the
+    // garage stage, drawing straight to its canvas, was smooth. rt2 is a
+    // clone and inherits the samples; three resolves the MSAA when the next
+    // pass reads the texture. Sized in CSS pixels because the composer
+    // multiplies by its pixel ratio, and applyViewport's composer.setSize
+    // sets the real size before the first frame. Touch keeps 0: §6.7's
+    // phone budget is fill rate and the governor has no lever for samples.
+    this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(
+      innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.isTouch ? 0 : 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.45, 0.88);
     this.composer.addPass(this.bloom);
@@ -2092,7 +2186,7 @@ class Game {
       chip.addEventListener('click', () => {
         this.steerSetting = id;
         localStorage.setItem('ir-steer', id);
-        this.applyUpgrades();
+        this._applyControlSettings();   // NOT applyUpgrades: see that method
         applySteerChips();
       });
       ssel.appendChild(chip);
@@ -2116,6 +2210,10 @@ class Game {
           paint();
           this._renderLevelCards();
           this.renderCarShop?.();
+          // ...except the job board, which memoises on the day: the repaint
+          // below could not see the new unlock set until the cache was
+          // dropped, so toggling OPEN ALL left the postings unchanged.
+          this._jobsCache = null;
           this._renderJobs?.();
           this._syncStartButton?.();
           this.audio?.ui?.();
@@ -2149,7 +2247,7 @@ class Game {
       const ids = STEERS.map(([i]) => i);
       this.steerSetting = ids[(ids.indexOf(this.steerSetting) + 1) % ids.length];
       localStorage.setItem('ir-steer', this.steerSetting);
-      this.applyUpgrades();
+      this._applyControlSettings();     // NOT applyUpgrades: see that method
       applySteerChips();
       this.hud.feed(`STEERING: ${this.steerSetting.toUpperCase()}`, 'info');
     });
@@ -2175,7 +2273,7 @@ class Game {
       chip.addEventListener('click', () => {
         this.assistSetting = id;
         localStorage.setItem('ir-assist', id);
-        this.applyUpgrades();
+        this._applyControlSettings();   // NOT applyUpgrades: see that method
         applyAidChips();
       });
       asel.appendChild(chip);
@@ -2475,8 +2573,29 @@ class Game {
       // its own timer, where the promise's .catch() cannot reach it. Every
       // APPLY in the editor produced one. On a rebuild the synchronous compile
       // is used instead: it is slower, and it cannot outlive its own scene.
+      //
+      // The BOOT warm is still async, and a world-card or garage tap in its
+      // first seconds tears the boot world (or car) down under the same poll,
+      // with the same uncaught TypeError and a `__warming` that never
+      // settled. So the async branch no longer uses compileAsync at all: it
+      // is three's own compile() — which returns the Set of materials it
+      // queued — plus the same 10 ms isReady() poll, except that a material
+      // with no currentProgram (disposed since: three's dispose drops its
+      // properties entry, and get() hands back an empty one) is dropped from
+      // the set instead of read. The sync branch stays for swapLevel.
       if (this.renderer.compileAsync && !sync) {
-        const p = this.renderer.compileAsync(this.scene, this.camera);
+        const mats = this.renderer.compile(this.scene, this.camera);
+        const props = this.renderer.properties;
+        const p = new Promise((res) => {
+          const tick = () => {
+            for (const m of mats) {
+              const prog = props.get(m).currentProgram;
+              if (!prog || prog.isReady()) mats.delete(m);
+            }
+            if (mats.size) setTimeout(tick, 10); else res();
+          };
+          setTimeout(tick, 10);
+        });
         for (const o of hidden) o.visible = false;
         hidden.length = 0;
         this.__warming = p.then(() => {
@@ -2584,7 +2703,10 @@ class Game {
     this.lapsTotal = this.level?.laps ?? LAPS;
 
     // --- tear down ---
-    for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);
+    // The blitz gates are left ON worldLayer for the disposeSubtree below.
+    // They used to be removed first, one line before the only walk that
+    // frees worldLayer, so each swap out of a live blitz kept every gate's
+    // glow texture, three gate geometries and four materials per gate.
     this.missionGates = null;
     this.flyingProps = [];
     // the settled wreckage lives under worldLayer and goes with it
@@ -2675,6 +2797,16 @@ class Game {
   _loadProfileState() {
     this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
     this._pkey = (base) => profileKey(this.profile.id, base);
+    // THE DAY'S JOB BOARD BELONGS TO A DRIVER. `_jobOffers` memoises on the
+    // day alone, but what it caches is seeded on the profile id AND filtered
+    // by this driver's unlock set and by the kinds this driver banked today —
+    // and a profile switch is an in-place reload (RULES §9b), not a page
+    // load, so the memo survived it. Hand the device to a second driver on
+    // the same day and they were served the first driver's five postings,
+    // including worlds they have never opened; taking one wrote it into their
+    // own career. Dropped here rather than in _applyProfileInPlace so switch,
+    // create, delete-active and the sync-driven reload are all covered.
+    this._jobsCache = null;
     // `rungs` is the contract-progression field: {contractId: rungIndex}. It
     // lives on CAREER rather than on the garage because it is progression, not
     // money, and career is already profile-scoped and carried by the sync
@@ -2872,17 +3004,32 @@ class Game {
    *  Shared by setMode() and by anything that needs the mode furniture redone
    *  without touching the track itself. */
   _rebuildModeWorld() {
-    for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);
+    for (const gsp of this.missionGates ?? []) this._freeLoose(gsp.spr);
     this.missionGates = null;
     this.mission = null;
+    // _missionLaunch borrows the LAP row's leading text node for the mission
+    // glyph and nothing wrote 'LAP ' back. That was harmless while a mode
+    // change reloaded the page; in place, every race after a mission read
+    // '💥 1/3' and roam '💥 ∞'. This runs on every setMode and showMenu, and
+    // a mission launch puts its glyph back, so restoring the shipped text
+    // here returns the frozen HUD to itself rather than changing it.
+    const lapRow = document.getElementById('lap')?.parentElement;
+    if (lapRow?.firstChild?.nodeType === 3) lapRow.firstChild.textContent = 'LAP ';
     // these all live in worldLayer, which a mode switch does NOT tear down —
     // only a level swap does — so each one has to be taken out by hand or it
-    // haunts the next mode (roam turrets standing around a rally stage)
-    for (const h of this.hostiles ?? []) h.mesh?.parent?.remove(h.mesh);
-    this.hostiles = [];
-    for (const c of this.choppers ?? []) c.mesh?.parent?.remove(c.mesh);
+    // haunts the next mode (roam turrets standing around a rally stage).
+    // Taken out AND freed: detaching alone put them out of reach of the
+    // level swap's disposeSubtree(worldLayer), so every menu visit kept the
+    // gates', stars' and choppers' GPU buffers for the life of the page, and
+    // each SURVIVOR nest left behind kept its collider in track.solids — an
+    // invisible metal post on the verge of every later run on that world.
+    this._retireHostiles();
+    // despawn, not a bare remove: its own docstring says every silent
+    // removal must use it, and resetRace's despawn loop runs after this
+    // list is already empty
+    for (const c of this.choppers ?? []) c.despawn();
     this.choppers = [];
-    for (const s of this.roamStars ?? []) s.spr?.parent?.remove(s.spr);
+    for (const s of this.roamStars ?? []) this._freeLoose(s.spr);
     this.roamStars = [];
     this.chopperTimer = 0;
     this.chopperWave = 0;
@@ -3248,36 +3395,61 @@ class Game {
         }
       }
     }
-    // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
-    // Standard materials pick up soft sky reflections (glossy wet roads, car
-    // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
-    {
-      // dimmer than it was: the IBL is a THIRD ambient term on top of the
-      // hemisphere, and at the old strength it re-filled every shadow the
-      // key/fill rebalance had just opened up. It is here for sheen on paint
-      // and wet road, not for lighting the world.
-      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
-      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
-      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
-      const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
-      const cx = cnv.getContext('2d');
-      const gr = cx.createLinearGradient(0, 0, 0, 64);
-      gr.addColorStop(0, '#' + top.getHexString());
-      gr.addColorStop(0.5, '#' + hor.getHexString());
-      gr.addColorStop(0.56, '#' + gnd.getHexString());
-      gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
-      cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
-      const envTex = new THREE.CanvasTexture(cnv);
-      envTex.colorSpace = THREE.SRGBColorSpace;
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(10, 16, 12),
-        new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
-      const envScene = new THREE.Scene();
-      envScene.add(dome);
-      this.scene.environment = pmrem.fromScene(envScene, 0.06).texture;
-      pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
-    }
+    this._bakeEnvironment(th);
+  }
+
+  // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
+  // Standard materials pick up soft sky reflections (glossy wet roads, car
+  // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
+  // Its own method so a restored WebGL context can re-bake it (see the ctor).
+  _bakeEnvironment(th) {
+    // dimmer than it was: the IBL is a THIRD ambient term on top of the
+    // hemisphere, and at the old strength it re-filled every shadow the
+    // key/fill rebalance had just opened up. It is here for sheen on paint
+    // and wet road, not for lighting the world.
+    const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
+    const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
+    const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
+    const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
+    const cx = cnv.getContext('2d');
+    const gr = cx.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#' + top.getHexString());
+    gr.addColorStop(0.5, '#' + hor.getHexString());
+    gr.addColorStop(0.56, '#' + gnd.getHexString());
+    gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
+    cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
+    const envTex = new THREE.CanvasTexture(cnv);
+    envTex.colorSpace = THREE.SRGBColorSpace;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(10, 16, 12),
+      new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
+    const envScene = new THREE.Scene();
+    envScene.add(dome);
+    // fromScene hands back a render target the CALLER owns — pmrem.dispose()
+    // frees only the generator's own ping-pong target and blur material.
+    // Keeping just `.texture` orphaned the previous world's 768x1024
+    // HalfFloat target and its depth buffer on every swapLevel and every
+    // editor APPLY (r160's cube-UV size works out near 9 MB). Hold the
+    // target and free the old one once the new texture is in place.
+    //
+    // Blur sigma 0.04, not 0.06. three's PMREM blur takes
+    // 1 + floor(3 * sigma / (PI / 510)) samples at the 256 cube LOD and caps
+    // them at 20, so 0.06 asked for 30 and was CLIPPED — printing "sigmaRadians,
+    // 0.06, is too large and will clip, as it requested 30 samples when the
+    // maximum is set to 20" twice (one per blur pass) on every world. The
+    // clip is energy-conserving — r160 normalises the weights over the 20
+    // taps it applies — so it cut the Gaussian's tails, not its light. 0.04
+    // is inside the widest sigma rendered whole (0.04107). Measured: the
+    // baked target's mean RGB matches the clipped 0.06 to 1e-4 on PINE
+    // VALLEY, GREENWATER RAPIDS and AVALANCHE ALLEY. (Do not "compensate" it:
+    // a 0.916 tint, from reading that normalisation as over all 30 taps,
+    // darkened the IBL 8.4 % and was caught by that same measurement.)
+    const envRT = pmrem.fromScene(envScene, 0.04);
+    this._envRT?.dispose();
+    this._envRT = envRT;
+    this.scene.environment = envRT.texture;
+    pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
   }
 
   /** Fade to black, then navigate — used for level changes. Saves the menu's
@@ -3311,15 +3483,44 @@ class Game {
   /** Swap the player's machine in place — no reload, no menu reset. */
   swapPlayerCar(entry) {
     const p = this.player;
-    this.scene.remove(p.mesh);
+    // THE OLD RIG IS FREED, NOT JUST DETACHED. buildCarMesh news a fresh
+    // BoxGeometry per part (dozens) plus eight body materials every call and
+    // caches nothing, and `p.mesh = mesh` below used to drop the last
+    // reference to the previous rig — so a garage session that tapped ten
+    // owned cars left ten bodies' worth of GPU buffers alive for the life of
+    // the page, with nothing in the game able to reclaim them. Same class of
+    // leak the crash planks and the stage car were already fixed for.
+    // _dropCarMesh and NOT disposeSubtree: the rig carries the shared
+    // carLightMaterial and, after applyUpgrades, the shared kit materials,
+    // and freeing either blanks the lamps or the kit on every car in the game.
+    const old = p.mesh;
+    this.scene.remove(old);
     const mesh = buildCarMesh(entry.spec);
-    mesh.position.copy(p.mesh.position);
-    mesh.rotation.copy(p.mesh.rotation);
+    mesh.position.copy(old.position);
+    mesh.rotation.copy(old.rotation);
     this.scene.add(mesh);
     p.mesh = mesh;
+    this._dropCarMesh(old);   // after the swap: a throw above must not leave
+                              // the player holding a disposed rig
     p.catalogKey = entry.key;
     p._popped = [];
     p._litFor = null;      // fresh mesh, fresh lamps: re-decide on the new rig
+    // _setShield builds its bubble once and caches it on the car, parented
+    // to the mesh of the day. That sphere went with the old rig through
+    // _dropCarMesh, but `_shield` still pointed at it, so after one respawn
+    // and a garage swap every later bubble — respawn, return, shield
+    // pickup — was written to a disposed sphere outside the scene. Cleared,
+    // the next grant builds one on the new rig.
+    p._shield = null;
+    // The driver's seat hides the rig's shadow casters and AO blob once, on
+    // entry, keyed on `_dWasDriver`, which only a chase frame clears — and
+    // no camera runs on the title screen. End a race in the seat, swap car,
+    // and the next race skipped the entry block: only the OLD rig had its
+    // casters off, and the new one's shadow and blob lay under the dash
+    // as the dark band the block was written to remove. Re-arm the entry
+    // so it runs on this rig; the old `_dCasters` belong to a dead mesh.
+    this._dWasDriver = false;
+    this._dCasters = [];
     this._syncCarLights();
     p.maxSpeed = entry.stats.maxSpeed;
     p.accel = entry.stats.accel;
@@ -3625,6 +3826,7 @@ class Game {
         + 'border-radius:8px;font-size:13px;text-align:left';
       host.appendChild(box);
     }
+    box.style.display = '';   // every other results path hides it (_resultsCardForRace)
     const name = this.chapters()[k]?.name ?? `CHAPTER ${k + 1}`;
     const rows = this.seasonTable(k).map(([n, p], i) =>
       `<div style="display:flex;justify-content:space-between;${n === 'YOU'
@@ -4960,6 +5162,16 @@ class Game {
     return Math.min(MOUNT_MAX, base + mountFromLevel(lv));
   }
 
+  /** THE HIGHEST MOUNT CLASS THIS CAR COULD EVER CARRY in a slot, ladder
+   *  maxed. A ladder is worth exactly one class, so this is base + 1 clamped
+   *  to MOUNT_MAX — and on a chassis with base <= 1 that lands BELOW
+   *  MOUNT_MAX, which is the distinction the bay header was missing. Written
+   *  through mountMax's `up` override rather than as a second copy of the
+   *  min/base/mountFromLevel expression. */
+  mountCeiling(slotKey, carKey = this.cars.selected) {
+    return this.mountMax(slotKey, carKey, { [PART_SLOT[slotKey].mount]: 5 });
+  }
+
   /** CAN THIS CAR TAKE THIS PART, and if not, is that a thing money can fix?
    *
    *  Three outcomes, and the difference between the last two is the whole
@@ -5102,8 +5314,7 @@ class Game {
     p.gripBoost = (1 + 0.04 * (g.tires || 0)) * eng.grip;
     p.downforce = wing.down || 0;
     p.damperLvl = g.dampers || 0;                // read by Car.onLand
-    p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
-    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
+    this._applyControlSettings();
     // ...AND THE CAR LOOKS LIKE WHAT YOU BOUGHT. Every upgrade until now was
     // an invisible multiplier: a fully built machine was identical to the one
     // on the forecourt, so the money had nothing to show for itself. Rebuilt
@@ -5111,6 +5322,22 @@ class Game {
     // one place that reads the garage row, so the mesh cannot drift from the
     // numbers.
     applyUpgradeKit(p.mesh, g, { engine: eng, spoiler: wing });
+  }
+
+  /** The two SETTINGS the pause menu can change without leaving the race:
+   *  steering weight and driving aid. Split out of applyUpgrades() because the
+   *  pause-menu handlers used to call that whole method just to push these two
+   *  fields, and applyUpgrades() is a BETWEEN-RACES rebuild — it full-heals the
+   *  car (`p.health = p.maxHealth`) and rebuilds every stat from the garage row,
+   *  which by its own docstring is how the per-race kit penalties get reverted
+   *  "on the next one". Run mid-race from the pause menu it did both: three taps
+   *  on STEERING repaired a wrecked hull for free and handed back the grip, gun,
+   *  nitro, top end and dampers the world had taken for an unmet feat. */
+  _applyControlSettings() {
+    const p = this.player;
+    if (!p) return;
+    p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
+    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }
 
   /** RACE FOR THE PART, ANNOUNCED. The locks read live career data, so a part
@@ -5165,14 +5392,16 @@ class Game {
    *  conflict; they were wearing different clothes, and the upgrade ladders
    *  were a wall of grey rows underneath a shop that had pictures.
    *
-   *  Every one of the ten UPGRADES lands in exactly one bay, so nothing is
-   *  orphaned by the regrouping:
+   *  Every one of the eleven UPGRADES lands in exactly one bay, so nothing is
+   *  orphaned by the regrouping (it said ten, and was written before r316
+   *  appended RALLY COPILOT — which then sat in no bay at all):
    *    ENGINE SHOP   the blocks, and the ENGINE WRENCH that tunes whichever
    *                  one is in
    *    BODY KIT      the wings, and the suspension that makes them worth it
    *    TIRE BAY      the compounds, and the TIRES ladder that unlocks them
    *    WEAPONS CACHE cannon, rockets, drums
-   *    CHASSIS       armour, nitro, dampers, the recovery beacon
+   *    CHASSIS & CREW armour, nitro, dampers, the recovery beacon, the
+   *                  rally copilot
    */
   _renderGarageBays() {
     this._renderBuildPreview();
@@ -5212,17 +5441,43 @@ class Game {
       { name: 'BODY KIT & SPOILERS', icon: '🪽', slot: 'spoiler', ups: ['handling'] },
       { name: 'TIRE BAY', icon: '🛞', tyres: true, ups: ['tires'] },
       { name: 'WEAPONS CACHE', icon: '🔫', ups: ['cannon', 'rack', 'magazine'] },
-      { name: 'CHASSIS & CREW', icon: '🛡️', ups: ['armor', 'nitro', 'dampers', 'beacon'] },
+      // RALLY COPILOT WAS ORPHANED. This table is the only place upgrade
+      // cards are built (the single UPGRADES.find that feeds _upgradeCard is
+      // in the `bay.ups` loop below), and `copilot` was appended to UPGRADES
+      // in r316 without being added here — so there was no card, no price and
+      // no button for it, `carUpgrades().copilot` was pinned at 0 for the
+      // life of every save, and _copilotTick's `if (!lvl)` guard returned on
+      // every frame, leaving the whole pacenote engine and the `case
+      // 'copilot'` rung ladder unreachable. HANDOVER asks for "a real garage
+      // part — RALLY COPILOT 🎧, max 3, priced on the standard rung ladder,
+      // per-car like every upgrade, and WIRED (no RECOVERY BEACON repeat)".
+      // It rides in CHASSIS & CREW because a co-driver is crew — no new
+      // header, no new layout.
+      { name: 'CHASSIS & CREW', icon: '🛡️', ups: ['armor', 'nitro', 'dampers', 'beacon', 'copilot'] },
     ];
+    // A ladder that reaches no bay is invisible to the player and silently
+    // disables whatever reads it, which is how copilot shipped inert. Warn
+    // rather than throw: a data-entry slip must not blank the garage.
+    if (UPGRADES.some((u) => !BAYS.some((b) => b.ups.includes(u.key)))) {
+      console.warn('orphaned upgrade ladder — no bay lists it');
+    }
 
     for (const bay of BAYS) {
       const box = document.createElement('div');
       box.className = 'bay';
       // A SLOT BAY SAYS WHAT THIS CHASSIS CAN TAKE, up front, so the greyed
-      // cards below are explained before they are met.
+      // cards below are explained before they are met. The headroom test was
+      // against the GLOBAL MOUNT_MAX, not this chassis's own ceiling, so a
+      // BRAWLER at ENGINE WRENCH 5 read "CHASSIS CLASS 2 · ENGINE WRENCH
+      // RAISES IT" directly above a V12 card reading "⛔ WON'T FIT — this
+      // body tops out at class 2", from the same render pass: partFits
+      // already computes base + one class and knows better. Nine of the
+      // sixteen chassis/slot pairs top out below MOUNT_MAX, so the header
+      // promised headroom that no amount of credits could buy.
       const cap = bay.slot
         ? `<b class="bay-cap">CHASSIS CLASS ${this.mountMax(bay.slot)}${
-  this.mountMax(bay.slot) < MOUNT_MAX ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
+  this.mountMax(bay.slot) < this.mountCeiling(bay.slot)
+    ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
         : '';
       box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}${cap}</div>`;
 
@@ -5316,8 +5571,10 @@ class Game {
     const arrow = (a, b, unit) => (lvl < u.max ? `${a} → ${b} ${unit}` : `${a} ${unit} — MAXED`);
     switch (u.key) {
       case 'engine': {
+        // HUD_KMH, the speedometer's own factor, not 3.6: a quote the gauge
+        // can never read is a promise the car breaks (see hud.js).
         const kmh = (l) => Math.round((base.maxSpeed ?? 55) * (1 + 0.04 * l)
-          * (eng.speed ?? 1) * (wing.speed ?? 1) * 3.6);
+          * (eng.speed ?? 1) * (wing.speed ?? 1) * HUD_KMH);
         return arrow(kmh(lvl), kmh(lvl + 1), 'KM/H TOP SPEED');
       }
       case 'armor': {
@@ -5751,7 +6008,7 @@ class Game {
     };
     const sheet = `<div class="bp-sheet">
       ${bar('SPEED', p?.maxSpeed ?? 0, base.maxSpeed, CEIL.speed,
-    `${Math.round((p?.maxSpeed ?? 0) * 3.6)} KM/H`)}
+    `${Math.round((p?.maxSpeed ?? 0) * HUD_KMH)} KM/H`)}
       ${bar('PULL', p?.accel ?? 0, base.accel, CEIL.accel,
     `${(p?.accel ?? 0).toFixed(0)}`)}
       ${bar('GRIP', (stats.grip ?? 4.5) * (p?.gripBoost ?? 1), stats.grip ?? 4.5, CEIL.grip,
@@ -5846,6 +6103,16 @@ class Game {
     const car = this.cars.selected;
     const up = (this.garage.upgrades || {})[car];
     const max = tyreMaxClass(car, up);
+    // THE LEVEL COMES FROM THE CAR, NOT FROM THE COMPOUND. Both labels below
+    // used to read the required TIRES level off the compound being shown
+    // (`c >= 2 ? 3 : 1`), which is only right for a ROAD-base chassis: the
+    // rule in tyreMaxClass is base + bump, so a GRAVEL-base car reaches SNOW
+    // on ONE rung. On the starter BRAWLER (offroad 0.70) and on the ALPINE
+    // (0.84) the bay therefore quoted TIRES 3 for SNOW when TIRES 1 unlocks
+    // it — overstating its own headline purchase by 3,700 CR, and
+    // contradicting the world card on the same screen, which prices the
+    // identical advice through tyreLevelFor.
+    const lvlFor = (c) => tyreLevelFor(car, up, c) ?? 1;
     const now = this.fittedTyre(car);
     const need = this.level ? surfaceClass(this.level) : null;
     // REAL RUBBER, not three glyphs. The compounds differ by TREAD and the
@@ -5860,7 +6127,7 @@ class Game {
         need === c ? 'want' : ''].filter(Boolean).join(' ');
       return `<button class="${cls}" data-tyre="${c}"${locked ? ' disabled' : ''}>`
         + `${locked ? '🔒' : ICON[c]}<b>${TYRE_LABEL[c]}</b>`
-        + `<i>${locked ? 'BUY TIRES ' + (c >= 2 ? 3 : 1) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
+        + `<i>${locked ? 'BUY TIRES ' + lvlFor(c) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
     }).join('');
     // AUTO IS THE DEFAULT AND IT IS THE POINT OF BUYING TYRES AT ALL: it fits
     // the compound each world asks for, capped by what you own, so a purchase
@@ -5872,7 +6139,7 @@ class Game {
       + `<div class="tyre-row">${autoBtn}${btns}</div>`
       + (max < 2
         ? `<div id="jobs-note">You own up to ${TYRE_LABEL[max]}. `
-          + `TIRES STACK ${max < 1 ? 1 : 3} unlocks ${TYRE_LABEL[max + 1]}, `
+          + `TIRES STACK ${lvlFor(max + 1)} unlocks ${TYRE_LABEL[max + 1]}, `
           + `which is what the ${TYRE_LABEL[2] === TYRE_LABEL[max + 1] ? 'ICE' : 'LOOSE'} `
           + `stages want.</div>`
         : '');
@@ -7672,9 +7939,19 @@ class Game {
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
    *  already expose (heat/ammo/health deltas, _draftOn is counted via the
-   *  style() labels) — no hooks into files owned by the other agents. */
-  _updateContracts() {
-    if (this.freeRoam || this.state !== 'race' || !this.contracts?.length) return;
+   *  style() labels) — no hooks into files owned by the other agents.
+   *
+   *  THE COUNTERS ARE NOT PART OF THE CONTRACT SLATE. The guard used to bail
+   *  on `!this.contracts?.length`, which killed the per-race counters only
+   *  written here whenever the player declined every contract for a world —
+   *  a choice the contract board itself recommends. FLAT OUT (`topKph >=
+   *  190`) and BOOST RUN (`boostHeld >= 6`) then could not be earned at all,
+   *  and ON RAILS was handed over free because `leftRoad` stayed unwritten.
+   *  Feats are the other axis from contracts (see the TRACK FEATS header) and
+   *  are banked permanently, so the observation now runs on every race frame
+   *  and only the slate resolution at the bottom is gated. */
+  _updateContracts(dt = 1 / 60) {
+    if (this.freeRoam || this.state !== 'race') return;
     const ct = this._ct, p = this.player;
     if (!ct) return;
     // weapon-fire detection by state transition (cannon heats, ammo drops,
@@ -7689,7 +7966,26 @@ class Game {
     // Read off state the car already keeps, same as everything above it.
     const kph = Math.hypot(p.vel.x, p.vel.z) * 3.6;
     if (kph > (ct.topKph ?? 0)) ct.topKph = kph;
-    if (p.boosting || (p.nitroT ?? 0) > 0) ct.boostHeld = (ct.boostHeld ?? 0) + (this.clock?.lastDt ?? 1 / 60);
+    // BOOST RUN read two properties no car has: `p.boosting` is a LOCAL
+    // inside vehicles.js (`const boosting = this.boostTimer > 0`) and
+    // `p.nitroT` does not exist anywhere, so the guard was
+    // `undefined || (undefined ?? 0) > 0` — false on every frame of every
+    // race, and the feat was unearnable on the ~17 worlds that deal it. The
+    // accumulator was wrong too: THREE.Clock has no `lastDt`, so it always
+    // fell back to 1/60 and credited 3 s for a 6 s hold at 30 fps. Read
+    // `boostTimer`, which is what the HUD's own nitro pill reads, and bill
+    // the frame's real dt.
+    if ((p.boostTimer ?? 0) > 0) ct.boostHeld = (ct.boostHeld ?? 0) + dt;
+    // SOS CALLS ARE COUNTED, NOT CHARGES. `player.sos` is refilled at the
+    // start line and never spent — CORRIDOR §10 made recovery unlimited and
+    // deleted the ration — so NO BEACON and CLEAN HANDS, which both asked
+    // `sos >= maxSos`, passed on every finish however often the player
+    // called the rescue. `unstuckCool` is set only where the rescue actually
+    // fires and otherwise decays, so a rise is one call; observing it keeps
+    // this function to state vehicles.js already exposes, as above.
+    const cool = p.unstuckCool ?? 0;
+    if (cool > (ct.prevUnstuck ?? 0) + 1e-4) ct.rescues = (ct.rescues ?? 0) + 1;
+    ct.prevUnstuck = cool;
     // ON RAILS: a wheel off the tarmac ends it. `lateral` against the world's
     // own width profile, so a pinched section is judged by ITS width and not
     // by a constant — and never while airborne, since a jump is not a mistake.
@@ -7705,12 +8001,14 @@ class Game {
     if ((this.comboT ?? 0) > 0) {
       ct.comboMax = Math.max(ct.comboMax, Math.min(4, 1 + (this.comboN ?? 0) * 0.25));
     }
-    for (const c of this.contracts) {
-      if (!c.done && !c.atFinish && c.check && c.check(this, ct, this.playerRank, c.need)) {
-        this._completeContract(c);
+    if (this.contracts?.length) {
+      for (const c of this.contracts) {
+        if (!c.done && !c.atFinish && c.check && c.check(this, ct, this.playerRank, c.need)) {
+          this._completeContract(c);
+        }
       }
+      this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
     }
-    this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
   }
 
   _completeContract(c) {
@@ -7760,7 +8058,16 @@ class Game {
   /** Lap `lapNo` just completed — resolve the lap-boundary contracts. */
   _lapContracts(lapNo) {
     const ct = this._ct;
-    if (!this.contracts?.length || !ct) return;
+    // The slate clause bought nothing and cost SURE-FOOTED: `cleanLaps` is
+    // incremented nowhere else, so a player who declined a world's contracts
+    // drove a flawless lap and the feat stayed unticked forever. Both
+    // _tryContract calls below already no-op on an empty slate
+    // (`this.contracts?.find(...)` finds nothing), so only the tally and the
+    // `lapDamaged` reset were being skipped. This is safe only together with
+    // the ungated damage detector in _updateContracts above — with that
+    // detector still slate-gated, an unconditional tally would hand the feat
+    // over on a lap that cost half the hull.
+    if (!ct) return;
     if (!ct.lapDamaged) ct.cleanLaps = (ct.cleanLaps ?? 0) + 1;
     this._tryContract('cleanlap');
     ct.lapDamaged = false;
@@ -8122,6 +8429,34 @@ class Game {
     return won;
   }
 
+  /** WRECKED OUT BREAKS A STREAK, and nothing else. IRONMAN's `test` returns
+   *  `false` when `g.raceOver`, expecting _checkQuests to wipe `keys` — but
+   *  _checkQuests is only ever reached from finishRace, and a wreck-out goes
+   *  through _raceOver, which deliberately never calls finishRace. So the
+   *  `false` arm was unreachable in play and IRONMAN degraded to "finish 5
+   *  races, ever": three clean finishes, wreck out of ten races, two more
+   *  finishes, and it paid the free ARMOR level plus 1600 CR. This is the
+   *  break driven from the wreck-out path instead. It pays nothing and banks
+   *  nothing — _raceOver's whole point is that being destroyed rewards none
+   *  of a finish — and it leaves a quest already claimed alone, since a
+   *  later wreck must not silently un-claim a part the player was given. */
+  _breakStreakQuests() {
+    if (this.freeRoam || this.missionMode) return;
+    const q = (this.career.quests ??= {});
+    let hit = false;
+    for (const def of QUESTS) {
+      if (!def.streak) continue;
+      const rec = q[def.id];
+      if (!rec || rec.done || !rec.keys?.length) continue;
+      rec.keys = [];
+      hit = true;
+    }
+    if (hit) {
+      saveJSON(this._pkey('career'), this.career);
+      this._renderQuests?.();
+    }
+  }
+
   /** The quest board, in the GARAGE tab beside the parts it pays for. */
   _renderQuests() {
     const el = document.getElementById('quest-board');
@@ -8481,7 +8816,14 @@ class Game {
       s.spr.position.y = s.y + 2.2 + Math.sin(time * 2 + s.x) * 0.5;
       if (Game._segDist2(from.x, from.z, p.pos.x, p.pos.z, s.x, s.z) < 16) {
         s.got = true;
-        this.scene.remove(s.spr);
+        // parent, not scene: the star sprites are added to worldLayer, so
+        // scene.remove was a no-op and a collected star kept glowing on the
+        // spot for the rest of the session — including the summit star.
+        s.spr.parent?.remove(s.spr);
+        // Its own material goes now — a detached star is out of reach of
+        // every later walk. The glow map is shared with the stars still
+        // out there, so the set's teardown (_freeLoose) frees that.
+        s.spr.material.dispose();
         if (this.missionMode) { this._missionEvent('star', s); continue; } // [MISSIONS]
         if (s.summit) {
           this.score += 600;
@@ -8972,9 +9314,13 @@ class Game {
       // throttle simply outruns anything dropped behind it.
       const d = M.def;
       // THE ENGAGEMENT RULE: you are only SURVIVING while something is
-      // actually shooting at you. A gunship tops out at 46 u/s and a flat-out
-      // car does ~55, so without this the mission is "drive a circle for 70 s"
-      // and never take a scratch — measured, hull untouched the whole run.
+      // actually shooting at you. A gunship cruises at ~37 u/s, not the 46
+      // MAX_SPEED names: thrust runs before drag, so self-propelled flight
+      // settles at ACCEL/0.9 - ACCEL*dt, which is 36.1 to 37.5 across our dt
+      // range, and 46 only clamps the shockwave knockback impulse. A flat-out
+      // car does ~55, so the gap is wider than 46 implied, and without this
+      // the mission is "drive a circle for 70 s" and never take a scratch —
+      // measured, hull untouched the whole run.
       // Bank time by staying in the fight; run and the clock simply stops.
       M.engaged = this.choppers.some((c) => c.alive
         && (c.pos.x - p.pos.x) ** 2 + (c.pos.z - p.pos.z) ** 2 < 80 * 80);
@@ -8996,7 +9342,7 @@ class Game {
             if (d2 > fd) { fd = d2; far = c; }
           }
           // silent removal, NOT a kill — no score, no hull patch, no feed line
-          if (far) { far.alive = false; this.scene.remove(far.mesh); }
+          if (far) far.despawn();
           this._spawnChopper(true);
         }
       }
@@ -9119,7 +9465,11 @@ class Game {
     this.state = 'finished';
     const def = M.def;
     // survivor stragglers stop shooting the debrief screen
-    for (const c of this.choppers) if (c.alive) { c.alive = false; this.scene.remove(c.mesh); }
+    for (const c of this.choppers) if (c.alive) c.despawn();
+    // ...and so do the nests. _updateHostiles and the weapons still run in
+    // 'finished', and player.damage has no state gate, so on an EXTRACTED
+    // win a nest in range kept chipping the hull behind the results card.
+    this._retireHostiles();
     const medal = this._missionMedal(win, M);
     if (def.survive) win = medal > 0; // outlasted nothing = failed the run
     const cr = MISSION_CR[medal] | 0;
@@ -9143,7 +9493,8 @@ class Game {
     // Results card, re-dressed as a debrief. The card is `.results-card >
     // .result-stats > .rrow`, each row `<span>LABEL</span><b id=…>value</b>`,
     // so a label is the value node's PREVIOUS sibling. Labels are only ever
-    // rewritten in-memory; a reload restores the race wording from the markup.
+    // rewritten in-memory; mode switches no longer reload, so the race paths
+    // put the markup's wording back themselves (_resultsCardForRace).
     const setRow = (id, label, value) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -9168,6 +9519,10 @@ class Game {
     // panel up would show the last RACE's stars against a mission debrief
     const starBox = document.getElementById('star-panel');
     if (starBox) starBox.style.display = 'none';
+    // ...and the same for the last chapter race's season standings, which
+    // nothing hid: a MISSION FAILED card ended in a CHAMPIONSHIP table
+    const seasonBox = document.getElementById('season-board');
+    if (seasonBox) seasonBox.style.display = 'none';
     setRow('r-medal', 'MEDAL', MISSION_MEDAL_WORD[medal]);
     document.getElementById('r-credits').textContent = `+${cr}`;
     // itemized breakdown, same box the race payout uses — one line, so the
@@ -9205,10 +9560,28 @@ class Game {
     // `missionNoGuns` would follow you out of a DUEL and disarm the next race.
     this.missionFoe = null;
     this.missionNoGuns = false;
-    for (const gsp of this.missionGates ?? []) this.scene.remove(gsp.spr);
+    // parent, not scene — both live on worldLayer (the teardown paths in
+    // swapLevel and _rebuildModeWorld already use worldLayer.remove here).
+    // Via scene.remove this reset kept nothing: retrying a mission left every
+    // star and every blitz gate of the previous attempt standing in the world,
+    // and the new attempt's set was built on top of them.
+    //
+    // Removing them stopped the ghosts but still freed nothing: each retry
+    // kept the old attempt's glow texture, gate geometry and per-gate or
+    // per-star materials. They are freed now, and collected stars with
+    // them — those were detached at pickup, so `!s.got` skipped exactly the
+    // ones nothing else would ever reach.
+    for (const gsp of this.missionGates ?? []) this._freeLoose(gsp.spr);
     this.missionGates = null;
-    for (const s of this.roamStars ?? []) if (!s.got) this.scene.remove(s.spr);
+    for (const s of this.roamStars ?? []) this._freeLoose(s.spr);
     this.roamStars = [];
+    // SURVIVOR's nests are mission furniture too. Nothing retired them on a
+    // retry: _digGunNests pushes onto the live list, so RETRY MISSION faced
+    // the last attempt's surviving guns plus four new ones (8 after one
+    // untouched retry, 12 after two), each still firing and still a metal
+    // collider. The nests are only dug in mission mode, so the guard above
+    // costs nothing.
+    this._retireHostiles();
   }
 
   // ======================================================================
@@ -9234,11 +9607,23 @@ class Game {
         const idx = Math.floor(t.N * (k + 0.5) / n);
         const latr = (k % 2 === 0 ? -1 : 1) * 3.5;
         const p = t.pointAt(idx, latr);
+        // The ring is the geyser's only telegraph, and it lost to the road.
+        // 0.06 u of lift with no polygonOffset is less than the road's own
+        // -4/-4 pull toward the camera at TOP-DOWN range and far less in
+        // CHASE at distance, so the road won the depth test; pointAt() also
+        // ignores the bank, and a flat 3 u ring on a grade dips into the
+        // ribbon at one edge whatever the lift. So: out-bias the road at
+        // -6, the same margin the car's AO blob uses against it (vehicles.js),
+        // write no depth over later transparents, seat on the banked surface
+        // and pitch with the grade the way the boost pads do.
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(1.6, 3.0, 20),
-          new THREE.MeshBasicMaterial({ color: 0xc9a06a, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(p.x, p.y + 0.06, p.z);
+          new THREE.MeshBasicMaterial({ color: 0xc9a06a, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+            depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
+        ring.rotation.order = 'YXZ';
+        ring.rotation.y = t.headingAt(idx);
+        ring.rotation.x = -Math.PI / 2 - Math.atan(t.slopeAt(idx));
+        ring.position.set(p.x, p.y + t.bankOffset(idx, latr) + 0.06, p.z);
         this.worldLayer.add(ring);
         this.geysers.push({ x: p.x, y: p.y, z: p.z, phase: k * 1.9, ring });
       }
@@ -9555,7 +9940,11 @@ class Game {
     for (const gy of this.geysers) {
       const ph = (this.raceTime + gy.phase) % 7.5;
       if (ph > 5.6 && ph < 6.4) { // pre-blow rumble
-        if (Math.random() < 0.3) this.particles.spawnDust?.(gy.x, gy.y, gy.z);
+        // Particles has no spawnDust — the optional call made the whole 0.8 s
+        // rumble emit nothing, leaving the ring's opacity step as the only
+        // warning before a launch. dust() is the real API and reads p.x/y/z,
+        // which the geyser record carries.
+        if (Math.random() < 0.3) this.particles.dust(gy);
         gy.ring.material.opacity = 0.85;
       } else if (ph >= 6.4) {     // eruption
         gy.ring.material.opacity = 0.55;
@@ -9706,10 +10095,12 @@ class Game {
 
   // ---------- choppers ----------
   /** `intercept` drops the gunship in the player's PATH instead of on a random
-   *  bearing. [MISSIONS] SURVIVOR needs it: a chopper tops out at 46 u/s and a
-   *  flat-out car does ~55, so one spawned 80 u away on a random bearing can
-   *  never close and the whole assault turns into scenery you outrun. An
-   *  interceptor lands ahead and off to one side, so the player drives into
+   *  bearing. [MISSIONS] SURVIVOR needs it: a chopper cruises at ~37 u/s under
+   *  its own thrust (MAX_SPEED's 46 clamps shockwave knockback, it is not the
+   *  cruise ceiling) and a flat-out car does ~55, so one spawned 80 u away on
+   *  a random bearing can never close — the deficit is ~18 u/s, not the ~9 the
+   *  46 figure implied — and the whole assault turns into scenery you outrun.
+   *  An interceptor lands ahead and off to one side, so the player drives into
    *  gun range and has to actually fight or break the line. */
   _spawnChopper(intercept = false) {
     const p = this.player.pos;
@@ -9780,6 +10171,37 @@ class Game {
       const y = t.terrainHeight(p.x, p.z);
       this.hostiles.push(new GunNest(this, new THREE.Vector3(p.x, y, p.z)));
     }
+  }
+
+  /** Take every hostile out of the world WITHOUT a kill — no score, no
+   *  explosion, no feed line, which is why this is not `_die()`. It does the
+   *  other half of `_die` that a bare mesh removal skipped: a GunNest's
+   *  collider is spliced back out of track.solids (only `_die` ever did
+   *  that), and the mesh is freed. buildNestMesh/buildRaiderMesh make fresh
+   *  geometry and materials per instance, so nothing shared is disposed. */
+  _retireHostiles() {
+    const solids = this.track?.solids;
+    for (const h of this.hostiles ?? []) {
+      const i = solids && h._solid ? solids.indexOf(h._solid) : -1;
+      if (i >= 0) solids.splice(i, 1);
+      h.alive = false;
+      if (h.mesh) { h.mesh.parent?.remove(h.mesh); disposeSubtree(h.mesh); }
+    }
+    this.hostiles = [];
+  }
+
+  /** Detach and free a piece of mode furniture (a blitz gate, a star) that
+   *  the level swap's disposeSubtree(worldLayer) will never reach. Every
+   *  THREE.Sprite shares one module-level quad geometry, so it is tagged
+   *  shared before the walk: disposing it under the sky's and the track's
+   *  sprites, still live, is exactly what the shared flag exists to stop.
+   *  A glow texture shared across one set is safe to free
+   *  here, because the whole set goes together. */
+  _freeLoose(root) {
+    if (!root) return;
+    root.parent?.remove(root);
+    root.traverse((o) => { if (o.isSprite && o.geometry) o.geometry.userData.shared = true; });
+    disposeSubtree(root);
   }
 
   /** Send a raider after the player. Spawns behind and to one side so it
@@ -10015,9 +10437,21 @@ class Game {
     if (!t?.center?.length) return 0;
     _dv.set(x, 0, z);
     const i = t.nearestIndex(_dv);
-    const lat = Math.abs(t.lateralOffset(_dv, i));
+    // THE SIGNED LATERAL IS THE THIRD ARGUMENT, and it was being thrown away.
+    // groundHeightAtPos(pos, i, lateral) forwards `lateral` to bankOffset,
+    // which ends in `v * clamp(lateral, -w, w)` — and THREE's clamp is
+    // max(min, min(max, value)), so a missing argument comes back NaN rather
+    // than 0. On every banked station (circumcircle R <= 30 with >= 2% grade,
+    // i.e. every mountain hairpin) this returned NaN, `f.mesh.position.y <=
+    // gy` was false, and the piece fell through the tarmac until the y < -3
+    // cull deleted it — against a comment two hundred lines up promising it
+    // "comes to rest where it stopped … a real obstacle for every car".
+    // _settleDebris could also write position.y = NaN, which NaNs the
+    // bounding sphere and drops a still-solid collider out of the frustum.
+    const slat = t.lateralOffset(_dv, i);
+    const lat = Math.abs(slat);
     const half = t.widthAt ? t.widthAt(i) : 9;
-    if (lat <= half + 1.5 && t.groundHeightAtPos) return t.groundHeightAtPos(_dv, i) + 0.18;
+    if (lat <= half + 1.5 && t.groundHeightAtPos) return t.groundHeightAtPos(_dv, i, slat) + 0.18;
     return (t.terrainHeight ? t.terrainHeight(x, z) : 0) + 0.18;
   }
 
@@ -10393,6 +10827,11 @@ class Game {
       if (!c.visible || !c.isMesh || !c.geometry || excluded.has(c)) return false;
       if (c.material === ud.bodyMat) return false; // never shed the hull itself
       if (c === ud.carLights) return false;        // nor the lamps, as one flying quad
+      // nor the merged rear/roof detail, which buildVoxelRacer tags "not a
+      // smashable panel" and nothing read: one mesh per material spanning
+      // BOTH sides, so the tail-lamp bar (both clusters) or the plate +
+      // reverse lamps + both exhaust tips flew off as a single car-wide piece
+      if (c.userData.detail) return false;
       if (c.userData.vol === undefined) {
         c.geometry.computeBoundingBox();
         const s = c.geometry.boundingBox.getSize(new THREE.Vector3());
@@ -10427,6 +10866,22 @@ class Game {
   spawnHusk(car) {
     if (this.husks.length >= 6) return;
     const husk = car.mesh.clone(true);
+    // Not everything on the rig is bodywork. The additive lamp-and-beam rig
+    // (visible on a dark world, frustumCulled off), the transparent AO blob
+    // and a frozen rival's shield bubble were all cloned and repainted in
+    // the opaque husk material below: a near-black road-beam wedge ahead of
+    // the shell (one edge lifted by the slump roll), dark lamp squares, an
+    // opaque slab z-fighting the road, a black ball round a frozen kill.
+    // All three are direct children and clone(true) keeps child order, so
+    // drop their copies by index. Only the copies leave; their geometry and
+    // materials are the live car's and are not disposed here.
+    {
+      const src = car.mesh.children, ud = car.mesh.userData;
+      const skip = [ud.carLights, ud.aoBlob, car._shield];
+      for (let i = src.length - 1; i >= 0; i--) {
+        if (skip.includes(src[i])) husk.remove(husk.children[i]);
+      }
+    }
     this._huskMat ??= new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 1 });
     husk.traverse((o) => { if (o.isMesh) o.material = this._huskMat; });
     husk.position.copy(car.mesh.position);
@@ -10445,7 +10900,11 @@ class Game {
         this.particles.damageSmoke?.(new THREE.Vector3(h.pos.x, h.pos.y + 1, h.pos.z), 0.7);
       }
       if (h.life < 1.5) h.mesh.position.y -= dt * 1.4; // sink away
-      if (h.life <= 0) { this.scene.remove(h.mesh); this.husks.splice(i, 1); }
+      // parent, not scene: spawnHusk adds to worldLayer, so scene.remove never
+      // unhooked anything. The husk left the list but not the graph, so the
+      // 6-husk cap stopped bounding the scene and every wreck of the session
+      // stayed drawn — sunk just below the road where the sink loop left it.
+      if (h.life <= 0) { h.mesh.parent?.remove(h.mesh); this.husks.splice(i, 1); }
     }
   }
 
@@ -10780,8 +11239,16 @@ class Game {
     // race contracts: fresh slate + counters every race (picked in startRace)
     this.contracts = [];
     this.contractCredits = 0;
+    // EVERY COUNTER A PREDICATE READS IS INITIALISED HERE. `topKph`,
+    // `boostHeld` and `leftRoad` were missing, and a missing counter is not
+    // a harmless zero: ON RAILS asks `!ct.leftRoad`, and `!undefined` is
+    // true, so the feat banked its 400 CR on a lap driven entirely in the
+    // scenery. Spelling them out means an unwritten counter reads as "not
+    // achieved" rather than "achieved". `rescues` counts SOS calls (see the
+    // detector in _updateContracts) and `prevUnstuck` is its baseline.
     this._ct = { props: 0, rivalKills: 0, drafts: 0, bigAirs: 0, closeCalls: 0,
       livestock: 0, comboMax: 1, cleanLaps: 0, weaponFired: false, lapDamaged: false,
+      topKph: 0, boostHeld: 0, leftRoad: false, rescues: 0, prevUnstuck: 0,
       prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
     this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
@@ -10791,7 +11258,7 @@ class Game {
     this.track?.restoreSmashed?.();
     this._missionReset?.(); // [MISSIONS] mission state never survives a reset
     this._clearWorldHazards?.();
-    for (const h of this.husks) this.scene.remove(h.mesh);
+    for (const h of this.husks) h.mesh.parent?.remove(h.mesh);
     this.husks.length = 0;
     this.restoreCarParts(this.player);
     for (const e of this.enemies) this.restoreCarParts(e);
@@ -10865,11 +11332,14 @@ class Game {
     this.track.setLights('red');
 
     // choppers + destructible props back to pristine
-    for (const c of this.choppers) if (c.alive && c.mesh) this.scene.remove(c.mesh);
+    for (const c of this.choppers) if (c.alive) c.despawn();
     this.choppers = [];
     this._raceChopper = false;
     this.chopperTimer = 15;
-    for (const f of this.flyingProps) this.scene.remove(f.mesh);
+    // parent, not scene: popped body panels are added to worldLayer (see
+    // popCarPart), so scene.remove left every in-flight panel frozen mid-air
+    // for the whole next race. Same idiom as the debris sweep below.
+    for (const f of this.flyingProps) f.mesh.parent?.remove(f.mesh);
     this.flyingProps = [];
     // A NEW RACE STARTS ON A CLEAN ROAD. The wreckage persists for the whole
     // race, which is the point of it — but restarting means restarting, and
@@ -11146,13 +11616,37 @@ class Game {
    *  `career.finished`, pays credits and rolls contracts and feats. Being
    *  destroyed out of the race must reward none of it, or the three-hull rule
    *  is a slower way to collect the same prize. */
+  /** Put the results card back in its RACE dress before a race writes it.
+   *  The card is shared, and the DOM outlives a run now that mode switches
+   *  happen in place: a mission debrief relabels the four stat rows (MISSION
+   *  SCORE / OBJECTIVE / MISSION TIME / GOLD / SILVER) and reveals the MEDAL
+   *  row, and nothing put either back, so the next race card read 'GOLD /
+   *  SILVER' over its best lap beside a stale medal. The season board is
+   *  appended once and never hidden, so a wreck-out or a round outside a
+   *  chapter showed the last chapter race's standings and NEXT signpost;
+   *  it is hidden here and _renderSeasonBoard reveals it when it renders.
+   *  Labels are the markup's own (index.html .result-stats). */
+  _resultsCardForRace() {
+    for (const [id, label] of [['r-score', 'FINAL SCORE'], ['r-kills', 'RIVALS DESTROYED'],
+      ['r-time', 'RACE TIME'], ['r-best', 'BEST LAP']]) {
+      const s = document.getElementById(id)?.previousElementSibling;
+      if (s) s.textContent = label;
+    }
+    const medalRow = document.getElementById('rrow-medal');
+    if (medalRow) medalRow.style.display = 'none';
+    const sb = document.getElementById('season-board');
+    if (sb) sb.style.display = 'none';
+  }
+
   _raceOver(attacker) {
     if (this.state === 'finished') return;
     this.state = 'finished';
     this.player.finished = true;
     this.player.outOfHulls = true;      // stops the respawn tick in PlayerCar.update
     this.raceOver = true;               // read by the HUD and by the results dressing
+    this._breakStreakQuests();          // the only place a streak can break
     for (const e of this.enemies) e.finished = true;
+    this._resultsCardForRace();
     document.getElementById('result-place').textContent = 'DESTROYED';
     document.getElementById('r-score').textContent = this.score.toLocaleString();
     document.getElementById('r-kills').textContent = this.kills;
@@ -11216,6 +11710,7 @@ class Game {
     const bonus = Math.round(2000 * (150 / 2000) ** ((rank - 1) / Math.max(1, FIELD - 1)) / 10) * 10;
     this.score += bonus;
     const sfx = ordinal(rank);
+    this._resultsCardForRace();   // before _recordSeasonRound, which re-shows the board
     document.getElementById('result-place').textContent = sfx;
     document.getElementById('r-score').textContent = this.score.toLocaleString();
     document.getElementById('r-kills').textContent = this.kills;
@@ -11934,9 +12429,16 @@ class Game {
       }
       if (rim > p.pos.y + 8) gorgeLift = Math.min(30, rim - p.pos.y - 8);
     }
+    // One expression for how far above the car this mode asks to sit, because
+    // the MAX_UP cap far below has to allow exactly what this asks for and
+    // nothing here can be named down there: the terrain branch shadows `lift`
+    // with the sightline probe's own lift, so the cap was rebuilt by hand and
+    // drifted. Computed here, while the cliff lift and the speed rise are
+    // still in scope, both sites read the same number by construction.
+    const anchorUp = gorgeLift + (M.h || 0) + lift + speedZoom * (M.spdH || 0);
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
-      .add(new THREE.Vector3(0, gorgeLift + M.h + lift + speedZoom * (M.spdH || 0), 0));
+      .add(new THREE.Vector3(0, anchorUp, 0));
     const targetLook = p.pos.clone()
       .addScaledVector(fwd, M.look)
       .add(new THREE.Vector3(0, M.lookH || 0, 0));
@@ -12302,7 +12804,24 @@ class Game {
       // the overhead anchor rides the rim, so the allowance carries it —
       // without this the cap clipped the camera right back into the slot
       // (measured: target 54.8, capped to 27.3, wall interiors again).
-      const MAX_UP = Math.max(13, (M.h || 0) + gorgeLift
+      // ...AND SO IS EVERY OTHER ANCHOR TERM. Carrying only `M.h + gorgeLift`
+      // left the allowance a hand-copy of `targetPos` that had fallen behind
+      // it twice over, and `lift` here is the sightline probe's lift, not the
+      // cliff lift, so the missing term could not even be spelled at this
+      // line. Measured: TRAIL on CANYON RUN (h 26, cliffLift 11, spdH 6)
+      // asked for car+37 at rest and car+43 at pace and was pinned at
+      // car+26.5, so the 11 u rise cliffLift exists to deliver arrived as
+      // 0.5 and the mode was still eating rock faces; TOP-DOWN, the default
+      // view on every world, asked for car+54 at pace against a cap of 46.5,
+      // i.e. 1.011x of its height where §6.4 specifies 1.0x to 1.35x. The
+      // recorded post-r170 heights (46.5 / 72.5 / 26.5) are all exactly
+      // `h + 0.5` — the camera was sitting AT the cap, not at its anchor.
+      // `anchorUp` is that anchor, so the cap allows what the mode asked for
+      // and no more; it already includes gorgeLift, which is therefore gone
+      // from here rather than counted twice. The ternary still grants the
+      // probe lift its own room, and the 13 u floor still keeps the chase
+      // family on the behaviour it was tuned with.
+      const MAX_UP = Math.max(13, anchorUp
         + (lift > 0 || liftHard > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
@@ -13198,7 +13717,7 @@ class Game {
         this._updateRolledRocks(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
-        this._updateContracts();
+        this._updateContracts(dt);
         this._updateTaunts();
         this._beginSweep(); // [MISSIONS] shared swept-pickup segment for this frame
         this._updateRoamStars(time);
@@ -13239,6 +13758,16 @@ class Game {
       const c = this.player?.mesh?.position ?? this.track.center[0];
       this.camera.position.set(c.x + Math.cos(a) * 26, c.y + 11, c.z + Math.sin(a) * 26);
       this.camera.lookAt(c.x, c.y - 12.5, c.z);
+      // The sun's +-168 shadow box rides on the attract subject too. Only
+      // _applyCamera moves it, and that never runs on 'title', while
+      // resetRace (a menu world pick, showMenu after a race) teleports the
+      // car to the new grid: the box stayed where the car had been — the
+      // old world's grid, or wherever a quit left it — and the whole shot
+      // behind the menu rendered with no cast shadows. _applyTheme's
+      // seat only covered boot, before the player existed.
+      this.moon.position.set(c.x + this._sunOffset.x, c.y + this._sunOffset.y,
+        c.z + this._sunOffset.z);
+      this.moon.target.position.set(c.x, c.y, c.z);
       if (this.particles.ambient && this.track.theme?.weather) {
         this.particles.ambient(new THREE.Vector3(c.x, 0, c.z), this.track.theme.weather, dt);
       }
@@ -13340,9 +13869,17 @@ class Game {
     if (fps >= 26 || (this._quality ?? 0) >= 3) return;
     const q = this._quality = (this._quality ?? 0) + 1;
     const baseDpr = Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2);
+    // The render scale has to reach the COMPOSER, which is where the scene is
+    // drawn. EffectComposer copies the renderer's pixel ratio once, at
+    // construction, and setSize(w, h) sizes its targets and every pass at
+    // w * that stale ratio — so these steps shrank only the canvas, and
+    // RenderPass and bloom kept filling boot-DPR targets that OutputPass then
+    // downsampled: softer, no faster. composer.setPixelRatio resizes all of
+    // it, at the vw/vh applyViewport last gave it; the innerWidth the old
+    // setSize passed also dropped applyViewport's safe-area overscan.
     if (q === 1) {
       this.renderer.setPixelRatio(baseDpr * 0.75);
-      this.composer.setSize(innerWidth, innerHeight);
+      this.composer.setPixelRatio(baseDpr * 0.75);
     } else if (q === 2) {
       // This step used to switch the sun's shadow OFF, and that was one of the
       // two freezes. Changing the shadow-caster count rewrites every material's
@@ -13362,7 +13899,7 @@ class Game {
     } else {
       this.bloom.enabled = false;
       this.renderer.setPixelRatio(Math.min(baseDpr, 1));
-      this.composer.setSize(innerWidth, innerHeight);
+      this.composer.setPixelRatio(Math.min(baseDpr, 1));   // see step 1
     }
     this.hud?.feed?.(`AUTO QUALITY ${q}/3 — smoothing frame rate`, 'info');
   }

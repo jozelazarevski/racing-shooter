@@ -9,7 +9,7 @@
  * takes the WORST drop in it, which is the patch's test, and asks whether
  * any barrier stands within reach on that side. */
 import { chromium } from 'playwright-core';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 320, height: 200 } });
 p.setDefaultTimeout(1800000);

@@ -2,7 +2,7 @@
  * what each pixel-ray hits and diff the frame with world-skirt hidden. */
 import { chromium } from 'playwright-core';
 const LVL = Number(process.env.LVL ?? 25), ST = Number(process.env.ST ?? 300);
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const p = await browser.newPage({ viewport: { width: 480, height: 300 } });
 p.setDefaultTimeout(600000);

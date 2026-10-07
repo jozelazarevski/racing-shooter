@@ -5335,13 +5335,36 @@ THEMES.savanna = {
  *  Everything textures.js hands out is freshly made per call, so it belongs to
  *  the world that asked for it — the sole exception is the memoised contact
  *  shadow, which tags itself `userData.shared` and is left alone. Geometry can
- *  opt out the same way. */
+ *  opt out the same way — or, for anything that is ever `clone()`d, by joining
+ *  `SHARED_ASSETS` below, which a clone cannot inherit. */
+
+/** The module-level singletons a world BORROWS and must not free: the prop
+ *  geometry/material cache (`propAssets`) and the shared gable prism. They
+ *  hang off `this.group` like everything else, so `disposeSubtree` was walking
+ *  straight into them on every level swap — ~45 KB of primitives plus the
+ *  crate (128x128) and cone (64x64) canvases, ~155 KB re-uploaded per swap for
+ *  nothing. `Track.dispose`'s own docstring claimed they were "deliberately
+ *  left alone"; they were not, because the opt-out the docstring advertises was
+ *  never taken. The repo has been bitten by this class twice from the other
+ *  side (HANDOVER.md 1194-1205, 2679-2684: disposing one bay car's shared
+ *  light material blanked every car's headlights), so the exclusion is the
+ *  established rule and this is the cache that never got it.
+ *
+ *  A WeakSet, NOT `userData.shared`: three r160's Material.copy and
+ *  BufferGeometry.copy both do `userData = JSON.parse(JSON.stringify(...))`,
+ *  so a tag would be inherited by `_makeProp`'s `base.clone()` night-tape
+ *  materials (and by `gablePrismGeo().clone()`), making those per-Track copies
+ *  and their un-memoised emissive maps permanently undisposable — an unbounded
+ *  leak traded for a bounded re-upload. A clone is a new object, so it is not
+ *  in this set. */
+export const SHARED_ASSETS = new WeakSet();
+
 export function disposeSubtree(root) {
   if (!root) return;
   const geos = new Set(), mats = new Set();
   const freeTex = (t) => { if (t && t.isTexture && !t.userData?.shared) t.dispose(); };
   const freeMat = (m) => {
-    if (!m || mats.has(m) || m.userData?.shared) return;
+    if (!m || mats.has(m) || m.userData?.shared || SHARED_ASSETS.has(m)) return;
     mats.add(m);
     for (const k of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap',
       'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'lightMap', 'envMap']) freeTex(m[k]);
@@ -5349,7 +5372,9 @@ export function disposeSubtree(root) {
   };
   root.traverse((o) => {
     const g = o.geometry;
-    if (g && !geos.has(g) && !g.userData?.shared) { geos.add(g); g.dispose(); }
+    if (g && !geos.has(g) && !g.userData?.shared && !SHARED_ASSETS.has(g)) {
+      geos.add(g); g.dispose();
+    }
     const m = o.material;
     if (Array.isArray(m)) m.forEach(freeMat); else freeMat(m);
   });
@@ -5496,7 +5521,7 @@ const PROP_SPECS = {
   volcano: [['barrel', 18], ['crate', 16], ['cone', 14]],
   alpine: [['hay', 20], ['crate', 16], ['cone', 14]],
   glacial: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  jungle: [['crate', 14], ['barrel', 12], ['cone', 12], ['hay', 14]],
+  jungle: [['crate', 14], ['barrel', 12], ['cone', 12]],   // no straw (r104); no hayColor either
   dunes: [['barrel', 16], ['crate', 16], ['cone', 14]],
   ravine: [['crate', 14], ['barrel', 14], ['cone', 12], ['rock', 8]],
   oasis: [['crate', 16], ['barrel', 12], ['hay', 14], ['cone', 10]],
@@ -5504,7 +5529,7 @@ const PROP_SPECS = {
   flume: [['hay', 26], ['crate', 16], ['barrel', 12]],   // hay = cut-log rounds here
   wildfire: [['barrel', 18], ['crate', 14], ['cone', 12]],
   sheetice: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12], ['hay', 10]],
+  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12]],   // no straw (r104); no hayColor either
   neon: [['barrel', 18], ['crate', 16], ['cone', 14]],
   undercity: [['crate', 18], ['barrel', 18], ['cone', 12]],
   pass: [['hay', 20], ['crate', 16], ['cone', 14], ['rock', 8]],
@@ -6764,6 +6789,9 @@ function gablePrismGeo() {
   PRISM_GEO.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   PRISM_GEO.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   PRISM_GEO.computeVertexNormals();
+  // borrowed by every world, freed by none: parented un-cloned at the roof
+  // sites below, so disposeSubtree would otherwise take it down with the world
+  SHARED_ASSETS.add(PRISM_GEO);
   return PRISM_GEO;
 }
 
@@ -6852,6 +6880,10 @@ function propAssets() {
       pengOrange: new THREE.MeshStandardMaterial({ color: 0xe8862e, roughness: 0.8 }),
     },
   };
+  // the cache is built once and handed to every world after it, so nothing
+  // here belongs to the world that happens to be tearing down
+  for (const g of Object.values(PROP_ASSETS.geo)) SHARED_ASSETS.add(g);
+  for (const m of Object.values(PROP_ASSETS.mat)) SHARED_ASSETS.add(m);
   return PROP_ASSETS;
 }
 
@@ -7428,16 +7460,23 @@ export class Track {
     // ---- W-CURVE-01.7 (r400): superelevation on gradient sharp curves ----
     this._buildBanking();
 
-    // Natural jumps. Must happen HERE — before any mesh is built — so the road
-    // ribbon, its skirts, the ruts, the terrain blend and every prop placement
-    // follow the hump for free.
-    this._buildCrests();
-    // ---- outback creeks: cut the dry watercourses into the same profile, for
-    // the same reason and under the same contract as the crests above.
-    this._planCreeks();
-
-    this._checkLayout();
-
+    // A GUARD CANNOT REFUSE STATE THAT DOES NOT EXIST YET. These three
+    // planners used to sit AFTER `_buildCrests`, and `_buildCrests`' own
+    // `_nearGorge(w.i, 60)` guard answers entirely from `this._overpasses`,
+    // `this._gorge` and `this._jumpGorges` — all three undefined at that
+    // point, and every read of them `??`/`&&`-guarded, so the guard returned
+    // false for every window on every world and had never rejected a single
+    // station. The crest placer's chasm and flyover avoidance was dead code,
+    // while the symmetric guard in `_planCreeks` ("never cut a creek through
+    // a crest — the two profiles would ADD") did its job: a gorge got exactly
+    // the treatment a creek is forbidden to get, and a 2.1-4.6 u hump could
+    // be baked at a jump's launch station, on a bridge crossing, or under an
+    // overpass deck. Planned before the bake, all three are honoured. All of
+    // them read only `center`/`tan`/`nrm`/`curvature`, which are final above,
+    // and none of them draws from the seeded RNG, so nothing downstream
+    // shifts; `_buildCrests` still rolls exactly two numbers per crest and
+    // still fills its quota, only from stations that are actually free.
+    //
     // OVERPASSES: where the ROUTE crosses itself, one leg rises on a bridge.
     // nearestIndex is hint-windowed (±30 samples), so index continuity keeps
     // every car on its own leg through the stack - the capability the 2-opt
@@ -7458,6 +7497,17 @@ export class Track {
     this._jumpGorges = [];
     this._jumpCut = null;
     if (this.T.gorgeJump) this._planJumpGorges();
+
+    // Natural jumps. Must happen HERE — before any mesh is built — so the road
+    // ribbon, its skirts, the ruts, the terrain blend and every prop placement
+    // follow the hump for free.
+    this._buildCrests();
+    // ---- outback creeks: cut the dry watercourses into the same profile, for
+    // the same reason and under the same contract as the crests above.
+    this._planCreeks();
+
+    this._checkLayout();
+
     // TUNNELS are planned, not found: the road-field blend flattens the
     // ground beside every carriageway, so no natural cutting is ever deep
     // enough to bore. Instead the straightest eligible stretches are chosen
@@ -7547,7 +7597,12 @@ export class Track {
     // once they wander past it.
     this.worldBounds = 1400;
     // Baked contact-shadow specs {x, z, r, y} collected by every builder and
-    // realized as ONE instanced decal mesh at the end of _buildEnvironment.
+    // realized as ONE instanced decal mesh by _buildContactShadows, which
+    // runs in this constructor after _conformTrees and _treelineLaw (and
+    // before _applyShadowLaw), not at the end of _buildEnvironment: the
+    // bake filters this queue against the cull result, dropping the decal of
+    // each tree those two passes scaled away unless something live shares its
+    // point, so it has to run after them.
     this._shadows = [];
     this._buildRoad();
     // dirt shoulder aprons under the road edges: they bury themselves where
@@ -7571,6 +7626,31 @@ export class Track {
     this._buildEnvironment();
     this._conformTrees();    // WR-7.6d: trees stand ON the FINAL ground
     this._treelineLaw();     // r407: nothing grows inside a wall, nothing on the ice
+    // THE BAKE RUNS AFTER THE CULLS, not at the tail of _buildEnvironment.
+    // Both passes above scale a rejected tree to 0.0001 and set `tr.culled`,
+    // and neither touches `this._shadows` or the baked mesh — so a decal baked
+    // before them was left sitting at 0.4 opacity on bare ground under a tree
+    // that is no longer there. `_conformTrees`' own docstring (WR-7.6) demands
+    // a culled tree be "scaled away, collider off, never left half-buried",
+    // and the decal is the visual half of exactly that. Moved here, the bake
+    // can read the cull result — see _buildContactShadows, where the filter
+    // lives; moving it alone would be inert, because nothing between the old
+    // call site and this one changes a terrain height or an instance matrix
+    // the bake reads.
+    //
+    // Still BEFORE _applyShadowLaw, and no later: that law's NONE regex
+    // matches the literal name 'contact-shadows', which the bake assigns just
+    // before adding the mesh to this.group, so the mesh must already exist
+    // when the law traverses. This also leaves the r405/r406/r410 trio below
+    // in its documented order. Safe to move across the two culls because
+    // neither of them queues a decal: _conformTrees, _treelineLaw and the
+    // _clearIceCarpet pass it calls never reach _addShadow or touch
+    // this._shadows, directly or through anything they call (_distToTrack,
+    // _cliffProfile, _terrainMeshHeight are height queries). So the move
+    // neither skips a producer nor newly admits one, and the bake draws
+    // no Math.random and no rnd(), so the shared stream that _clearIceCarpet's
+    // note warns every later world re-rolls from is untouched.
+    this._buildContactShadows();
     this._applyShadowLaw();  // r405: one shadow rule, after every builder
     this._clearRoadSolids();  // r406: no collider left biting the carriageway
     this._pruneGhostTrees();  // r410: no collider left standing where no tree is
@@ -7659,7 +7739,14 @@ export class Track {
         part.setMatrixAt(tr.id, m4);
         touched.add(part);
       }
-      tr.r = 0; tr.solid = false; tr.culled = true;
+      // `dead` as well as `culled`, the way applyRouteDensity and stagecheck's
+      // cullTree retire a tree. Every runtime consumer - the car's tree loop,
+      // the cannon raycast, blastWorld, the camera sightline, smashTree - tests
+      // only `dead`, and `solid = false` is ignored by the car step, which
+      // decides solidity by size: a grown tree culled here was an invisible
+      // trunk on the canyon floor, a sapling one a full-size stand-in flung
+      // out of empty air. restoreSmashed skips `culled`, so it stays down.
+      tr.r = 0; tr.solid = false; tr.culled = true; tr.dead = true;
       if (why === 1) wall++; else ice++;
     }
     for (const part of touched) part.instanceMatrix.needsUpdate = true;
@@ -7837,7 +7924,11 @@ export class Track {
         part.setMatrixAt(tr.id, m4);
         touched.add(part);
       }
-      tr.r = 0; tr.solid = false; tr.culled = true;
+      // `dead` too: the runtime colliders, the cannon, blastWorld, the camera
+      // and smashTree all read `dead` alone, so a tree culled here within
+      // rCrown + 7 of the road still crashed the car with nothing on screen.
+      // See _treelineLaw; restoreSmashed's `culled` guard keeps it down.
+      tr.r = 0; tr.solid = false; tr.culled = true; tr.dead = true;
       culled++;
     };
     // BURIAL-GATED, and ONLY burial. The first cut of this pass also
@@ -7886,7 +7977,13 @@ export class Track {
   }
 
   /** Dev sanity check: warn if the centerline passes too close to itself
-   *  (any two non-adjacent samples nearer than the full road ribbon width). */
+   *  (any two non-adjacent samples nearer than the full road ribbon width).
+   *  A designed crossing is exempt: one leg on a registered overpass deck AND
+   *  the legs grade-separated by LAW 4's 6 u (test-roadclear). Without that it
+   *  reported the bridge itself on every overpass world, and — printing only
+   *  the global minimum — hid a real at-grade clash behind it (HANDOVER item
+   *  3: SEA CLIFF RUN's stack was masked by its legitimate overpass). Planned
+   *  overpasses are already baked into `center[].y` when this runs. */
   _checkLayout() {
     const minGap = (WALL_OFF + 0.6) * 2;
     let worst = Infinity, wi = -1, wj = -1;
@@ -7896,7 +7993,10 @@ export class Track {
         const dx = this.center[i].x - this.center[j].x;
         const dz = this.center[i].z - this.center[j].z;
         const d2 = dx * dx + dz * dz;
-        if (d2 < worst) { worst = d2; wi = i; wj = j; }
+        if (d2 >= worst) continue;
+        if (Math.abs(this.center[i].y - this.center[j].y) >= 6 &&
+          (this._onOverpass(i) || this._onOverpass(j))) continue;
+        worst = d2; wi = i; wj = j;
       }
     }
     const d = Math.sqrt(worst);
@@ -9845,9 +9945,21 @@ export class Track {
   waterAt(x, z) {
     const R = this._river;
     if (!R) return 0;
-    const { d } = this._riverNearest(x, z);
-    if (!(d < R.half)) return 0;
-    const across = Math.cos((d / R.half) * Math.PI * 0.5);   // 1 mid-channel
+    // ...and it has to ask the SAME width the water was built from. This
+    // measured the channel with the scalar `R.half` (4.0) while the carve
+    // (`halfAt[k]` above) and the drawn ribbon both read the per-station
+    // `halfAt`, which breathes 2.56 to 5.44 u. So on a wide station the outer
+    // 1.44 u of the drawn, carved channel read bone dry — at d = 4.0 under
+    // halfAt 5.44 the honest depth is 1.05 u and this returned 0, well over
+    // the 0.06 u that arms the drag, the aquaplane and the wet-tyre fade —
+    // and on a narrow station (halfAt 2.56, breathing alone, before the
+    // tight-bend clamp) the car took full river drag plus the 3.5 s grip fade
+    // on dry, un-carved bank. `_riverNearest` already hands back the station
+    // index, so there is now one width law with three readers.
+    const { d, k } = this._riverNearest(x, z);
+    const hw = (R.halfAt && R.halfAt[k] != null) ? R.halfAt[k] : R.half;
+    if (!(d < hw)) return 0;
+    const across = Math.cos((d / hw) * Math.PI * 0.5);       // 1 mid-channel
     const near = 1 - THREE.MathUtils.smoothstep(this._distToTrack(x, z), 10, 26);
     return R.depth * across * (0.12 + 0.88 * (1 - near));
   }
@@ -10529,8 +10641,12 @@ export class Track {
     if (this._nearGorge(i, reach)) return 0;
     // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
     //
-    // `_buildCrests` runs first and refuses narrows and gorges; it cannot
-    // refuse tunnels, because none exist yet. This ran second and asked about
+    // `_buildCrests` runs first and refuses narrows, overpasses and gorges
+    // (it only truly does since those three planners were hoisted above it —
+    // before that its `_nearGorge` call read three undefined fields and
+    // refused nothing); it cannot refuse tunnels, because none exist yet, and
+    // the two guards cannot both run second — hoisting `_planTunnels` too
+    // would kill the crest test below instead. This ran second and asked about
     // the start gate, gorges and curvature — never about the humps already
     // baked into the roadway. So a bore could be, and was, sited straight
     // over a jump built expressly to throw the car.
@@ -11672,8 +11788,20 @@ export class Track {
         // On the INSIDE of tight turns the apron may not reach past the turn
         // radius, or the ribbon folds over itself and sweeps up across the
         // road (visible as pale shards on hairpins/S-folds). Clamp reach.
+        // The sign was the wrong way round, so the clamp guarded the convex
+        // side and left the concave one at Infinity — the apron folded on
+        // exactly the stations this comment was written about. `nrm` is
+        // `(tan.z, 0, -tan.x)`, so rotating the tangent by phi toward +nrm
+        // gives `a.x*b.z - a.z*b.x = -sin(phi)`: the bend whose centre of
+        // curvature lies on the +nrm side (inside = side +1) reads NEGATIVE.
+        // Checked on a 64-station R20 circle built the way this class builds
+        // one, both traversal directions, against `_buildBanking`'s real
+        // circumcentre test at 8103, which returns sIn +1 for that geometry
+        // while this returned -1. At an R10 hairpin the unclamped inside
+        // apron reached wOff + face + 2.8 = 15.8 u, 5.8 u past the pivot,
+        // while the outside was needlessly cut back to the 11.0 u floor.
         const a = this.tan[j], b = this.tan[(j + 8) % N];
-        const insideSign = (a.x * b.z - a.z * b.x) > 0 ? 1 : -1;
+        const insideSign = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
         const maxLat = side === insideSign
           ? Math.max(WALL_OFF + 0.6, 0.85 / Math.max(this.curvature[j], 1e-4))
           : Infinity;
@@ -12092,7 +12220,15 @@ export class Track {
     // checkered strip on the road
     const strip = new THREE.Mesh(
       new THREE.PlaneGeometry(ROAD_HALF * 2 + 2, 4),
-      new THREE.MeshBasicMaterial({ map: checkerTexture(), transparent: true, opacity: 0.92 })
+      // Out-biased past the road's polygonOffset -4 (_buildRoad), as the car's
+      // AO blob is at -6: a 0.04 u lift alone is worth only about two depth
+      // slope steps from the TOP-DOWN rig, so the biased road won the test and
+      // the strip dropped out or flickered. No depth write, like every other
+      // decal on the carriageway.
+      new THREE.MeshBasicMaterial({
+        map: checkerTexture(), transparent: true, opacity: 0.92, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
+      })
     );
     strip.material.map.repeat.set(5, 1);
     strip.rotation.order = 'YXZ';
@@ -12763,6 +12899,22 @@ export class Track {
       // work. Rocks belong beside the course, not lining its edge like bollards.
       const lateral = side * (w + r + 4.6);
       const p = this.pointAt(i, lateral);
+      // ...AND THE SEAT HAS TO MOVE WITH THEM. `pointAt` returns the
+      // CARRIAGEWAY height ("the road surface is flat across its width"),
+      // which was right when these stood on the road at ±1.2-4.5 u. At
+      // `w + r + 4.6` ≈ 16 u the ground is no longer the road: `_blendHeight`
+      // holds it a tuck below the datum there — 0.47 u on the plain worlds and
+      // 1.22 u wherever `retainingWalls`/`shelfRoad` deepen it — and the drawn
+      // patch sits 0.12 u lower again, so the hoodoo stack, the log pile and
+      // the shelf-world boulders stood that far clear of the earth, with the
+      // baked contact-shadow decal hanging at road height with them. HRD-8
+      // allows 0.15 m. The file's own convention two hundred lines down is
+      // `_buildProps`' "beyond ~9.5 u lateral, seat on terrain", and
+      // `_buildNarrowDressing` already fixed this exact class with `_seatY`
+      // (measured 2.25 u in the air on OLIVE COAST). `_seatY` takes the lower
+      // of the physics ground and the drawn mesh, so it can only push the rock
+      // down onto the surface that is actually visible.
+      p.y = this._seatY(p.x, p.z);
       // AND CHECK IT AGAINST THE WHOLE LAP. `lateral` is measured along the
       // normal at sample `i`; on a switchback world the road's other leg
       // swings underneath, so an obstacle correctly set back from ITS leg can
@@ -12841,7 +12993,7 @@ export class Track {
         const g = new THREE.Group();
         const nSeg = 4 + (Math.random() < 0.4 ? 1 : 0);
         const wr = [1, 0.8, 0.64, 0.78, 0.55];
-        let y = p.y;                                     // stack up from the road surface
+        let y = p.y;                                     // stack up from the ground seat
         for (let s = 0; s < nSeg; s++) {
           const rad = r * wr[Math.min(s, wr.length - 1)] * (0.92 + Math.random() * 0.16);
           const hh = (2.5 - s * 0.25) * (0.85 + Math.random() * 0.35);
@@ -12860,7 +13012,8 @@ export class Track {
         }
         this.group.add(g);
       }
-      // collision stays horizontal ({x, z, r}); y is the road height for visuals
+      // collision stays horizontal ({x, z, r}); `y` is the ground seat the
+      // visuals stand on (the vehicle code reads only x/z/r)
       this.obstacles.push({ x: p.x, z: p.z, r, y: p.y });
       this._addShadow(p.x, p.z, r * 1.35, p.y);
     });
@@ -12897,6 +13050,11 @@ export class Track {
           // reflectance right down without needing its own decal system
           map: tex, transparent: true, depthWrite: false,
           roughness: this.T.puddleRough ?? 0.25, metalness: this.T.puddleMetal ?? 0.08,
+          // -6 beats the road's polygonOffset -4; the 0.04 u lift below is
+          // worth only about two slope steps from the TOP-DOWN rig, so without
+          // it the road's biased depth rejected the puddle while its grip and
+          // splash in track.puddles still fired on a patch nobody could see
+          polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
         })
       );
       m.rotation.order = 'YXZ';
@@ -12943,6 +13101,9 @@ export class Track {
     });
     const mat = new THREE.MeshStandardMaterial({
       map: tex, transparent: true, roughness: 1, metalness: 0, depthWrite: false,
+      // out-biased past the road's -4 like the puddles: a 0.035 u lift cannot
+      // carry it, and the patch lost the depth test to the carriageway
+      polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
     });
     const stoneGeo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
     const stones = new THREE.InstancedMesh(
@@ -13334,6 +13495,10 @@ export class Track {
       ggeo.setIndex(gidx);
       const gloom = new THREE.Mesh(ggeo, new THREE.MeshBasicMaterial({
         color: 0x03130a, transparent: true, opacity: 0.34, depthWrite: false,
+        // -6 out-biases the road's polygonOffset -4; at a 0.05 u lift the road
+        // won the depth test, so the gloom showed on the verges with a clear
+        // hole down the carriageway it was laid to darken
+        polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
       }));
       gloom.renderOrder = 1;
       this.group.add(gloom);
@@ -13371,7 +13536,7 @@ export class Track {
     switch (type) {
       case 'hay': {
         if (!this._hayPropMat) {
-          this._hayPropMat = new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 });
+          this._hayPropMat = new THREE.MeshStandardMaterial({ color: this.T.hayColor ?? 0xd8b95e, roughness: 1 });
         }
         const m = new THREE.Mesh(A.geo.hay, this._hayPropMat);
         m.castShadow = true;
@@ -13708,10 +13873,13 @@ export class Track {
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     // LAST OF THE SCENERY, so an authored tree or boulder always wins its spot
-    // over anything the world scattered there — and still BEFORE the contact
-    // shadows, which have to see it to ground it.
+    // over anything the world scattered there. The contact-shadow bake used to
+    // follow on the next line, and the note that used to stand here — "still
+    // BEFORE the contact shadows, which have to see it to ground it" — was the
+    // one-directional reasoning that produced the orphan-decal defect: the bake
+    // also has to see what got scaled AWAY, and the tree culls do not run until
+    // after this function returns. It is called from the constructor now.
     this._buildEditProps();                          // trees and rocks the owner planted
-    this._buildContactShadows();                     // baked AO under everything
   }
 
   /** OUTBACK RED DIRT: the dry creek beds, drawn from the wash polylines
@@ -13901,9 +14069,38 @@ export class Track {
         // The two ground functions were checked against each other before this
         // was blamed on them: _terrainMeshHeight and terrainHeight return
         // identical values here, max difference 0 over 25 samples.
+        //
+        // THAT PROBE WAS WALKING THE WRONG AXIS. It stepped (cos h, -sin h)
+        // * 1.7, which is `nrm` itself -- headingAt is atan2(tan.x, tan.z)
+        // and nrm is (tan.z, -tan.x) -- so it sampled 1.7 u ACROSS the road,
+        // along the 0.9 u thin axis whose half-width is 0.45, and never once
+        // along the 3.4 u long axis it was written for. (The quaternion above
+        // sends local +X to -(sin h, cos h), the tangent; `_barrier` below
+        // declares the same direction for its segment.) Both halves of the
+        // bug bite: on the laterally falling shelf this builder only ever
+        // builds on, the outboard sample reads 1.7*tan(lat) low where the
+        // true footprint minimum is 0.45*tan(lat) low, so on a 40-degree face
+        // off a 3.0 u drop `need` came out 5.38 instead of 4.33 -- 1.05 u,
+        // 24%, of body stretched into solid hillside, and the `need > 26` cap
+        // below spuriously dropped walls whose true need was inside it; while
+        // the downhill END on a longitudinal grade, the 232-instance residue
+        // this whole block exists to kill, was still never sampled at all
+        // (0.34 u at a 20% grade, 1.7 u at 45 degrees). So probe the four
+        // corners the footprint actually has: long axis the TANGENT
+        // (sin h, cos h) at half 1.7, thin axis the NORMAL (cos h, -sin h) at
+        // half 0.45. Every sample is now a point the block actually stands on,
+        // so `ground` moves both ways and both ways are right: up on a
+        // laterally falling shelf (less body buried) and down on a
+        // longitudinal grade (the hanging end finally seated). Nothing can
+        // float that did not float before, because the old pair sampled
+        // ground the footprint never reached.
         const hdF = this.headingAt(i);
-        const fxF = Math.cos(hdF) * 1.7, fzF = -Math.sin(hdF) * 1.7;
-        for (const [ox, oz] of [[fxF, fzF], [-fxF, -fzF]]) {
+        const sF = Math.sin(hdF) * 1.7, cF = Math.cos(hdF) * 1.7;
+        const snF = Math.sin(hdF) * 0.45, cnF = Math.cos(hdF) * 0.45;
+        for (const [ox, oz] of [
+          [sF + cnF, cF - snF], [sF - cnF, cF + snF],
+          [-sF + cnF, -cF - snF], [-sF - cnF, -cF + snF],
+        ]) {
           const g2 = this._terrainMeshHeight(p.x + ox, p.z + oz);
           if (Number.isFinite(g2) && g2 < ground) ground = g2;
         }
@@ -13960,26 +14157,49 @@ export class Track {
       const plankGeo = new THREE.BoxGeometry(deckW * 2, 0.22, 1.15);
       const tex = plankTexture();
       tex.anisotropy = 8;
+      // THE DECK RAN OUT OF BOARDS BEFORE IT REACHED THE FAR TOWER, and the
+      // boards it did lay were stacked on top of each other. `f` counts
+      // SAMPLES and advances by `1.5 / segLen` of one, so crossing the deck
+      // takes `rows * segLen / 1.5` iterations — 46.7 at the authored span 26
+      // and segLen 7 — while the buffer was sized `rows * 3` = 30 and the
+      // guard below hard-stopped there. Coverage was exactly `4.5 / segLen`,
+      // i.e. 0.52 to 0.68 of the span on this roster's 6.6-8.7 u samples: the
+      // far 38% of the crossing had towers, cables, hangers and railings over
+      // a bare ribbon that `_deckDip` had already dropped 0.34 u, so the deck
+      // read as stopping in mid-air. And `Math.round(f)` snapped every board
+      // onto a whole centreline sample, so ~4.7 consecutive iterations wrote
+      // the identical matrix and spent the buffer on coincident duplicates,
+      // leaving the survivors segLen (~7 u) apart under a 1.15 u board — 5.9 u
+      // gaps where the comment promises 1.5 u. Size the buffer from the real
+      // iteration count and lerp between the two bracketing samples, since
+      // `pointAt`/`headingAt` index `center`/`tan` directly and cannot take a
+      // fractional index.
+      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
+      const cap = Math.floor(rows / step) + 2;
       const planks = new THREE.InstancedMesh(
         plankGeo,
         new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }),
-        rows * 3
+        cap
       );
       planks.name = 'bridge-deck';
       planks.receiveShadow = planks.castShadow = true;
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
       const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
       let k = 0;
-      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
       for (let f = 0; f <= rows; f += step) {
-        const j = (i0 + Math.round(f) + N) % N;
-        const c = this.center[j];
-        q.setFromAxisAngle(up, this.headingAt(j));
-        m4.compose(new THREE.Vector3(c.x, c.y - 0.02, c.z), q, new THREE.Vector3(1, 1, 1));
+        const fi = Math.floor(f), u = f - fi;
+        const ja = (i0 + fi + N) % N, jb = (ja + 1) % N;
+        const ca = this.center[ja], cb = this.center[jb];
+        q.setFromAxisAngle(up, this.headingAt(ja));
+        m4.compose(new THREE.Vector3(
+          ca.x + (cb.x - ca.x) * u,
+          ca.y + (cb.y - ca.y) * u - 0.02,
+          ca.z + (cb.z - ca.z) * u
+        ), q, new THREE.Vector3(1, 1, 1));
         planks.setMatrixAt(k, m4);
         col.setScalar(0.86 + Math.random() * 0.28);
         planks.setColorAt(k++, col);
-        if (k >= rows * 3) break;
+        if (k >= cap) break;
       }
       planks.count = k;
       g.add(planks);
@@ -15072,7 +15292,14 @@ export class Track {
         const du = -HALF * 0.35 + (HALF * 0.7 * c2) / segs;
         const wig = Math.sin(c2 * 1.7) * 2.2;
         for (let e = 0; e < 2; e++) {
-          const dd = dn + wig * 0.3 + e * w;
+          // r437: `dn` is distance from the WATERLINE, so the ribbon has to
+          // carry the coast profile the sea grid above carries. Laid on the
+          // raw a-b line it sat `push` units out to sea: on CITADEL BAY the
+          // profile runs ~368 u over the bulk of the axis (RALLY_RULES.md
+          // E-31 recorded median distance to water 380 u -> 12 u), so the one
+          // bright beach ribbon floated a third of a kilometre offshore while
+          // the shore it belongs to read as a hard sea/land edge.
+          const dd = dn + wig * 0.3 + e * w - this._coastPushAt(du);
           const o = (c2 * 2 + e) * 3;
           fverts[o] = mx + ux * du + nx * dd;
           fverts[o + 1] = y + 0.06;
@@ -15357,16 +15584,27 @@ export class Track {
       foamCol.setRGB(1, 1, 1).lerp(seaTint, fade);
       crest.setColorAt(ck2++, foamCol);
     };
+    // r437: bands (a)-(c) are distances from the WATERLINE and must carry the
+    // coast profile, the same term the sea grid, the flotilla and the marina
+    // carry. Without it band (b) - labelled "patches at the drawn shore" -
+    // was laid on the raw a-b line, i.e. ~push units seaward of the row the
+    // grid actually draws the shore at (~368 u on CITADEL BAY), so the drawn
+    // beach had no surf on it at all and every dash sat in open water.
+    // The term belongs at the CALL SITES, not inside `dash`: band (d)'s rings
+    // take their centres from the un-pushed ISLES table and `srTaken`, whose
+    // coordinates also feed `_clearsRoad` and the `dn <= 24` solids grade
+    // gate and so have to stay put, and pushing `dash` wholesale would slide
+    // every surf ring off the rock it circles.
     // (a) open-bay drift dashes - as before
     for (let k = 0; k < 90; k++) {
-      dash((Math.sin(k * 12.9898) * 0.5 + 0.5) * 1400 - 700,
-        14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300,
+      const du = (Math.sin(k * 12.9898) * 0.5 + 0.5) * 1400 - 700;
+      dash(du, 14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300 - this._coastPushAt(du),
         Math.sin(k * 3.7) * 0.3, 1, 1, 0.25);
     }
     // (b) the waterline band: broken foam patches at the drawn shore
     for (let k = 0; k < 170; k++) {
       const du = -700 + k * (1400 / 170) + Math.sin(k * 7.31) * 3;
-      dash(du, 1.5 + (Math.sin(k * 12.9898) * 0.5 + 0.5) * 3.5,
+      dash(du, 1.5 + (Math.sin(k * 12.9898) * 0.5 + 0.5) * 3.5 - this._coastPushAt(du),
         Math.sin(k * 5.1) * 0.25,
         0.5 + (Math.sin(k * 3.3) * 0.5 + 0.5) * 1.1,
         1.2 + (Math.sin(k * 9.7) * 0.5 + 0.5) * 2.0,
@@ -15375,7 +15613,7 @@ export class Track {
     // (c) the outer break line, dimmer
     for (let k = 0; k < 110; k++) {
       const du = -700 + k * (1400 / 110) + Math.sin(k * 4.7) * 5;
-      dash(du, 7 + (Math.sin(k * 6.9) * 0.5 + 0.5) * 7,
+      dash(du, 7 + (Math.sin(k * 6.9) * 0.5 + 0.5) * 7 - this._coastPushAt(du),
         Math.sin(k * 8.3) * 0.3, 0.8, 1.4, 0.35 + (Math.sin(k * 3.1) * 0.5 + 0.5) * 0.15);
     }
     // (d) surf rings around every isle and sea rock
@@ -16423,7 +16661,13 @@ export class Track {
     const terr = this._seatY(p.x, p.z);
     const stand = gy - terr;
     if (stand > 0.3) {
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 0.6, stand + 0.6, D * 2 - 0.6),
+      // W and D are the body's FULL width and depth (BoxGeometry(W, H, D)
+      // above), so `W * 2 - 0.6` built the masonry at nearly twice the
+      // building it is supporting — 33.4 x 18.4 under a 17 x 9.5 hotel, the
+      // opposite of this comment's "just inside the footprint", and 6 u of it
+      // reached past the solid record below (r = max(W, D) * 0.62) as
+      // collider-free stone a car could drive into.
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(W - 0.6, stand + 0.6, D - 0.6),
         new THREE.MeshStandardMaterial({ color: 0x6f6a60, roughness: 1, flatShading: true }));
       plinth.position.set(p.x, terr + (stand + 0.6) / 2 - 0.3, p.z);
       plinth.rotation.y = yaw;
@@ -18482,8 +18726,18 @@ export class Track {
    *  Rather than teach every cull path to also edit the registry — the same
    *  "fix it in three places" trap the placeAt wrap-count law fell into — the
    *  registry is reconciled ONCE, here, after every builder and every law has
-   *  run: an instance scaled away is not a tree, so its record goes. Reading
-   *  element 0 of each 16-float block is the instance's x scale.
+   *  run: an instance scaled away is not a tree, so its record goes.
+   *
+   *  The instance's x scale is the LENGTH OF THE FIRST COLUMN of its matrix,
+   *  not its first element. This read was `array[idx * 16] >= 0.01`, i.e.
+   *  element 0 alone — but every carpet instance is composed with a uniformly
+   *  random yaw (`_buildForestCarpet` below: `eu.set(0, random * 2PI, 0)`), and
+   *  for a Y-rotation element 0 is sx*cos(yaw). cos(yaw) is negative for
+   *  exactly half a full turn, so this test dropped roughly HALF of every
+   *  world's live carpet records — the opposite of the desync it was written to
+   *  repair, and it blinded the camera's foliage guard to half the real crowns.
+   *  Column 0 of T*R*S is sx times a unit vector for ANY rotation, so its
+   *  length is sx exactly, and a zeroed (culled) instance still reads 0.
    */
   _pruneGhostTrees() {
     if (!this.camTrees?.length) return;
@@ -18491,7 +18745,8 @@ export class Track {
     this.camTrees = this.camTrees.filter((t) => {
       const m = t.meshes && t.meshes[0];
       if (!m || t.idx == null || !m.instanceMatrix) return true;
-      return m.instanceMatrix.array[t.idx * 16] >= 0.01;
+      const a = m.instanceMatrix.array, o = t.idx * 16;
+      return Math.hypot(a[o], a[o + 1], a[o + 2]) >= 0.01;
     });
     this._camTreeGrid = null;          // the cell hash was built from the old list
     this._ghostTreesPruned = before - this.camTrees.length;
@@ -20679,7 +20934,18 @@ export class Track {
       rg.addColorStop(1, 'rgba(255,180,110,0)');
       cx2.fillStyle = rg;
       cx2.fillRect(0, 0, 64, 64);
-      return new THREE.CanvasTexture(cv);
+      // Colour art, so sRGB like every textures.js make() map: left at
+      // NoColorSpace the stops were read as linear and re-encoded on output,
+      // (255,198,132) coming out near (255,228,190), and the warm sodium
+      // pools washed to pale cream. And `shared`, because this memo outlives
+      // the Track: disposeSubtree's freeTex honours only userData.shared, so
+      // every world swap freed the static's texture and the next tunnel
+      // re-uploaded it. Never cloned (the material holds it by reference), so
+      // the tag cannot leak onto a per-Track copy the way SHARED_ASSETS warns.
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.userData.shared = true;
+      return t;
     })());
     const poolGeo = new THREE.PlaneGeometry(17, 20);
     poolGeo.rotateX(-Math.PI / 2);
@@ -20743,7 +21009,12 @@ export class Track {
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
    *  world units (≈1.3× the object footprint). Pass y for objects sitting on
    *  the road/cliff (quad stays flat there); omit it for terrain objects —
-   *  the decal then samples terrainHeight and tilts to the local slope. */
+   *  the decal then samples terrainHeight and tilts to the local slope. An
+   *  entry queued at the exact (x, z) of a tree that _conformTrees or
+   *  _treelineLaw scales away is dropped by the bake, unless something live
+   *  in a point-recorded registry stands on the same coordinates. Culls that
+   *  run after the constructor (applyRouteDensity, the stage validator) do
+   *  NOT drop it; see _buildContactShadows for what is and is not covered. */
   _addShadow(x, z, r, y = null) {
     this._shadows.push({ x, z, r, y });
   }
@@ -20755,6 +21026,85 @@ export class Track {
   _buildContactShadows() {
     const specs = this._shadows;
     if (!specs.length) return;
+    // A CULLED TREE TAKES ITS DECAL WITH IT. `_conformTrees` and
+    // `_treelineLaw` scale a rejected tree to 0.0001 and turn its collider
+    // off, and neither knows this queue exists, so the AO decal stayed behind
+    // on bare ground — a dark 0.4-opacity ring under nothing at all.
+    //
+    // The pairing is re-derived here from the tree record's own coordinates
+    // rather than threaded through `_addShadow`: at all 13 tree sites that
+    // queue a decal, the x/z handed to _addShadow are the SAME expressions
+    // reading the SAME object as the record's x/z with no arithmetic between
+    // them, so the two are bit-identical doubles and the string key matches
+    // exactly. That keeps every registration site and _addShadow's ~60 callers
+    // out of the blast radius. Neither cull mutates tr.x or tr.z (the cull
+    // block writes r, solid and culled; the seating branch writes tr.y), so
+    // the key is still the value that was registered.
+    //
+    // A key is a POSITION, though, not a tree, and a position is not owned by
+    // the tree alone. The first cut of this seeded `live` from `this.trees`
+    // only and claimed a live object's shadow could not be blanked; review
+    // falsified that on CANYON RUN with an editor-authored boulder and pine
+    // at x 868.9, z 316.5 (src/editor.js serialises nature props to 0.1 u,
+    // so exact coincidence is ordinary authoring, not a freak): the pine was
+    // culled, the boulder kept its stone collider and lost its decal, and
+    // the only trace was `retracted` exceeding `keys`. Reproduced on the
+    // tree-only seeding by pushing a stone solid and a decal onto a culled
+    // tree's exact coordinates and re-baking: 0 decals left at that point,
+    // retracted 108 against 107 keys on CANYON RUN, 10 against 9 on GLACIER
+    // COL. With the seeding below the same probe keeps both decals, shared 1,
+    // over 0, on both worlds.
+    //
+    // So `live` seeds every POINT-RECORDED registry that can own a decal — the
+    // surviving trees, solids, buildings and props, and obstacles, tyre
+    // stacks, banners and bushes — and a culled key that any of them shares
+    // is dropped with both decals kept. Seeding is safe to widen in one
+    // direction only: an extra live key can only PREVENT a retraction, never
+    // cause one, so the worst it can do is leave a culled tree's orphan where
+    // something else stands, which is the conservative trade already taken
+    // for two trees on one coordinate.
+    //
+    // What this does NOT protect, stated so nobody relies on it: `barriers`
+    // are segments (x1/z1 to x2/z2) with no single point to key on, and some
+    // decals are queued with no registry behind them at all — gantry legs,
+    // and boulders too small to be given a solid. A culled tree landing on one
+    // of those exact coordinates would still take that decal with it. Review
+    // reproduced the mechanism by pushing a banner onto a culled cactus on
+    // CANYON RUN; it has not occurred on its own on any world measured.
+    //
+    // Nor is this the only cull. It covers `_conformTrees` and `_treelineLaw`,
+    // the two that run before this bake. `applyRouteDensity` and the stage
+    // validator's cullTree/cullSolid (src/stagecheck.js) run AFTER the
+    // constructor, on an already-baked decal mesh, and leave their own
+    // orphans — trees and stone solids alike. Review counted 127 tree decals
+    // and 18 solid decals left that way across 71 worlds (OASIS AMBUSH alone
+    // 39), against 2829 this bake retracted. `_shadowRetract` sees none of
+    // those, so it is not a census of orphans, only of this pass.
+    //
+    // `over` publishes retracted - keys and is a SIGNAL, not a proof. More
+    // decals retracted than culled positions means something nobody culled
+    // lost its shadow — but the figure is net, so a culled tree whose builder
+    // queued no decal (redwood saplings, jungle leaf plants, vine panels)
+    // subtracts one and can cancel a wrongful retraction exactly. A positive
+    // `over` is a certain defect; a zero is not a clean bill.
+    //
+    // `this.solids` here is untrimmed by `_clearRoadSolids`, which runs only
+    // after this bake — the right list, since a collider that pass later
+    // drops keeps its mesh. (It is not literally the whole build-time list:
+    // `_buildOldTown` filters out its own horizon-ring solids earlier, which
+    // is harmless, as those rings queue no decal.) The Number.isFinite guards
+    // match the cull passes' own and keep a NaN coordinate from ever making a
+    // key.
+    const gone = new Set(), live = new Set();
+    for (const tr of this.trees ?? []) {
+      if (!Number.isFinite(tr?.x) || !Number.isFinite(tr.z)) continue;
+      (tr.culled ? gone : live).add(tr.x + ',' + tr.z);
+    }
+    for (const reg of [this.solids, this.buildings, this.props,
+      this.obstacles, this.tireStacks, this.banners, this.bushes]) for (const o of reg ?? [])
+      if (Number.isFinite(o?.x) && Number.isFinite(o.z)) live.add(o.x + ',' + o.z);
+    let shared = 0;
+    for (const key of live) if (gone.delete(key)) shared++;
     const geo = new THREE.PlaneGeometry(2, 2);       // scale r → radius r
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
@@ -20766,8 +21116,14 @@ export class Track {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3();
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    let k = 0;
+    let k = 0, retracted = 0;
     for (const s of specs) {
+      // retracted FIRST, so a decal whose tree has been scaled away never
+      // reaches the terrain sample, the slope conform or the road walk below.
+      // Capacity is unaffected: the mesh is allocated at specs.length and
+      // `mesh.count = k` already publishes the shortfall, so skipping more
+      // entries only lowers k, exactly as the r253 `drop` path already does.
+      if (gone.size && gone.has(s.x + ',' + s.z)) { retracted++; continue; }
       let y = s.y;
       if (y === null) {
         y = this.terrainHeight(s.x, s.z);
@@ -20832,6 +21188,23 @@ export class Track {
       m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(rr, 1, rr));
       mesh.setMatrixAt(k++, m4);
     }
+    // Build telemetry, the same family as _treesConformed, _treelineCull,
+    // _solidTrim, _shadowLaw and _ghostTreesPruned: `retracted` is how many
+    // decals the two build-time culls took with them, `keys` how many
+    // culled-tree positions were unambiguous, and `shared` how many culled
+    // trees kept an orphan because something live stands on the same point —
+    // within THIS pass, the only way a culled tree's decal survives. `over`
+    // is the net signal described above: positive is a certain defect, zero
+    // is not proof, since a decal-less culled tree cancels one.
+    //
+    // NOT covered, and deliberately so: the culls that run after the
+    // constructor has returned — `applyRouteDensity` from main.js and the
+    // stage validator's cullTree/cullSolid (src/stagecheck.js) on the first
+    // race frame — act on a mesh that is already baked, so their orphans
+    // outlive any bake position inside it, and nothing here counts them.
+    // Retracting those needs the final instance index recorded per spec here
+    // and a zero-scale setMatrixAt at each cull site, which is a larger change.
+    this._shadowRetract = { keys: gone.size, shared, retracted, over: retracted - gone.size };
     mesh.count = k;                    // ...so the skipped ones are not drawn
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';
@@ -22737,14 +23110,30 @@ export class Track {
     // fog or haze tuning hides a 300 u cone, because at this fog distance the
     // cone IS the fog colour and the haze band behind it is not. Dropped here
     // rather than in `_buildHorizon` so no other world is touched.
+    // ONE NAME, UP TO THREE MESHES. `_buildHorizon` builds one InstancedMesh
+    // per distinct FORM per ring, not one per ring, so a 3-form set leaves
+    // three meshes called 'horizon-hills' and three called 'horizon-peaks'
+    // (track.js:24890). `getObjectByName` is `getObjectByProperty`, which
+    // returns the FIRST match, so this dropped one mesh of each name and left
+    // two thirds of the cone hills and two thirds of the far peaks standing —
+    // at fogFar 780 against rings at 930-1280 u, exactly the silhouette the
+    // negative list forbids. Worse, the material and its gradient map are
+    // shared by every form in a ring (one `mat` argument per `layer` call) and
+    // the form geometries are shared between the near and far ring, so the
+    // disposal below was tearing GPU resources out from under meshes that were
+    // still in the scene. Take every match, and dispose each material once by
+    // identity. The same ~130 ring colliders `place` pushed into `this.solids`
+    // go with them: a stone wall at 930 u with no mesh behind it is the BARE
+    // INTRUDER case, and today's partial removal already orphans a third.
     for (const n of ['horizon-hills', 'horizon-peaks']) {
-      const mesh = this.group.getObjectByName(n);
-      if (!mesh) continue;
-      this.group.remove(mesh);
-      mesh.geometry.dispose();
-      mesh.material.map?.dispose();
-      mesh.material.dispose();
+      const hits = this.group.children.filter((o) => o.name === n);
+      for (const mesh of hits) { this.group.remove(mesh); mesh.geometry.dispose(); }
+      for (const m of new Set(hits.map((o) => o.material))) {
+        m.map?.dispose();
+        m.dispose();
+      }
     }
+    this.solids = this.solids.filter((s) => !s.hzRing);
     const MAX = 2600;                 // deep enough that the back lanes exist
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     bodyGeo.translate(0, 0.5, 0);
@@ -24727,8 +25116,11 @@ export class Track {
           // height", and one rule is the only kind worth having.
           if (!profOf[form]) profOf[form] = this._formProfile(F[form]);
           this.solids.push({
+            // tagged so `_buildOldTown`, which drops the ring meshes behind a
+            // built skyline, can drop their colliders with them instead of
+            // leaving invisible stone at 930-1280 u
             x: px, z: pz, r: w * Math.max(1, zs) * 0.48,
-            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form],
+            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form], hzRing: true,
           });
         }
       }
@@ -24779,12 +25171,21 @@ export class Track {
     const mv = 1 + this._routeElevRange() / 420;
     place(near, 9, 930 * hs, 140 * hs, 48 * mv, 36 * mv, 240 * mv, 210 * mv, 0.82);
     place(far, 8, 1120 * hs, 160 * hs, 135 * mv, 60 * mv, 360 * mv, 300 * mv, 0.76);
+    // The near/far boundary in `meshes` is how many meshes `layer` PUSHED for
+    // the near ring, and `layer` de-duplicates by form name — so it is the
+    // distinct-form count, which equals `set.length` only when no form
+    // repeats. SETS[5] is ['dome','ridge','dome'], so on the ids that draw it
+    // `meshes` holds 4 entries against a set length of 3 and index 2 — the FAR
+    // ring's dome — was labelled 'horizon-hills'. The names are the handle
+    // `_buildOldTown` deletes the geological skyline by, so the mislabel
+    // changed which ring survived behind LIMESTONE COAST and PORTO GRANDE.
+    const nearCount = new Set(set).size;
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       // named so a world whose skyline must be built, not geological, can drop
       // them (OLD TOWN — see _buildOldTown)
-      mesh.name = mi++ < set.length ? 'horizon-hills' : 'horizon-peaks';
+      mesh.name = mi++ < nearCount ? 'horizon-hills' : 'horizon-peaks';
       if (mesh.count) this.group.add(mesh);
     }
     if (T.massif) this._buildMassif(m4);
@@ -27187,8 +27588,12 @@ export class Track {
       const y = this._seatY(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
       // carry the instance so a knocked-loose stone can actually be SEEN to go
+      // ...and its snow cap, which is a separate instance at the same index in
+      // `caps`. Every path that retires a boulder edits `ob.im` alone, so on
+      // the snow and glacial worlds a culled or punted rock left its white cap
+      // hanging over bare ground. `cap` is null on capless themes.
       if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone',
-        inst: rk, im: rocks, sc: s });
+        inst: rk, im: rocks, sc: s, cap: caps, capInst: rk });
       const rot = Math.random() * Math.PI * 2;
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
@@ -27455,7 +27860,32 @@ export class Track {
       tr.hp = undefined;                 // re-derived from size on the next hit
       trees++;
     }
-    return { buildings, trees };
+    // Tyre stacks and sponsor boards are the same class of smashable and
+    // were never stood back up: resetRace reuses this Track, so every chicane
+    // stack and board knocked flat in race 1 was still missing in race 2,
+    // neither drawn nor solid. Only a stack with its smash-time m0 comes
+    // back; the gate-clear cull zeroes WITHOUT one and sets `culled`, and
+    // that cull is permanent.
+    let tires = 0, banners = 0;
+    for (const st of this.tireStacks ?? []) {
+      if (!st.dead || st.culled || !st.m0 || !this._tireMesh) continue;
+      st.ids.forEach((id, k) => this._tireMesh.setMatrixAt(id, st.m0[k]));
+      this._tireMesh.instanceMatrix.needsUpdate = true;
+      st.dead = false;
+      tires++;
+    }
+    for (const b of this.banners ?? []) {
+      if (!b.dead) continue;
+      if (b.kind === 'fence') {
+        if (!b.m0 || !this._guardFenceMesh) continue;
+        this._guardFenceMesh.setMatrixAt(b.id, b.m0);
+        this._guardFenceMesh.instanceMatrix.needsUpdate = true;
+      } else if (b.group) b.group.visible = true;
+      else continue;
+      b.dead = false;
+      banners++;
+    }
+    return { buildings, trees, tires, banners };
   }
 
   /** CORRIDOR §6 DENSITY RULE — obstacles are rationed around the route.
@@ -27530,6 +27960,12 @@ export class Track {
         _m4.makeScale(0, 0, 0);
         ob.im.setMatrixAt(ob.inst, _m4);
         ob.im.instanceMatrix.needsUpdate = true;
+        // the boulder's snow cap goes with it (see _buildGroundCover): left
+        // alone it floated above the empty seat, which is not instance-honest
+        if (ob.cap && ob.capInst !== undefined) {
+          ob.cap.setMatrixAt(ob.capInst, _m4);
+          ob.cap.instanceMatrix.needsUpdate = true;
+        }
         ob.r = 0; ob.culled = true;
         culled.solids++;
       }
@@ -27725,8 +28161,10 @@ export class Track {
     const hayGeo = rectHay
       ? new THREE.BoxGeometry(1.7, 0.95, 0.95)
       : (() => { const g = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10); g.rotateZ(Math.PI / 2); return g; })();
+    // The worlds r104 cleared of straw (hayCount: 0) define no hayColor; the
+    // mesh is still built, and an undefined colour warns and renders white.
     const hay = new THREE.InstancedMesh(
-      hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), Math.max(hayCount, 1)
+      hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor ?? 0xd8b95e, roughness: 1 }), Math.max(hayCount, 1)
     );
     hay.castShadow = true;
     let hk = 0;
@@ -27742,6 +28180,16 @@ export class Track {
       const p = this._trackSidePos(hayNear, hayFar);
       return p && !this._inWater(p.x, p.z) ? p : null;
     }, (p) => {
+      // BUDGET FIRST. `hayCount` is the instance capacity allocated above, and
+      // the two `hk < hayCount` guards below already treat it as the cap on
+      // total bales — but THIS write was unguarded, and the rect style lays up
+      // to three bales per call while _scatter still calls back `hayCount`
+      // times. Averaging 1.8 bales a group, hk ran ~44% past the buffer on
+      // every harvest world: setMatrixAt silently dropped the overflow (a
+      // typed-array write past the end is a no-op) and then `hay.count = hk`
+      // told the renderer to draw instances whose matrices were never
+      // allocated, plus a contact shadow under each phantom bale.
+      if (hk >= hayCount) return;
       const yaw = Math.random() * Math.PI;
       q.setFromAxisAngle(up, yaw);
       const baseY = this._seatY(p.x, p.z) + (rectHay ? 0.48 : 0.8);
@@ -27959,6 +28407,9 @@ export class Track {
     // guard-fence bay: zero its instance and hand back a loose bay to fling
     if (b.kind === 'fence') {
       if (!this._guardFenceMesh) return null;
+      // keep the pristine bay transform so restoreSmashed can stand it back
+      // up on a restart (same pattern as smashBuilding's p.m0)
+      if (!b.m0) { b.m0 = new THREE.Matrix4(); this._guardFenceMesh.getMatrixAt(b.id, b.m0); }
       _m4.makeScale(0, 0, 0);
       this._guardFenceMesh.setMatrixAt(b.id, _m4);
       this._guardFenceMesh.instanceMatrix.needsUpdate = true;
@@ -27973,10 +28424,16 @@ export class Track {
     const board = new THREE.Mesh(b.board.geometry, b.board.material);
     board.position.y = 2.6;
     g.add(board);
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7),
-      new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 })
-    );
+    // One post geometry and material per Track, like the loose tyres below.
+    // A fresh pair per smash leaked: the flung post becomes debris, and
+    // resetRace and the DEBRIS_MAX cap only detach debris, so each board's
+    // cylinder buffers stayed registered with the renderer for the session.
+    // Track.dispose frees the shared pair.
+    if (!this._smashPostGeo) {
+      this._smashPostGeo = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
+      this._smashPostMat = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 });
+    }
+    const post = new THREE.Mesh(this._smashPostGeo, this._smashPostMat);
     post.position.set(0, 1.7, -0.1);
     g.add(post);
     g.position.set(b.x, b.y, b.z);
@@ -27989,6 +28446,11 @@ export class Track {
   smashTireStack(st) {
     if (!st || st.dead || !this._tireMesh) return null;
     st.dead = true;
+    // keep the pristine transforms for restoreSmashed: the stack was laid
+    // with per-tyre jitter, so it cannot be rebuilt from st.x/st.z alone
+    if (!st.m0) st.m0 = st.ids.map((id) => {
+      const m = new THREE.Matrix4(); this._tireMesh.getMatrixAt(id, m); return m;
+    });
     _m4.makeScale(0, 0, 0);
     for (const id of st.ids) this._tireMesh.setMatrixAt(id, _m4);
     this._tireMesh.instanceMatrix.needsUpdate = true;
@@ -29366,11 +29828,21 @@ export class Track {
    *  geometries and textures are NOT garbage collected on their own, and a
    *  player hopping between tracks would otherwise leak a world each time.
    *
-   *  Shared module-level assets (the prop geometry cache, the texture makers'
-   *  memoised canvases) are deliberately left alone: they are reused by the
-   *  next world and disposing them would cost a rebuild for nothing. */
+   *  Shared module-level assets (the prop geometry/material cache, the gable
+   *  prism, the texture makers' memoised canvases) are left alone: they are
+   *  reused by the next world and disposing them would cost a rebuild for
+   *  nothing. That is enforced, not assumed — `SHARED_ASSETS` and
+   *  `userData.shared` are the two opt-outs `disposeSubtree` honours. This
+   *  paragraph used to assert it while the walk was in fact freeing the prop
+   *  cache on every swap. */
   dispose() {
     disposeSubtree(this.group);
+    // The smash stand-ins' shared assets live under neither subtree once
+    // resetRace or the debris cap has detached every piece that used them,
+    // so free them by hand. A repeat dispose (worldLayer's walk got there
+    // first) is harmless: r160's dispose listener removes itself.
+    this._smashPostGeo?.dispose(); this._smashPostMat?.dispose();
+    this._looseTireGeo?.dispose(); this._looseTireMat?.dispose();
     this.scene.remove(this.group);
     // drop the world-sized lookup tables too — these are the big retained
     // arrays (900 centreline samples, every collider, the river grid)

@@ -1,11 +1,23 @@
 // DOM HUD: circular speedometer, standings, weapon status. (NO minimap — hard rule.)
 const $ = (id) => document.getElementById(id);
 const SUFFIX = ['ST', 'ND', 'RD', 'TH', 'TH', 'TH', 'TH', 'TH'];
+// World units per second to the km/h the SPEEDOMETER shows. The working spec
+// fixes every speed ceiling in this displayed unit ("the spec's numbers come
+// from recordings of the HUD"), so anything that quotes a speed to the player
+// must use this factor or it promises a number the gauge can never read.
+// Exported for exactly that: the garage quoted top speed at x3.6 and so
+// overstated it by 16% against the needle.
+export const HUD_KMH = 3.1;
 
 export function fmtTime(s) {
   if (!isFinite(s)) return '–:––.–';
-  const m = Math.floor(s / 60);
-  const sec = s - m * 60;
+  // Round to the displayed tenth BEFORE splitting off the minutes. Splitting
+  // first and rounding second let the seconds field carry the rounding up past
+  // its own range: at s = 59.96, toFixed(1) on 59.96 is "60.0", so the clock
+  // read "0:60.0" for one frame of every minute boundary instead of "1:00.0".
+  const t = Math.round(s * 10) / 10;
+  const m = Math.floor(t / 60);
+  const sec = t - m * 60;
   return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
 }
 
@@ -95,7 +107,14 @@ export class Hud {
     return Math.max(1, Math.min(5, Math.floor((floor - top - 8) / ROW)));
   }
 
-  show() { this.el.hud.classList.add('on'); }
+  // show() is called once per race, from startRace, so it is where the hull
+  // watch re-baselines. _lastHealth used to survive from the last finished
+  // frame of the previous race: after a garage swap to a lower-hull car, or
+  // on a world whose kit cuts the hull, the first countdown frame read the
+  // lower start figure as a hit and flashed the bar, pulsed the vignette and
+  // floated a damage number over a car nothing had touched. With null here
+  // the first update takes the new start hull as its baseline (drop = 0).
+  show() { this._lastHealth = null; this.el.hud.classList.add('on'); }
   hide() { this.el.hud.classList.remove('on'); }
 
   // HARD RULE (user): NO MINIMAPS — ever. Do not reintroduce a map overlay
@@ -236,7 +255,7 @@ export class Hud {
   // ---------- per-frame update ----------
   update(dt) {
     const g = this.game, p = g.player;
-    const kmh = Math.round(Math.abs(p.speedAlong) * 3.1);
+    const kmh = Math.round(Math.abs(p.speedAlong) * HUD_KMH);
     // r302 (user): the gauge is BACK — the corner number is deleted, the
     // dial carries speed, revs and gear. Porsche discipline: the tach is
     // the hero, speed is digits inside it. Redrawn at ~30 Hz, not per
@@ -339,12 +358,23 @@ export class Hud {
     }
     if (this.el.strip) this.el.strip.style.display = (g.missionMode || g.freeRoam) ? 'none' : '';
 
+    // The NUMBER is hull points; the BAR is a fraction of this car's own hull.
+    // Both were driven off the raw point count — `width = hp + '%'` — which is
+    // only correct for a 100-point car, and no car in the game has 100:
+    // PlayerCar takes maxHealth from its catalogue entry (vehicles.js:6284),
+    // armour adds 15 a level (main.js:5080) and a kit multiplies it
+    // (main.js:11026), so the real range runs from 70 to about 170. A 70-hull
+    // car therefore showed a 70%-full bar at FULL health, and a 170-hull one
+    // read completely full until it had already lost 40% of its hull. The
+    // colour steps inherited the same error and turned amber at 71% of a
+    // small car's hull and at 29% of a big one's.
     const hp = Math.max(0, Math.round(p.health));
-    this.el.health.style.width = hp + '%';
+    const pct = Math.max(0, Math.min(100, (p.health / (p.maxHealth || 100)) * 100));
+    this.el.health.style.width = pct + '%';
     this.el.healthNum.textContent = hp;
-    this.el.health.style.background = hp > 50
+    this.el.health.style.background = pct > 50
       ? 'linear-gradient(90deg,#2fb84a,#7de08a)'
-      : hp > 25 ? 'linear-gradient(90deg,#ffb52e,#ffe86b)' : 'linear-gradient(90deg,#e8402a,#ff8b3b)';
+      : pct > 25 ? 'linear-gradient(90deg,#ffb52e,#ffe86b)' : 'linear-gradient(90deg,#e8402a,#ff8b3b)';
     // §4 HULL PRESENTATION, watched off the NUMBER so no damage path can
     // forget to announce itself: bar flash (120 ms), edge vignette scaled by
     // the size of the hit over 20, a floating number spawned AT THE CAR (the
@@ -492,8 +522,14 @@ export class Hud {
       a.style.display = 'block';
       n++;
     };
+    // `m.active` was tested here, but `active` is a BULLET field: the pooled
+    // bullets carry it, missiles never do (weapons.js:344 builds them without
+    // one and weapons.js:665 splices a spent missile out of the array instead,
+    // so array membership IS liveness). The guard was therefore never true and
+    // the only threat arrow the HUD still has — the one this docstring calls
+    // combat information the race cannot fairly withhold — never drew once.
     for (const m of (g.weapons?.missiles ?? [])) {
-      if (m.active && m.target === p) place(m.mesh?.position ?? m.pos, true);
+      if (m.target === p) place(m.mesh?.position ?? m.pos, true);
     }
     for (let k = n; k < pool.length; k++) pool[k].style.display = 'none';
   }

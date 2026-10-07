@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core';
 const [port, out, spin] = [process.argv[2] || '8901',
   process.argv[3] || 'tools-scratch/shot-bay-pair.png', process.argv[4] || '2.05'];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 460, height: 900 }, hasTouch: true,
   isMobile: true, deviceScaleFactor: 3 });

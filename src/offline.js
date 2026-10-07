@@ -71,7 +71,12 @@
           'The game already runs offline. Tap to also store the world art (about 1 MB).');
       }
     } else {
-      paint('partial', `✈ STORING ${d.cached}/${d.core ?? d.total}`,
+      // `coreCached`, not `cached`: this branch is the NOT-YET-PLAYABLE one,
+      // so it must count progress toward CORE alone. `cached` totals CORE plus
+      // the 58 stored previews, which on a device that has the art but is
+      // still short a few game files printed a numerator above its own
+      // denominator — "✈ STORING 88/38".
+      paint('partial', `✈ STORING ${d.coreCached ?? d.cached}/${d.core ?? d.total}`,
         'Storing the game for offline play — stay online a moment.');
     }
   });
@@ -114,9 +119,26 @@
   let reloading = false;
   // ...but never yank the world out from under someone mid-race. If a new
   // worker lands while a lap is running, wait for the menu before reloading.
+  // 'paused' counts as mid-race and used to be missing here, which made the
+  // guard fail on the commonest update path of all: main.js:1955 auto-pauses
+  // on backgrounding (`if (document.hidden && this.state === 'race')
+  // this.togglePause()`), and nothing un-pauses on return, so a player who
+  // flicks away mid-lap comes back in state 'paused' — the same moment the
+  // visibilitychange handler below fires `reg.update?.()` looking for a
+  // deploy. The old two-state list read that as idle and reloaded on the
+  // spot, and since nothing persists an in-flight race (no resume key is
+  // written until finishRace banks it) the lap, race time, position, hull
+  // and score were simply gone and the player landed on the title screen.
+  // The "menu" this comment means is the title/garage screen, not the pause
+  // overlay, whose RESUME button goes straight back to 'race'
+  // (main.js:2364-2373). 'finished' stays out deliberately: finishRace has
+  // already banked credits, stars and career progress by then, so a reload
+  // there costs only the results card. The cost of including 'paused' is
+  // that this re-poll now ticks every 2 s for someone who pauses and walks
+  // away; that clears the moment they exit to the menu.
   const reloadWhenIdle = () => {
     const g = window.__game;
-    const racing = g && (g.state === 'race' || g.state === 'countdown');
+    const racing = g && (g.state === 'race' || g.state === 'countdown' || g.state === 'paused');
     if (racing) { setTimeout(reloadWhenIdle, 2000); return; }
     try { sessionStorage.setItem(STAMP_KEY, String(Date.now())); } catch { /* private mode */ }
     location.reload();

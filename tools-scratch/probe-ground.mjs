@@ -4,7 +4,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
 const [id, X, Z] = process.argv.slice(2);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 480, height: 300 } });
 page.setDefaultTimeout(600000);
@@ -14,7 +14,12 @@ const r = await page.evaluate(({ X, Z }) => {
   const t = window.__game.track;
   const at = (x, z) => {
     const ns = t._nearestSample(x, z);
-    const blend = t._blendHeight(ns.d, t.center[ns.i].y, x, z);
+    // ns.i is _blendHeight's `bi`: without it the r400 bank block is skipped
+    // (it runs only when bi is given), so on a banking world this column was
+    // the UNBANKED blend while the game, which always passes bi, computes the
+    // banked one — the tool for taking the height apart printed a term the
+    // game never uses.
+    const blend = t._blendHeight(ns.d, t.center[ns.i].y, x, z, ns.i);
     return { d: +ns.d.toFixed(2), i: ns.i, roadY: +t.center[ns.i].y.toFixed(2),
       hill: +t._hillNoise(x, z).toFixed(2), blend: +blend.toFixed(2),
       valley: +t._valleyWall(ns.d).toFixed(2),

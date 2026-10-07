@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:8901';
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const out = {};
 for (const [id, name] of [[74, 'IL BUDELLO'], [66, 'GLACIER COL'], [1, 'PINE VALLEY']]) {
